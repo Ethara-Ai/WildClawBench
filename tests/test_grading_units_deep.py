@@ -979,6 +979,8 @@ def test_grade_council_zero_survivors_all_abstain(monkeypatch):
     assert out["criteria_abstained"] == 1
     assert out["abstention_flags"] == [0]
     assert out["criteria"][0]["resolved_by"] == "human_eval"
+    # No verdict from anyone: the 0.0 is the no-signal sentinel, not a grade.
+    assert "judge council cast no verdicts" in out["error"]
 
 
 # ---------------------------------------------------------------------------
@@ -1545,3 +1547,313 @@ def test_duplicate_label_numbering_follows_collection_order_not_size(tmp_path):
     numbered_hdr = "----- DELIVERABLE: final.md [2] -----\n"
     assert ev[ev.index(plain_hdr) + len(plain_hdr):].startswith("ARTIFACT COPY")
     assert ev[ev.index(numbered_hdr) + len(numbered_hdr):].startswith("older")
+
+
+# --- ported from neo-version bd8afc26 (phase 1: code/svg/ipynb evidence) ---
+def test_code_and_svg_deliverables_included_verbatim(tmp_path):
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "build_hero.py").write_text("CREDIT = 'fig: N.F. / 10-04'", encoding="utf-8")
+    (results / "chart.svg").write_text("<svg><text>Re-cut minutes</text></svg>", encoding="utf-8")
+    (results / "deploy.sh").write_text("echo deploying", encoding="utf-8")
+    (results / "app.js").write_text("console.log('boot')", encoding="utf-8")
+    ev = grading._payload_text(grading._gather_evidence(results, "t", budget=None))
+    assert "fig: N.F. / 10-04" in ev
+    assert "Re-cut minutes" in ev
+    assert "echo deploying" in ev
+    assert "console.log('boot')" in ev
+
+
+def test_ipynb_extraction_keeps_source_and_text_drops_base64(tmp_path):
+    import json as _json
+    nb = {
+        "cells": [
+            {"cell_type": "code", "source": ["x = compute_reward()\n"],
+             "outputs": [
+                 {"output_type": "stream", "text": ["reward=0.42\n"]},
+                 {"output_type": "display_data",
+                  "data": {"image/png": "iVBORw0KGgoAAAANSUhEU" * 500,
+                           "text/plain": ["<Figure 640x480>"]}},
+             ]},
+            {"cell_type": "markdown", "source": ["## Analysis section"], "outputs": []},
+        ]
+    }
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "analysis.ipynb").write_text(_json.dumps(nb), encoding="utf-8")
+    out = grading._extract_text_deliverable(results / "analysis.ipynb")
+    assert "x = compute_reward()" in out
+    assert "reward=0.42" in out
+    assert "## Analysis section" in out
+    assert "<Figure 640x480>" in out
+    assert "iVBORw0KGgo" not in out
+
+
+
+
+# --- ported from neo-version 1c4babd9 / 21a7633c (judge chunk retries) ---
+def _fake_grade_success(n):
+    return {
+        "overall_score": 1.0, "rubric_weights_percentage": 100.0,
+        "criteria_total": n, "criteria_passed": n, "criteria_failed": 0,
+        "criteria_abstained": 0, "criteria": [
+            {"id": i, "weight": 1.0, "satisfied": True, "passed": True,
+             "resolved_by": "unanimous", "human_eval": "", "voters": 1,
+             "criterion": f"c{i}", "votes": "Yes", "satisfied_by_judge": [True],
+             "voted_by_judge": [True], "rationales_by_judge": ["r"],
+             "truncation_affected_by_judge": [False], "judges": ["sonnet"],
+             "is_positive": True} for i in range(n)],
+        "judge_model": "council", "judge_council": {"members": ["m"], "surviving": ["m"], "failed": [], "per_member_verdict_count": {"sonnet": n}},
+        "truncation_flags": [], "abstention_flags": [], "usage": dict(grading._ZERO_USAGE),
+    }
+
+
+def test_parse_truncation_retries_same_size_once(tmp_path, monkeypatch):
+    monkeypatch.setenv("JUDGE_COUNCIL_SONNET_ARN", "bedrock/arn:aws:bedrock:x:1:application-inference-profile/s1")
+    monkeypatch.setenv("JUDGE_GPT_PRIMARY", "0")
+    monkeypatch.setattr(grading, "validate_judge_pricing", lambda members: None)
+    calls = []
+
+    def fake_council(chunk, system, user_for_member, members, images=None):
+        calls.append(len(chunk))
+        if len(calls) == 1:
+            return {"overall_score": 0.0, "error": "parse: expected up to 6 verdicts, matched 2", "usage": dict(grading._ZERO_USAGE)}
+        return _fake_grade_success(len(chunk))
+
+    monkeypatch.setattr(grading, "_grade_council", fake_council)
+    rubrics = [{"criterion": f"c{i}", "weight": 1} for i in range(6)]
+    ws = tmp_path / "task_output" / "results"; ws.mkdir(parents=True)
+    out = grading.grade_with_rubric(rubrics, "task", ws, transcript_text="t")
+    assert calls == [6, 6], "one same-size retry, no halving needed"
+    assert out["criteria_abstained"] == 0
+
+
+def test_parse_truncation_persistent_falls_back_to_halving(tmp_path, monkeypatch):
+    monkeypatch.setenv("JUDGE_COUNCIL_SONNET_ARN", "bedrock/arn:aws:bedrock:x:1:application-inference-profile/s1")
+    monkeypatch.setenv("JUDGE_GPT_PRIMARY", "0")
+    monkeypatch.setattr(grading, "validate_judge_pricing", lambda members: None)
+    calls = []
+
+    def fake_council(chunk, system, user_for_member, members, images=None):
+        calls.append(len(chunk))
+        if len(chunk) > 3:
+            return {"overall_score": 0.0, "error": "parse: expected up to 6 verdicts, matched 1", "usage": dict(grading._ZERO_USAGE)}
+        return _fake_grade_success(len(chunk))
+
+    monkeypatch.setattr(grading, "_grade_council", fake_council)
+    rubrics = [{"criterion": f"c{i}", "weight": 1} for i in range(6)]
+    ws = tmp_path / "task_output" / "results"; ws.mkdir(parents=True)
+    out = grading.grade_with_rubric(rubrics, "task", ws, transcript_text="t")
+    assert calls == [6, 6, 3, 3], "full, retry, then two clean halves"
+    assert out["criteria_abstained"] == 0
+    assert out["criteria_passed"] == 6
+
+
+def test_ok_but_partial_sonnet_coverage_retries(tmp_path, monkeypatch):
+    monkeypatch.setenv("JUDGE_COUNCIL_SONNET_ARN", "bedrock/arn:aws:bedrock:x:1:application-inference-profile/s1")
+    monkeypatch.setenv("JUDGE_GPT_PRIMARY", "0")
+    monkeypatch.setattr(grading, "validate_judge_pricing", lambda members: None)
+    calls = []
+
+    def fake_council(chunk, system, user_for_member, members, images=None):
+        calls.append(len(chunk))
+        if len(calls) == 1:
+            partial = _fake_grade_success(len(chunk))
+            partial["judge_council"]["per_member_verdict_count"] = {"sonnet": 2}
+            partial["criteria_abstained"] = len(chunk) - 2
+            return partial
+        return _fake_grade_success(len(chunk))
+
+    monkeypatch.setattr(grading, "_grade_council", fake_council)
+    rubrics = [{"criterion": f"c{i}", "weight": 1} for i in range(6)]
+    ws = tmp_path / "task_output" / "results"; ws.mkdir(parents=True)
+    out = grading.grade_with_rubric(rubrics, "task", ws, transcript_text="t")
+    assert calls == [6, 6], "ok-but-partial sonnet coverage must retry same-size"
+    assert out["criteria_abstained"] == 0
+
+
+def test_glm_partial_coverage_alone_does_not_retry(tmp_path, monkeypatch):
+    monkeypatch.setenv("JUDGE_COUNCIL_SONNET_ARN", "bedrock/arn:aws:bedrock:x:1:application-inference-profile/s1")
+    monkeypatch.setenv("JUDGE_GPT_PRIMARY", "0")
+    monkeypatch.setattr(grading, "validate_judge_pricing", lambda members: None)
+    calls = []
+
+    def fake_council(chunk, system, user_for_member, members, images=None):
+        calls.append(len(chunk))
+        res = _fake_grade_success(len(chunk))
+        res["judge_council"]["per_member_verdict_count"] = {"sonnet": len(chunk), "glm": 1}
+        return res
+
+    monkeypatch.setattr(grading, "_grade_council", fake_council)
+    rubrics = [{"criterion": f"c{i}", "weight": 1} for i in range(6)]
+    ws = tmp_path / "task_output" / "results"; ws.mkdir(parents=True)
+    grading.grade_with_rubric(rubrics, "task", ws, transcript_text="t")
+    assert calls == [6], "glm small-context truncation is by-design, no retry"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: offline audio evidence (judge_asr)
+# ---------------------------------------------------------------------------
+
+
+
+
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: offline audio evidence (judge_asr) — ported from neo-version f3bd6862
+# ---------------------------------------------------------------------------
+
+
+def _write_wav(path, seconds=1.0, rate=16000):
+    import wave as _wave, struct as _struct, math
+    with _wave.open(str(path), "wb") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate)
+        n = int(seconds * rate)
+        w.writeframes(b"".join(
+            _struct.pack("<h", int(8000 * math.sin(i / 20))) for i in range(n)))
+
+
+def test_audio_collected_with_own_size_gate(tmp_path):
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    _write_wav(results / "memo.wav", seconds=1.0)
+    names = [f.name for f in grading._collect_deliverable_files(results)]
+    assert "memo.wav" in names
+
+
+def test_audio_marker_uses_transcript_when_asr_available(tmp_path, monkeypatch):
+    from src.utils import judge_asr
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    _write_wav(results / "memo.wav")
+    monkeypatch.setattr(judge_asr, "transcribe", lambda p: "hello from the memo")
+    ev = grading._payload_text(grading._gather_evidence(results, "t", budget=None))
+    assert "memo.wav (audio, transcribed offline)" in ev
+    assert "hello from the memo" in ev
+
+
+def test_audio_marker_falls_back_to_wav_duration(tmp_path, monkeypatch):
+    from src.utils import judge_asr
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    _write_wav(results / "memo.wav", seconds=2.0)
+    monkeypatch.setattr(judge_asr, "transcribe", lambda p: None)
+    ev = grading._payload_text(grading._gather_evidence(results, "t", budget=None))
+    assert "audio 2.0s, 16000 Hz, 1 channel(s)" in ev
+    assert "transcript unavailable" in ev
+
+
+def test_audio_marker_presence_only_for_undecodable(tmp_path, monkeypatch):
+    from src.utils import judge_asr
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "song.mp3").write_bytes(b"\xff\xfb\x90\x00" + b"\x00" * 64)
+    monkeypatch.setattr(judge_asr, "transcribe", lambda p: None)
+    ev = grading._payload_text(grading._gather_evidence(results, "t", budget=None))
+    assert "song.mp3" in ev and "audio transcript unavailable" in ev
+
+
+def test_wav_duration_marker_stdlib_only(tmp_path):
+    from src.utils import judge_asr
+    _write_wav(tmp_path / "clip.wav", seconds=3.5, rate=8000)
+    assert judge_asr.wav_duration_marker(tmp_path / "clip.wav") == \
+        "audio 3.5s, 8000 Hz, 1 channel(s)"
+
+
+def test_decode_wav_stdlib(tmp_path):
+    from src.utils import judge_asr
+    _write_wav(tmp_path / "clip.wav", seconds=0.5)
+    out = judge_asr._decode_wav(tmp_path / "clip.wav")
+    assert out is not None
+    samples, rate = out
+    assert rate == 16000 and len(samples) == 8000
+    assert all(-1.0 <= s <= 1.0 for s in samples)
+
+
+def test_transcribe_disabled_by_env(tmp_path, monkeypatch):
+    from src.utils import judge_asr
+    monkeypatch.setenv("WCB_JUDGE_AUDIO_TRANSCRIBE", "0")
+    _write_wav(tmp_path / "clip.wav")
+    assert judge_asr.transcribe(tmp_path / "clip.wav") is None
+
+
+# --- ported from neo-version 14551784 (scratch exclusion) ---
+def _results_dir(tmp_path):
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True, exist_ok=True)
+    return results
+
+
+_SCRATCH_DIRS = (".scratch", ".tmp", ".cache", "work", "intermediate", "_wip", ".hidden")
+
+
+def test_in_scratch_subdir_covers_dot_prefixed_and_new_names(tmp_path):
+    results = _results_dir(tmp_path)
+    for d in _SCRATCH_DIRS:
+        (results / d).mkdir()
+        (results / d / "note.txt").write_text("x", encoding="utf-8")
+        assert grading._in_scratch_subdir(results / d / "note.txt"), d
+    (results / "final.md").write_text("real", encoding="utf-8")
+    assert not grading._in_scratch_subdir(results / "final.md")
+
+
+def test_gather_evidence_dot_scratch_demoted_and_relabelled(tmp_path):
+    results = _results_dir(tmp_path)
+    (results / ".scratch").mkdir()
+    (results / ".scratch" / "cmp_pdf.txt").write_text("AGENT NOTES", encoding="utf-8")
+    (results / "final.md").write_text("REAL DELIVERABLE" * 300, encoding="utf-8")
+
+    ev = grading._payload_text(grading._gather_evidence(results, "tail", budget=None))
+    assert ev.index("final.md") < ev.index("cmp_pdf.txt")
+    # No rubric-named file: the block is kept (may be the only evidence) but
+    # must never present itself as a deliverable.
+    assert "----- SCRATCH: .scratch/cmp_pdf.txt -----" in ev
+    assert "DELIVERABLE: .scratch/cmp_pdf.txt" not in ev
+    assert "AGENT NOTES" in ev
+    assert "----- DELIVERABLE: final.md -----" in ev
+
+
+def test_gather_evidence_scratch_excluded_when_named_file_present(tmp_path):
+    results = _results_dir(tmp_path)
+    (results / ".scratch").mkdir()
+    (results / ".scratch" / "cmp_pdf.txt").write_text("SCRATCH CLAIM", encoding="utf-8")
+    (results / ".scratch" / "b.txt").write_text("MORE SCRATCH", encoding="utf-8")
+    (results / "handout.md").write_text("DELIVERED CONTENT", encoding="utf-8")
+
+    ev = grading._payload_text(grading._gather_evidence(
+        results, "tail", budget=None, rubric_names=frozenset({"handout.md"})
+    ))
+    assert "DELIVERED CONTENT" in ev
+    assert "SCRATCH CLAIM" not in ev
+    assert "MORE SCRATCH" not in ev
+    assert "DELIVERABLE: .scratch/cmp_pdf.txt" not in ev
+    assert ("----- SCRATCH (agent work-product, not graded): "
+            ".scratch/b.txt, .scratch/cmp_pdf.txt -----") in ev
+
+
+def test_gather_evidence_scratch_kept_when_no_named_deliverable(tmp_path):
+    results = _results_dir(tmp_path)
+    (results / "tmp").mkdir()
+    (results / "tmp" / "workings.md").write_text("PARTIAL WORK", encoding="utf-8")
+
+    ev = grading._payload_text(grading._gather_evidence(results, "tail", budget=None, rubric_names=frozenset()))
+    assert "PARTIAL WORK" in ev
+    assert "----- SCRATCH: tmp/workings.md -----" in ev
+    assert "agent work-product, not graded" not in ev
+
+
+def test_gather_evidence_scratch_line_survives_budget_cut(tmp_path):
+    results = _results_dir(tmp_path)
+    (results / ".scratch").mkdir()
+    (results / ".scratch" / "dump.txt").write_text("S" * 5000, encoding="utf-8")
+    (results / "handout.md").write_text("H" * 5000, encoding="utf-8")
+
+    ev = grading._payload_text(grading._gather_evidence(
+        results, "T" * 100, budget=3000, rubric_names=frozenset({"handout.md"})
+    ))
+    assert len(ev) <= 3000
+    assert "agent work-product, not graded): .scratch/dump.txt" in ev
+    assert "S" * 100 not in ev
+
+

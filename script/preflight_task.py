@@ -14,6 +14,7 @@ Exit code 0 when there are no FAILs (WARNs are allowed), 1 otherwise.
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import importlib.util
 import json
@@ -28,6 +29,13 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 ENV = REPO / "environment"
 DEFAULT_TASK = REPO / "input" / "IAN_001 -- Bhavik Jain"
+
+# Section 6 enforces the three task-format standards on NEW tasks. Delivered
+# corpora predate them, so --legacy downgrades those FAILs to WARNs instead of
+# forcing edits to tasks that already shipped. It softens FORMAT nits only —
+# section 7 judges whether the task's world can be built at all, and that
+# verdict is the same age as the bundle it is run on.
+LEGACY = False
 
 # OpenClaw native tools that can appear as a loud-inject `service` but are NOT
 # mock HTTP APIs (they deliver in-band to the agent, so they have no env folder).
@@ -374,6 +382,21 @@ def _check_op_modality(label: str, op: dict, host_src: Path) -> None:
         f"{mt or 'unknown'}: {op.get('src')}")
 
 
+# MUST mirror docker_utils._map_workspace_dst's alias list (this script is
+# standalone and cannot import it), each spelling extended with the `home/`
+# segment `data/` staging adds. An alias missing here makes the seed op fall
+# through unrecognised, so its mirrored-payload check never runs.
+_SEED_DST_DATA_PREFIXES = (
+    "/workspace/home/",
+    "/app/home/",
+    "/root/workspace/home/",
+    "/root/.openclaw/workspace/home/",
+    "~/workspace/home/",
+    "/data/home/",
+    "data/home/",
+)
+
+
 def _seed_dst_to_data_rel(dst: str) -> str | None:
     """Map a seed op's container dst to its expected ``data/`` counterpart.
 
@@ -381,7 +404,7 @@ def _seed_dst_to_data_rel(dst: str) -> str | None:
     so ``/workspace/home/<rel>`` is mounted from ``data/<rel>``.
     """
     p = str(dst or "").strip()
-    for prefix in ("/workspace/home/", "/app/home/"):
+    for prefix in _SEED_DST_DATA_PREFIXES:
         if p.startswith(prefix):
             return p[len(prefix):]
     return None
@@ -476,8 +499,173 @@ def check_turns_and_grading(task: Path) -> None:
 
 
 # --------------------------------------------------------------------------- #
-def main() -> int:
-    task = Path(sys.argv[1]).expanduser() if len(sys.argv) > 1 else DEFAULT_TASK
+# 6. task-format standards (derived date / TRUTH.md sections / prompt header)
+# --------------------------------------------------------------------------- #
+def _standard(ok: bool, good: str, bad: str) -> None:
+    """Record a standards check, honouring --legacy for the failing case."""
+    rec(PASS if ok else (WARN if LEGACY else FAIL), good if ok else bad)
+
+
+def _first_existing(task: Path, names) -> Path | None:
+    return next((task / n for n in names if (task / n).is_file()), None)
+
+
+def _prompts_json_facts(task: Path) -> tuple[dict, int | None]:
+    """Identity fields and the real turn count, straight off prompts.json."""
+    pj = task / "prompts.json"
+    if not pj.is_file():
+        return {}, None
+    try:
+        data = json.loads(pj.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}, None
+    if not isinstance(data, dict):
+        return {}, None
+    turns = data.get("turns")
+    return data, len(turns) if isinstance(turns, list) else None
+
+
+def check_task_standards(task: Path) -> None:
+    section("6. task-format standards")
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    try:
+        from src.utils import task_standard as ts
+    except Exception as exc:  # noqa: BLE001
+        rec(FAIL, f"cannot import src.utils.task_standard: {exc}")
+        return
+
+    window = ts.resolve_window(task)
+    _check_derived_date(task, ts, window)
+    _check_truth_md(task, ts)
+    _check_prompt_header(task, ts, window)
+
+
+def _check_derived_date(task: Path, ts, window) -> None:
+    """(A) The bundle's date must come from the task's own window."""
+    if window is None:
+        _standard(False, "", "task declares no window (prompts.json window/turn "
+                            "timestamps or task.yaml window) — CURRENT_DATE "
+                            "cannot be derived and would fall back to a static date")
+        return
+    rec(PASS, f"window {window.start.isoformat()}..{window.end.isoformat()} "
+              f"({window.days} days) from {window.source}")
+    try:
+        from src.utils.harbor.compose import resolve_current_date
+
+        derived = resolve_current_date(task)
+    except Exception as exc:  # noqa: BLE001
+        rec(FAIL, f"cannot resolve CURRENT_DATE: {exc}")
+        return
+    err = ts.check_current_date(derived, window)
+    _standard(err is None, f"CURRENT_DATE {derived} derives from the task window", err or "")
+
+    toml_date = _task_toml_current_date(task)
+    if toml_date is not None:
+        err = ts.check_current_date(toml_date, window)
+        _standard(err is None, f"task.toml CURRENT_DATE {toml_date} inside window",
+                  f"task.toml {err}")
+
+
+_TOML_DATE_RE = re.compile(r'^\s*CURRENT_DATE\s*=\s*"([^"]*)"', re.MULTILINE)
+
+
+def _task_toml_current_date(task: Path) -> str | None:
+    """The CURRENT_DATE a staged task.toml pins, if the bundle carries one."""
+    for candidate in (task / "task.toml", task / "data" / "task.toml"):
+        if candidate.is_file():
+            m = _TOML_DATE_RE.search(candidate.read_text(encoding="utf-8"))
+            return m.group(1) if m else ""
+    return None
+
+
+def _check_truth_md(task: Path, ts) -> None:
+    """(B) TRUTH.md carries exactly the three pilot-rework sections."""
+    truth = _first_existing(task, ts.TRUTH_FILENAMES)
+    if truth is None:
+        _standard(False, "", f"none of {list(ts.TRUTH_FILENAMES)} present — the "
+                             f"task ships no ground-truth narrative")
+        return
+    err = ts.check_truth_sections(truth.read_text(encoding="utf-8"))
+    _standard(err is None,
+              f"{truth.name} has exactly {list(ts.TRUTH_SECTIONS)}", err or "")
+
+
+def _check_prompt_header(task: Path, ts, window) -> None:
+    """(C) The prompt file opens with the five-line header block."""
+    prompt = _first_existing(task, ts.PROMPT_FILENAMES)
+    if prompt is None:
+        _standard(False, "", f"none of {list(ts.PROMPT_FILENAMES)} present")
+        return
+    facts, turn_count = _prompts_json_facts(task)
+    errors = ts.check_prompt_header(
+        prompt.read_text(encoding="utf-8"),
+        task_id=str(facts.get("task_id") or ""),
+        persona=str(facts.get("persona") or ""),
+        timezone=str(facts.get("timezone") or ""),
+        window=window,
+        turn_count=turn_count,
+    )
+    if not errors:
+        rec(PASS, f"{prompt.name} opens with the 5-line header block")
+        return
+    for err in errors:
+        _standard(False, "", f"{prompt.name}: {err}")
+
+
+# --------------------------------------------------------------------------- #
+# 7. world correctness (injection replay + required environment surface)
+# --------------------------------------------------------------------------- #
+def check_world_correctness(task: Path) -> None:
+    """Run the same gate the launcher runs, at authoring time.
+
+    Sections 1-6 check that a bundle is well FORMED. This one checks that the
+    world it describes can actually be built: that every injected write reaches
+    the agent, and that every required service exists, loads under this task's
+    own seeds and survives its own loader.
+
+    ``--legacy`` does not reach these. It exists so a corpus authored before the
+    format standards landed is not forced to re-edit its headers; it was never a
+    licence to run a task whose injection cannot land. A defect here costs a
+    container, a model budget and a graded artifact describing a world that was
+    never there, and that price is the same for old bundles and new ones.
+    """
+    section("7. world correctness (injection replay + required env surface)")
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    try:
+        from src.utils.inject_preflight import FATAL, gate_task
+    except Exception as exc:  # noqa: BLE001
+        rec(FAIL, f"cannot import the task gate: {exc}")
+        return
+    try:
+        report = gate_task(task)
+    except Exception as exc:  # noqa: BLE001
+        rec(FAIL, f"task gate raised: {type(exc).__name__}: {exc}")
+        return
+    for finding in report.findings:
+        rec(FAIL if finding.severity == FATAL else WARN, str(finding))
+    if not report.findings:
+        rec(PASS, f"{report.ops} injected op(s) land and serve; required "
+                  f"environment surface intact ({report.elapsed_ms}ms)")
+    elif not report.fatal:
+        rec(PASS, f"{report.ops} injected op(s) replayed, no fatal findings "
+                  f"({report.elapsed_ms}ms)")
+
+
+# --------------------------------------------------------------------------- #
+def main(argv: list[str] | None = None) -> int:
+    global LEGACY
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("task", nargs="?", default=str(DEFAULT_TASK),
+                    help="task bundle dir (default: IAN_001)")
+    ap.add_argument("--legacy", action="store_true",
+                    help="downgrade task-format-standard FAILs to WARNs, for "
+                         "corpora authored before the standards landed")
+    args = ap.parse_args(sys.argv[1:] if argv is None else argv)
+    LEGACY = args.legacy
+
+    task = Path(args.task).expanduser()
     if not task.is_dir():
         print(f"task dir not found: {task}")
         return 2
@@ -487,6 +675,8 @@ def main() -> int:
     check_mock_data(task)
     check_inject(task, required, distractor)
     check_turns_and_grading(task)
+    check_task_standards(task)
+    check_world_correctness(task)
     print("\n" + "=" * 60)
     print(f"SUMMARY: {_counts[PASS]} pass · {_counts[WARN]} warn · {_counts[FAIL]} fail")
     print("=" * 60)

@@ -3,11 +3,17 @@ or raw infra-failure noise from tool results (see builder._scrub_published_messa
 
 The rich in-memory trajectory must be left untouched so grading still sees what
 the agent actually saw.
+
+Also covers the completion status stamped into meta_info: a lane killed by the
+exec approval gate must not publish as `success` (see the approval-gate section
+at the bottom).
 """
 
 from src.utils.trajectory.builder import (
     _neutralize_infra_text,
     build_published_trajectory,
+    classify_child_completion,
+    ends_with_approval_plea,
 )
 
 # Canonical inner-message keys per Golden_Trajectory.json.
@@ -145,3 +151,147 @@ def test_mock_hostname_redacted_in_tool_result():
     assert "mocks-task-alden_002_haul_out_week-744148" not in cleaned
     assert "mock-services" in cleaned
     assert '{"ok": true}' in cleaned  # real payload preserved
+
+
+# ---------------------------------------------------------------------------
+# Approval-gate completion status.
+#
+# The exec approval gate has no channel to answer in a headless run, so a lane
+# it fires on dies with an `/approve <id>` plea as its last word. Sub-agent
+# lanes have been derived from that ending since the 2026-07-06 audit; the
+# parent lane was still stamped from the run-level verdict alone ("no fatal
+# error" => success), publishing a dead run as a clean one. Both lanes now go
+# through the one detector (ends_with_approval_plea).
+# ---------------------------------------------------------------------------
+
+_PLEA = "/approve exec_01JQ8M4 to run the inline-eval command"
+
+
+def _assistant(text):
+    return {"role": "assistant", "content": [{"type": "text", "text": text}]}
+
+
+def _status(rich, completion_status="success"):
+    return build_published_trajectory(
+        rich, _Task(), completion_status,
+    )["meta_info"]["task_completion_status"]
+
+
+def test_parent_ending_on_approval_plea_is_not_success():
+    rich = _rich(
+        {"role": "user", "content": [{"type": "text", "text": "audit the repo"}]},
+        _assistant(_PLEA),
+    )
+    assert _status(rich) == "blocked_on_approval"
+
+
+def test_parent_finishing_normally_stays_success():
+    rich = _rich(
+        {"role": "user", "content": [{"type": "text", "text": "audit the repo"}]},
+        _assistant("Audit complete: 3 findings, all filed."),
+    )
+    assert _status(rich) == "success"
+
+
+def test_parent_merely_mentioning_approval_stays_success():
+    """Prose about the gate is not a plea: the detector is anchored to the
+    START of the FINAL turn, so neither a mid-run plea the agent recovered
+    from nor a closing report that talks about approval is reclassified."""
+    rich = _rich(
+        {"role": "user", "content": [{"type": "text", "text": "audit the repo"}]},
+        _assistant(_PLEA),  # blocked mid-run...
+        {"role": "user", "content": [{"type": "text", "text": "use the sandbox"}]},
+        _assistant("Reran it in the sandbox; no /approve was needed. Done."),
+    )
+    assert _status(rich) == "success"
+
+
+def test_parent_failure_verdict_is_never_overridden():
+    """An explicit non-success verdict from the caller is the stronger signal
+    (fatal error); the plea must not downgrade it to blocked_on_approval."""
+    rich = _rich(_assistant(_PLEA))
+    assert _status(rich, "failure") == "failure"
+
+
+def test_parent_unset_status_is_classified():
+    """The bundle writer publishes with an empty status (no __completion_status__
+    on the entry); it must still flag the approval-gate ending."""
+    rich = _rich(_assistant(_PLEA))
+    assert _status(rich, "") == "blocked_on_approval"
+    rich_ok = _rich(_assistant("All set."))
+    assert _status(rich_ok, "") == ""
+
+
+def test_parent_takes_only_the_plea_signal_not_aborted():
+    """Parents inherit blocked_on_approval ONLY. The child classifier's
+    `aborted` verdicts (trailing toolCall, non-assistant ending, ...) are
+    run-shape noise at parent level and must not rewrite the run verdict."""
+    trailing_call = _rich(
+        _assistant("looking"),
+        {"role": "assistant", "content": [{"type": "toolCall", "id": "t1", "name": "exec"}]},
+    )
+    assert _status(trailing_call) == "success"
+    ends_on_user = _rich({"role": "user", "content": [{"type": "text", "text": "hi"}]})
+    assert _status(ends_on_user) == "success"
+
+
+def test_parent_meta_info_key_set_unchanged():
+    """meta_info is an exact reference-schema contract: classifying the parent
+    must not smuggle an ended_reason key into it."""
+    rich = _rich(_assistant(_PLEA))
+    out = build_published_trajectory(rich, _Task(), "success")
+    assert list(out["meta_info"].keys()) == [
+        "task_type", "task_description", "task_completion_status",
+        "system_prompt", "platform",
+    ]
+
+
+# --- the shared detector, and the child verdicts it must leave untouched ----
+
+
+def _msgs(*inner):
+    return [{"type": "message", "id": f"m{i}", "message": m}
+            for i, m in enumerate(inner)]
+
+
+def test_detector_matches_only_a_final_leading_plea():
+    assert ends_with_approval_plea(_msgs(_assistant(_PLEA)))
+    assert ends_with_approval_plea(_msgs(_assistant("\n  " + _PLEA)))
+    # not final
+    assert not ends_with_approval_plea(_msgs(_assistant(_PLEA), _assistant("done")))
+    # not leading
+    assert not ends_with_approval_plea(_msgs(_assistant("Please run " + _PLEA)))
+    # word-boundary: a path that merely starts with the same prefix
+    assert not ends_with_approval_plea(_msgs(_assistant("/approved.md is the log")))
+    assert not ends_with_approval_plea([])
+
+
+def test_child_verdicts_are_unchanged():
+    """Precision contract of classify_child_completion, pinned while the plea
+    detector is shared with the parent lane."""
+    cases = [
+        (_msgs(_assistant(_PLEA)), "blocked_on_approval"),
+        (_msgs(_assistant(_PLEA), _assistant("report text")), "success"),
+        (_msgs(_assistant("report text")), "success"),
+        (_msgs({"role": "assistant", "content": "plain string report"}), "success"),
+        (_msgs({"role": "assistant", "content": [{"type": "toolCall", "id": "t1"}]}), "aborted"),
+        (_msgs({"role": "assistant", "content": []}), "aborted"),
+        (_msgs({"role": "assistant", "content": [{"type": "thinking", "thinking": "hm"}]}), "aborted"),
+        (_msgs({"role": "assistant", "content": None}), "aborted"),
+        (_msgs({"role": "user", "content": [{"type": "text", "text": "hi"}]}), "aborted"),
+        ([], "aborted"),
+    ]
+    for msgs, expected in cases:
+        status, reason = classify_child_completion(msgs)
+        assert status == expected, (msgs, status)
+        assert reason  # every verdict carries a human-readable reason
+
+
+def test_child_plea_verdict_beats_a_trailing_tool_call():
+    """A plea turn that also carries a toolCall is still blocked_on_approval —
+    the gate is the cause, the dangling call is the symptom."""
+    msgs = _msgs({"role": "assistant", "content": [
+        {"type": "text", "text": _PLEA},
+        {"type": "toolCall", "id": "t1", "name": "exec"},
+    ]})
+    assert classify_child_completion(msgs)[0] == "blocked_on_approval"

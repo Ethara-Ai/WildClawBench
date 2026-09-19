@@ -56,7 +56,6 @@ class _FakeCompleted:
         self.stdout = stdout
         self.stderr = stderr
 
-
 class _RecordingRun:
     """Callable replacement for subprocess.run that records every invocation
     and returns a scripted result. ``result`` may be a single _FakeCompleted,
@@ -83,6 +82,23 @@ def rec_run(monkeypatch):
     r = _RecordingRun()
     monkeypatch.setattr(ocr.subprocess, "run", r)
     return r
+
+
+# litellm_config_yaml holds the YAML *content* (run_batch.py passes the string
+# returned by build_litellm_config_yaml, not a path), so the audio-env gate can
+# substring-match the registered model list.
+_YAML_WITH_WHISPER = (
+    "model_list:\n"
+    "  - model_name: whisper-1\n"
+    "    litellm_params:\n"
+    "      model: openai/whisper-1\n"
+)
+_YAML_NO_WHISPER = (
+    "model_list:\n"
+    "  - model_name: claude-opus-4.7\n"
+    "    litellm_params:\n"
+    "      model: bedrock/invoke/anthropic.claude-opus-4-7\n"
+)
 
 
 def _bare_agent(**overrides):
@@ -397,7 +413,15 @@ class TestSetModelLitellmAnthropic:
         script = _extract_script(self._run(monkeypatch))
         # anthropic branch uses base_url_root (no /v1 suffix in the provider baseUrl)
         assert "http://ll-sidecar:4000" in script
-        # master key threaded in
+        # Sidecar bearer threaded in. Under the default run-key mode _set_model
+        # runs before any run key exists for this task, so the stub is what goes
+        # in; the master key is not in the script either way.
+        assert "mk-secret" not in script
+
+    def test_master_key_mode_threads_the_master_key_into_the_config(self, monkeypatch):
+        monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
+        script = _extract_script(self._run(monkeypatch))
         assert "mk-secret" in script
 
     def test_thinking_default_written_when_set(self, monkeypatch):
@@ -477,6 +501,169 @@ class TestSetModelOpenrouter:
         script = _extract_script(self._run(monkeypatch))
         assert '"deny"' in script
         assert '"security"' in script
+
+
+# ---------------------------------------------------------------------------
+# Inline-eval obfuscation guard (EXEC_GUARD_SOURCE + _log_exec_guard_state)
+#
+# The guard silences openclaw's exec obfuscation prefilter, which otherwise
+# routes base64/encoded exec calls to a ~120s human-approval wait that headless
+# benchmark runs cannot answer. The decision runs INSIDE the agent container,
+# so these tests exec() the exact source the container executes.
+# ---------------------------------------------------------------------------
+class TestExecGuardVersionProbe:
+    @staticmethod
+    def _guard():
+        ns: dict = {}
+        exec(ocr.EXEC_GUARD_SOURCE, ns)
+        return ns
+
+    @staticmethod
+    def _pkg(tmp_path, name, body):
+        p = tmp_path / name
+        p.write_text(body, encoding="utf-8")
+        return str(p)
+
+    def test_prerelease_version_arms_the_guard(self, tmp_path):
+        # BYPASS REPRO: the previous gate did int(x) on each component, so a
+        # published prerelease ("2026.4.0-rc.1") raised ValueError on
+        # int("0-rc"), hit the bare `except Exception: pass`, and left the
+        # prefilter ARMED on a build that ships it -- while the harness still
+        # logged the config write as a success.
+        with pytest.raises(ValueError):
+            tuple(int(x) for x in "2026.4.0-rc.1".split(".")[:3])
+        ns = self._guard()
+        pkg = self._pkg(tmp_path, "pre.json", '{"version": "2026.4.0-rc.1"}')
+        cfg: dict = {}
+        assert ns["_wcb_arm_exec_guard"](cfg, [pkg]) == "armed"
+        assert cfg["strictInlineEval"] is False
+
+    @pytest.mark.parametrize("version", ["2026.4.0", "2026.3.31", "2026.4", "2027.1.0"])
+    def test_supported_versions_write_strict_inline_eval(self, tmp_path, version):
+        ns = self._guard()
+        pkg = self._pkg(tmp_path, "ok.json", json.dumps({"version": version}))
+        cfg: dict = {}
+        assert ns["_wcb_arm_exec_guard"](cfg, [pkg]) == "armed"
+        assert cfg["strictInlineEval"] is False
+
+    @pytest.mark.parametrize("version", ["2026.3.11", "2026.3.30", "2025.12.9"])
+    def test_older_builds_keep_the_key_unwritten(self, tmp_path, version):
+        # Pre-2026.3.31 validators reject strictInlineEval as an "Unrecognized
+        # key" and refuse the WHOLE config; the prefilter does not exist there.
+        ns = self._guard()
+        pkg = self._pkg(tmp_path, "old.json", json.dumps({"version": version}))
+        cfg: dict = {}
+        assert ns["_wcb_arm_exec_guard"](cfg, [pkg]) == "not-required"
+        assert "strictInlineEval" not in cfg
+
+    @pytest.mark.parametrize("body", ['{"version": "latest"}', '{"name": "openclaw"}', "not json"])
+    def test_undeterminable_version_reports_unknown_and_writes_nothing(self, tmp_path, body):
+        ns = self._guard()
+        pkg = self._pkg(tmp_path, "bad.json", body)
+        cfg: dict = {}
+        assert ns["_wcb_arm_exec_guard"](cfg, [pkg]) == "unknown-version"
+        assert "strictInlineEval" not in cfg
+
+    def test_missing_package_json_reports_unknown(self, tmp_path):
+        ns = self._guard()
+        cfg: dict = {}
+        missing = str(tmp_path / "absent.json")
+        assert ns["_wcb_arm_exec_guard"](cfg, [missing]) == "unknown-version"
+        assert "strictInlineEval" not in cfg
+
+    def test_falls_through_to_the_second_npm_root(self, tmp_path):
+        # Images that install openclaw under /usr/local/lib/node_modules used
+        # to probe-miss entirely and silently skip the guard.
+        ns = self._guard()
+        missing = str(tmp_path / "absent.json")
+        pkg = self._pkg(tmp_path, "second.json", '{"version": "2026.4.2"}')
+        cfg: dict = {}
+        assert ns["_wcb_arm_exec_guard"](cfg, [missing, pkg]) == "armed"
+        assert cfg["strictInlineEval"] is False
+
+    def test_probes_both_default_npm_global_roots(self):
+        ns = self._guard()
+        assert ns["_WCB_OC_PKG_PATHS"] == (
+            "/usr/lib/node_modules/openclaw/package.json",
+            "/usr/local/lib/node_modules/openclaw/package.json",
+        )
+
+    @pytest.mark.parametrize("version,expected", [
+        ("2026.4.0-rc.1", (2026, 4, 0)),
+        ("2026.4.1+build.7", (2026, 4, 1)),
+        ("2026.10.2", (2026, 10, 2)),
+        ("2026.4", (2026, 4)),
+    ])
+    def test_version_parsed_by_numeric_prefix(self, tmp_path, version, expected):
+        ns = self._guard()
+        pkg = self._pkg(tmp_path, "v.json", json.dumps({"version": version}))
+        assert ns["_wcb_openclaw_version"]([pkg]) == expected
+
+
+class TestExecGuardEmittedScript:
+    @pytest.mark.parametrize("litellm", [True, False])
+    def test_both_branches_embed_the_guard_and_report_it(self, monkeypatch, litellm):
+        a = (_bare_agent(litellm_config_yaml="/x.yaml", litellm_container_name="ll")
+             if litellm else _bare_agent())
+        rec = _RecordingRun(_FakeCompleted(returncode=0))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        a._set_model("task", "claude-opus-4.7")
+        script = _extract_script(rec)
+        assert "_wcb_arm_exec_guard(exec_cfg)" in script
+        assert ocr.EXEC_GUARD_SOURCE in script
+        assert f'print("{ocr._EXEC_GUARD_MARKER}" + _guard_state)' in script
+        compile(script, "<container-config>", "exec")
+
+    def test_guard_runs_before_the_config_is_written(self, monkeypatch):
+        a = _bare_agent(litellm_config_yaml="/x.yaml", litellm_container_name="ll")
+        rec = _RecordingRun(_FakeCompleted(returncode=0))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        a._set_model("task", "claude-opus-4.7")
+        script = _extract_script(rec)
+        assert script.index("_wcb_arm_exec_guard(exec_cfg)") < script.index("p.write_text(")
+
+
+class TestLogExecGuardState:
+    def _agent(self):
+        return _bare_agent(litellm_config_yaml="/x.yaml", litellm_container_name="ll")
+
+    def test_armed_state_logs_info_not_warning(self, caplog):
+        caplog.set_level("INFO", logger=ocr.logger.name)
+        self._agent()._log_exec_guard_state("t", "WCB_EXEC_GUARD=armed\n")
+        assert not [r for r in caplog.records if r.levelname == "WARNING"]
+        assert "guard armed" in caplog.text
+
+    def test_not_required_state_logs_info_not_warning(self, caplog):
+        caplog.set_level("INFO", logger=ocr.logger.name)
+        self._agent()._log_exec_guard_state("t", "WCB_EXEC_GUARD=not-required\n")
+        assert not [r for r in caplog.records if r.levelname == "WARNING"]
+        assert "not required" in caplog.text
+
+    @pytest.mark.parametrize("stdout", ["WCB_EXEC_GUARD=unknown-version", "", None, "noise\n"])
+    def test_unarmed_state_warns(self, caplog, stdout):
+        caplog.set_level("INFO", logger=ocr.logger.name)
+        self._agent()._log_exec_guard_state("t", stdout)
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 1
+        assert "NOT armed" in warnings[0].getMessage()
+
+    def test_marker_is_read_from_a_noisy_stdout(self, caplog):
+        caplog.set_level("INFO", logger=ocr.logger.name)
+        self._agent()._log_exec_guard_state(
+            "t", "some warning\n  WCB_EXEC_GUARD=armed  \ntrailing\n")
+        assert not [r for r in caplog.records if r.levelname == "WARNING"]
+
+    def test_set_model_surfaces_the_container_state(self, monkeypatch, caplog):
+        # The gap this closes: _set_model previously only checked returncode,
+        # so a container left unguarded looked identical to a guarded one.
+        caplog.set_level("INFO", logger=ocr.logger.name)
+        a = self._agent()
+        monkeypatch.setattr(
+            ocr.subprocess, "run",
+            lambda *a2, **k2: _FakeCompleted(0, stdout="WCB_EXEC_GUARD=unknown-version"),
+        )
+        a._set_model("task", "claude-opus-4.7")
+        assert [r for r in caplog.records if r.levelname == "WARNING"]
 
 
 # ---------------------------------------------------------------------------
@@ -632,6 +819,118 @@ class TestIndexMemory:
 
 
 # ---------------------------------------------------------------------------
+# _session_line_count / _restore_session_to — the duplicate-user-turn guard
+# ---------------------------------------------------------------------------
+class TestSessionLineCount:
+    def test_counts_rows(self, monkeypatch):
+        rec = _RecordingRun(_FakeCompleted(returncode=0, stdout="42\n"))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        assert OpenClawAgent._session_line_count("t") == 42
+        cmd = rec.calls[0]["cmd"]
+        assert cmd[:3] == ["docker", "exec", "t"]
+        assert "chat.jsonl" in cmd[-1]
+
+    def test_absent_session_is_zero_not_unknown(self, monkeypatch):
+        # `[ -f ... ] && awk ... || echo 0` — turn 0 runs before the file exists.
+        monkeypatch.setattr(ocr.subprocess, "run",
+                            _RecordingRun(_FakeCompleted(returncode=0, stdout="0\n")))
+        assert OpenClawAgent._session_line_count("t") == 0
+
+    def test_login_shell_noise_ignored(self, monkeypatch):
+        monkeypatch.setattr(
+            ocr.subprocess, "run",
+            _RecordingRun(_FakeCompleted(returncode=0, stdout="motd banner\n7\n")))
+        assert OpenClawAgent._session_line_count("t") == 7
+
+    def test_nonzero_rc_is_unknown(self, monkeypatch):
+        monkeypatch.setattr(
+            ocr.subprocess, "run",
+            _RecordingRun(_FakeCompleted(returncode=1, stderr="no such container")))
+        assert OpenClawAgent._session_line_count("t") is None
+
+    def test_unparsable_output_is_unknown(self, monkeypatch):
+        monkeypatch.setattr(ocr.subprocess, "run",
+                            _RecordingRun(_FakeCompleted(returncode=0, stdout="nan\n")))
+        assert OpenClawAgent._session_line_count("t") is None
+
+    def test_empty_output_is_unknown(self, monkeypatch):
+        monkeypatch.setattr(ocr.subprocess, "run",
+                            _RecordingRun(_FakeCompleted(returncode=0, stdout="")))
+        assert OpenClawAgent._session_line_count("t") is None
+
+    @pytest.mark.parametrize("exc", [OSError("no docker"),
+                                     subprocess.TimeoutExpired(cmd="docker", timeout=30)])
+    def test_exec_failure_is_unknown(self, monkeypatch, exc):
+        def boom(*a, **k):
+            raise exc
+        monkeypatch.setattr(ocr.subprocess, "run", boom)
+        assert OpenClawAgent._session_line_count("t") is None
+
+
+class TestRestoreSessionTo:
+    def test_truncates_to_pre_attempt_count(self, monkeypatch):
+        rec = _RecordingRun([_FakeCompleted(0, "9\n"), _FakeCompleted(0, ""),
+                             _FakeCompleted(0, "5\n")])
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        OpenClawAgent._restore_session_to("t", 5, 0)
+        assert "head -n 5" in rec.calls[1]["cmd"][-1]
+        assert "mv" in rec.calls[1]["cmd"][-1]
+
+    def test_no_truncation_when_count_unchanged(self, monkeypatch):
+        rec = _RecordingRun(_FakeCompleted(0, "5\n"))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        OpenClawAgent._restore_session_to("t", 5, 0)
+        assert len(rec.calls) == 1
+        assert "head -n" not in rec.calls[0]["cmd"][-1]
+
+    def test_no_truncation_when_count_shrank(self, monkeypatch):
+        rec = _RecordingRun(_FakeCompleted(0, "3\n"))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        OpenClawAgent._restore_session_to("t", 5, 0)
+        assert len(rec.calls) == 1
+
+    def test_unknown_pre_attempt_count_never_truncates(self, monkeypatch):
+        # A failed probe must not be read as "the session was empty".
+        rec = _RecordingRun(_FakeCompleted(0, "9\n"))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        OpenClawAgent._restore_session_to("t", None, 0)
+        assert rec.calls == []
+
+    def test_unknown_current_count_never_truncates(self, monkeypatch):
+        rec = _RecordingRun(_FakeCompleted(returncode=1, stderr="gone"))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        OpenClawAgent._restore_session_to("t", 5, 0)
+        assert len(rec.calls) == 1
+
+    def test_zero_pre_attempt_count_truncates_whole_file(self, monkeypatch):
+        rec = _RecordingRun([_FakeCompleted(0, "2\n"), _FakeCompleted(0, ""),
+                             _FakeCompleted(0, "0\n")])
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        OpenClawAgent._restore_session_to("t", 0, 0)
+        assert "head -n 0" in rec.calls[1]["cmd"][-1]
+
+    def test_head_failure_is_reported_not_raised(self, monkeypatch):
+        rec = _RecordingRun([_FakeCompleted(0, "9\n"),
+                             _FakeCompleted(returncode=1, stderr="read-only fs")])
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        OpenClawAgent._restore_session_to("t", 5, 0)
+        assert len(rec.calls) == 2
+
+    def test_exec_exception_is_swallowed(self, monkeypatch):
+        calls = []
+
+        def flaky(cmd, *a, **k):
+            calls.append(cmd)
+            if "head -n" in cmd[-1]:
+                raise subprocess.SubprocessError("boom")
+            return _FakeCompleted(0, "9\n")
+
+        monkeypatch.setattr(ocr.subprocess, "run", flaky)
+        OpenClawAgent._restore_session_to("t", 5, 0)
+        assert len(calls) == 2
+
+
+# ---------------------------------------------------------------------------
 # run_task — full orchestration with docker_utils helpers monkeypatched
 # ---------------------------------------------------------------------------
 class _FakeProc:
@@ -735,7 +1034,7 @@ class TestRunTaskHappyPath:
 
     def test_litellm_mode_wires_anthropic_base_url_env(self, monkeypatch, tmp_path):
         a = _bare_agent(
-            litellm_config_yaml="/x.yaml",
+            litellm_config_yaml=_YAML_WITH_WHISPER,
             litellm_container_name="ll",
             litellm_port=4000,
             litellm_master_key="mk",
@@ -764,17 +1063,98 @@ class TestRunTaskHappyPath:
         a.run_task(spec)
         env = captured["extra_env_dict"]
         assert env["WCB_AUDIO_TRANSCRIBE_URL"] == "http://ll:4000/v1/audio/transcriptions"
-        assert env["WCB_AUDIO_TRANSCRIBE_AUTH"] == "mk"
+        # Consumed by the audio-extract skill, which has to get past the sidecar's
+        # inbound auth, so this one is the sidecar bearer by necessity — which in
+        # the default run-key mode is the attempt's own key, not the master key.
+        assert env["WCB_AUDIO_TRANSCRIBE_AUTH"] == a._run_keys[spec.task_id]
+        assert env["WCB_AUDIO_TRANSCRIBE_AUTH"] != "mk"
         # claude model -> ANTHROPIC_* overrides pointing at sidecar
         assert env["ANTHROPIC_BASE_URL"] == "http://ll:4000"
-        assert env["ANTHROPIC_AUTH_TOKEN"] == "mk"
-        assert env["ANTHROPIC_API_KEY"] == "mk"
+        assert env["ANTHROPIC_API_BASE"] == "http://ll:4000"
+        # The master key is shared by every concurrent run and the container env
+        # is the channel the agent dumps by accident, so the key it carries is the
+        # per-attempt run key instead. openclaw sends the real bearer from
+        # providers.anthropic.apiKey in openclaw.json.
+        assert env["ANTHROPIC_API_KEY"] == a._run_keys[spec.task_id]
+        assert env["ANTHROPIC_API_KEY"] != "mk"
+        assert env["ANTHROPIC_API_KEY"].startswith(f"wcb::{spec.task_id}::")
+        # Nothing in the agent image reads ANTHROPIC_AUTH_TOKEN; it only ever
+        # duplicated the credential into the leakable channel.
+        assert "ANTHROPIC_AUTH_TOKEN" not in env
         # network threaded through
         assert captured["network"] == a.litellm_network
 
+    def test_keyless_sidecar_route_wires_the_same_run_scoped_key(
+        self, monkeypatch, tmp_path
+    ):
+        """Containment must not depend on which auth route the sidecar runs.
+
+        Under WCB_SIDECAR_NO_MASTER_KEY=1 the run key IS the bearer the sidecar
+        expects, so the agent env is already run-scoped; under master-key auth it
+        was the master key. Both routes now put the same per-attempt value in
+        ANTHROPIC_API_KEY, which is what makes the assertion above route-agnostic.
+        """
+        monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
+        a = _bare_agent(
+            litellm_config_yaml=_YAML_WITH_WHISPER,
+            litellm_container_name="ll",
+            litellm_port=4000,
+            litellm_master_key="mk",
+        )
+        captured = {}
+        monkeypatch.setattr(ocr, "start_container", lambda tid, ep, **kw: captured.update(kw))
+        for name in (
+            "inject_lobster_workspace", "inject_data_into_workspace",
+            "inject_persona_into_workspace", "inject_openclaw_models",
+            "inject_api_connectors", "run_warmup", "setup_skills",
+            "setup_workspace", "snapshot_workspace_state",
+        ):
+            monkeypatch.setattr(ocr, name, lambda *a2, **k2: None)
+        procs = iter([_FakeProc(), _FakeProc()])
+        monkeypatch.setattr(ocr, "run_background", lambda *a2, **k2: next(procs))
+        monkeypatch.setattr(ocr.time, "sleep", lambda *a2, **k2: None)
+        monkeypatch.setattr(ocr.time, "perf_counter", lambda: 0.0)
+        monkeypatch.setattr(ocr.time, "time", lambda: 1.0)
+        self._stub_agent_methods(monkeypatch, a)
+
+        spec = _make_spec(tmp_path, model="claude-opus-4.7")
+        a.run_task(spec)
+        env = captured["extra_env_dict"]
+        run_key = a._run_keys[spec.task_id]
+        assert env["ANTHROPIC_API_KEY"] == run_key
+        assert "ANTHROPIC_AUTH_TOKEN" not in env
+        assert env["ANTHROPIC_BASE_URL"] == "http://ll:4000"
+        # On this route the run key is also the sidecar bearer, so the helper
+        # credentials coincide with it rather than with the master key.
+        assert env["WCB_AUDIO_TRANSCRIBE_AUTH"] == run_key
+        assert env["WCB_RUN_KEY"] == run_key
+
+    def test_agent_env_bearer_never_returns_the_master_key(self):
+        a = _bare_agent(litellm_master_key="sk-talos-litellm")
+        # Before a run key is minted (the only window where there is nothing
+        # run-scoped to hand over) the fallback is an authority-free stub, not the
+        # master key — same role as WCB_CC_STUB_KEY on the cc-bridge.
+        assert a._agent_env_bearer("task-1") == ocr._AGENT_ENV_STUB_KEY
+        assert a._agent_env_bearer("task-1") != a.litellm_master_key
+        a._run_keys["task-1"] = "wcb::task-1::abc"
+        assert a._agent_env_bearer("task-1") == "wcb::task-1::abc"
+        # Both bearers still have to satisfy whatever the sidecar enforces. In
+        # the default run-key mode that IS the run key, so they coincide; the
+        # master key is reachable only by opting back into master-key auth.
+        assert a._agent_bearer("task-1") == "wcb::task-1::abc"
+
+    def test_master_key_mode_still_sends_the_master_key_to_the_sidecar(
+            self, monkeypatch):
+        monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
+        a = _bare_agent(litellm_master_key="sk-talos-litellm")
+        a._run_keys["task-1"] = "wcb::task-1::abc"
+        assert a._agent_bearer("task-1") == "sk-talos-litellm"
+        assert a._agent_env_bearer("task-1") == "wcb::task-1::abc"
+
     def test_non_claude_model_skips_anthropic_env_overrides(self, monkeypatch, tmp_path):
         a = _bare_agent(
-            litellm_config_yaml="/x.yaml",
+            litellm_config_yaml=_YAML_WITH_WHISPER,
             litellm_container_name="ll",
             litellm_master_key="mk",
         )
@@ -800,6 +1180,47 @@ class TestRunTaskHappyPath:
         # audio env still set (litellm mode) but NO anthropic overrides for gpt
         assert "WCB_AUDIO_TRANSCRIBE_URL" in env
         assert "ANTHROPIC_BASE_URL" not in env
+
+    def test_audio_env_omitted_when_yaml_registers_no_whisper_route(
+        self, monkeypatch, tmp_path
+    ):
+        """A sidecar existing does NOT imply a transcription route.
+
+        Bedrock-only / OAuth / Codex profiles with no OpenAI or whisper key emit
+        YAML without a whisper-1 block. Advertising the URL anyway pointed the
+        audio-extract skill at a route that answers 400 "Invalid model name";
+        leaving it unset is the signal to use the skill's local-whisper fallback.
+        """
+        a = _bare_agent(
+            litellm_config_yaml=_YAML_NO_WHISPER,
+            litellm_container_name="ll",
+            litellm_port=4000,
+            litellm_master_key="mk",
+        )
+        captured = {}
+        monkeypatch.setattr(ocr, "start_container", lambda tid, ep, **kw: captured.update(kw))
+        for name in (
+            "inject_lobster_workspace", "inject_data_into_workspace",
+            "inject_persona_into_workspace", "inject_openclaw_models",
+            "inject_api_connectors", "run_warmup", "setup_skills",
+            "setup_workspace", "snapshot_workspace_state",
+        ):
+            monkeypatch.setattr(ocr, name, lambda *a2, **k2: None)
+        procs = iter([_FakeProc(), _FakeProc()])
+        monkeypatch.setattr(ocr, "run_background", lambda *a2, **k2: next(procs))
+        monkeypatch.setattr(ocr.time, "sleep", lambda *a2, **k2: None)
+        monkeypatch.setattr(ocr.time, "perf_counter", lambda: 0.0)
+        monkeypatch.setattr(ocr.time, "time", lambda: 1.0)
+        self._stub_agent_methods(monkeypatch, a)
+
+        spec = _make_spec(tmp_path, model="claude-opus-4.7")
+        a.run_task(spec)
+        env = captured["extra_env_dict"]
+        assert "WCB_AUDIO_TRANSCRIBE_URL" not in env
+        assert "WCB_AUDIO_TRANSCRIBE_AUTH" not in env
+        # The rest of the litellm-mode wiring is untouched by the audio gate.
+        assert env["ANTHROPIC_BASE_URL"] == "http://ll:4000"
+        assert env["WILDCLAW_MODEL"] == "claude-opus-4.7"
 
     def test_agent_timeout_kills_process(self, monkeypatch, tmp_path):
         a = _bare_agent()
@@ -991,7 +1412,7 @@ class TestEmptyTurnGraceLoop:
 
         def write_row():
             with open(usage, "a", encoding="utf-8") as fh:
-                fh.write(json.dumps({"run_key": a._run_keys[spec.task_id]}) + "\n")
+                fh.write(json.dumps({"run_key": a._run_keys[spec.task_id], "kind": "agent"}) + "\n")
 
         def run_background(task_id, bash_cmd=None, **kw):
             if "openclaw gateway" in (bash_cmd or ""):
@@ -1069,7 +1490,7 @@ class TestEmptyTurnGraceLoop:
         def warning(msg, *args, **kwargs):
             if "EMPTY" in str(msg):  # attempt 0 just declared empty
                 with open(a.litellm_usage_log, "a", encoding="utf-8") as fh:
-                    fh.write(json.dumps({"run_key": a._run_keys[spec.task_id]}) + "\n")
+                    fh.write(json.dumps({"run_key": a._run_keys[spec.task_id], "kind": "agent"}) + "\n")
             return real_warning(msg, *args, **kwargs)
 
         monkeypatch.setattr(ocr.logger, "warning", warning)
@@ -1094,3 +1515,49 @@ class TestEmptyTurnGraceSeconds:
         for huge in ("inf", "1e9"):
             monkeypatch.setenv("WCB_EMPTY_TURN_GRACE_SECONDS", huge)
             assert OpenClawAgent._empty_turn_grace_seconds() == 60.0
+
+class TestCollectUsageRunKeyChannel:
+    """collect_usage hands the run key to eval/run_batch.py's per-message
+    back-fill so a delivered message's cost block and the run total it rolls
+    up into are attributed by the same key."""
+
+    def test_run_key_attached_when_bearer_carries_it(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
+        a = _bare_agent(litellm_usage_log=str(tmp_path / "u.jsonl"))
+        a._task_windows["t"] = (1.0, 2.0)
+        a._run_keys["t"] = "wcb::t::feed1234"
+        monkeypatch.setattr(ocr.subprocess, "run", lambda *a2, **k2: _FakeCompleted(0))
+        monkeypatch.setattr(
+            ocr, "extract_usage_from_litellm_log",
+            lambda p, s, e, run_key="": {"request_count": 1, "run_key_seen": run_key},
+        )
+        monkeypatch.setattr(ocr, "extract_preflight_usage_from_litellm_log",
+                            lambda p: {"request_count": 0})
+        out = a.collect_usage("t", tmp_path / "od", 1.0)
+        assert out["run_key_seen"] == "wcb::t::feed1234"
+        assert out["__run_key__"] == "wcb::t::feed1234"
+
+    def test_no_run_key_attached_under_master_key_auth(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
+        a = _bare_agent(litellm_usage_log=str(tmp_path / "u.jsonl"),
+                        litellm_master_key="sk-master")
+        a._task_windows["t"] = (1.0, 2.0)
+        a._run_keys["t"] = "wcb::t::feed1234"
+        monkeypatch.setattr(ocr.subprocess, "run", lambda *a2, **k2: _FakeCompleted(0))
+        monkeypatch.setattr(ocr, "extract_usage_from_litellm_log",
+                            lambda p, s, e: {"request_count": 1})
+        monkeypatch.setattr(ocr, "extract_preflight_usage_from_litellm_log",
+                            lambda p: {"request_count": 0})
+        out = a.collect_usage("t", tmp_path / "od", 1.0)
+        assert "__run_key__" not in out
+
+    def test_no_usage_log_does_not_raise_on_run_key(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
+        a = _bare_agent(litellm_usage_log="")
+        a._run_keys["t"] = "wcb::t::feed1234"
+        monkeypatch.setattr(ocr.subprocess, "run", lambda *a2, **k2: _FakeCompleted(1))
+        monkeypatch.setattr(ocr, "extract_usage_from_jsonl", lambda p: {"request_count": 0})
+        out = a.collect_usage("t", tmp_path / "od", 1.0)
+        assert out["__run_key__"] == "wcb::t::feed1234"

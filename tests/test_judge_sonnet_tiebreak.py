@@ -410,7 +410,7 @@ def test_effective_model_sonnet_on_bridge_shows_anthropic(monkeypatch):
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
     monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
     monkeypatch.delenv("KENSEI_JUDGE_OAUTH_BRIDGE_MODEL", raising=False)
-    assert grading._effective_judge_model(SONNET_ARN, "sonnet") == "claude-sonnet-5"
+    assert grading._effective_judge_model(SONNET_ARN, "sonnet") == "claude-sonnet-4-6"
 
 
 def test_effective_model_custom_bridge_model(monkeypatch):
@@ -468,15 +468,18 @@ def test_evidence_budget_non_sonnet_unaffected_by_bridge(monkeypatch):
     assert grading._member_evidence_budget(KIMI_ARN, "kimi") == 225_000
 
 
-# ---------- judge cost is $0 on the OAuth subscription (billed via the flat plan) ----------
+# ---------- judge cost on the OAuth subscription (derived, not flat-plan $0) ----------
 
-def test_judge_cost_zero_for_sonnet_on_bridge(monkeypatch):
-    """The sonnet judge runs on the Claude Max subscription, so its real dollar
-    cost is the flat plan (not per-token). When the OAuth bridge is active the
-    reported cost_usd is forced to 0 while token counts are preserved."""
+def test_judge_cost_on_bridge_is_the_sonnet_card_not_zero(monkeypatch):
+    """The sonnet judge runs on the Claude Max subscription, so there is no
+    per-token charge to read off. It is priced from its token counts at the
+    published Bedrock sonnet rates instead. Recording $0 made a regraded judge
+    free while the identical batch-graded judge carried list-price dollars."""
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
     monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
-    assert grading._judge_cost_usd(SONNET_ARN, 95_727, 2_417, 0, 0, "sonnet") == (0.0, True)
+    cost, priced = grading._judge_cost_usd(SONNET_ARN, 95_727, 2_417, 0, 0, "sonnet")
+    assert priced is True
+    assert cost == pytest.approx(0.323436, rel=1e-9)
 
 
 def test_judge_cost_nonzero_for_sonnet_without_bridge(monkeypatch):
@@ -484,6 +487,17 @@ def test_judge_cost_nonzero_for_sonnet_without_bridge(monkeypatch):
     cost, priced = grading._judge_cost_usd(SONNET_ARN, 95_727, 2_417, 0, 0, "sonnet")
     assert priced is True
     assert cost == pytest.approx(0.323436, rel=1e-9)
+
+
+def test_the_bridge_does_not_change_what_the_sonnet_judge_costs(monkeypatch):
+    # One cost column: the same tokens are the same dollars whichever transport
+    # carried them, so a run's judge line is comparable across routes.
+    monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
+    on_bridge, _ = grading._judge_cost_usd(SONNET_ARN, 95_727, 2_417, 0, 0, "sonnet")
+    monkeypatch.delenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", raising=False)
+    on_bedrock, _ = grading._judge_cost_usd(SONNET_ARN, 95_727, 2_417, 0, 0, "sonnet")
+    assert on_bridge == pytest.approx(on_bedrock)
 
 
 def test_judge_cost_non_sonnet_unaffected_by_bridge(monkeypatch):

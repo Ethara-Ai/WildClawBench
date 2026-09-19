@@ -11,7 +11,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (  # noqa: E402
-    read_seed_with_ctx, get_store, opt_csv_list, strict_int)
+    read_seed_with_ctx, get_store, opt_csv_list, opt_int, strict_int)
 
 _store = get_store("linkedin-api")
 _API = "linkedin-api"
@@ -77,20 +77,22 @@ def _now():
 # Load + coerce
 # ---------------------------------------------------------------------------
 
+# The engagement counters, spelled the way the seed carries them and therefore
+# the way a write addresses them. Folding them into ``socialDetail`` at load
+# time and popping the flat columns left the store holding a shape no caller
+# could write to: an upsert naming ``like_count`` was accepted, landed on a key
+# no getter read, and the post kept serving the old count. They stay columns
+# now, and ``socialDetail`` is derived from them at serve time.
+ENGAGEMENT_COLUMNS = ("like_count", "comment_count", "share_count")
+
+
 def _coerce_posts(rows):
     out = []
     for r in rows:
-        out.append({
-            **_strip_ctx(r),
-            "socialDetail": {
-                "likeCount": strict_int(r, "like_count"),
-                "commentCount": strict_int(r, "comment_count"),
-                "shareCount": strict_int(r, "share_count"),
-            },
-        })
-        # Drop the flat metric columns now that they are nested.
-        for k in ("like_count", "comment_count", "share_count"):
-            out[-1].pop(k, None)
+        post = _strip_ctx(r)
+        for column in ENGAGEMENT_COLUMNS:
+            post[column] = strict_int(r, column)
+        out.append(post)
     return out
 
 
@@ -141,6 +143,27 @@ def list_connections(start=0, count=50):
 # Posts
 # ---------------------------------------------------------------------------
 
+def _post_view(p):
+    """Serving shape of one post: its stored columns, plus the ``socialDetail``
+    block LinkedIn nests the same three counters under.
+
+    Both spellings are served on purpose. The nest is the shape the API
+    documents and agents read; the flat columns are the shape the seed and every
+    write use, so serving only the nest made a write to ``like_count`` invisible
+    on read-back even though the store had taken it.
+    """
+    counts = {c: opt_int(p, c, default=0) for c in ENGAGEMENT_COLUMNS}
+    return {
+        **p,
+        **counts,
+        "socialDetail": {
+            "likeCount": counts["like_count"],
+            "commentCount": counts["comment_count"],
+            "shareCount": counts["share_count"],
+        },
+    }
+
+
 def list_posts(author_id=None, start=0, count=50):
     posts = list(_posts_rows())
     if author_id:
@@ -148,7 +171,7 @@ def list_posts(author_id=None, start=0, count=50):
     posts.sort(key=lambda p: p["created_at"], reverse=True)
     sliced = posts[start: start + count]
     return {
-        "elements": sliced,
+        "elements": [_post_view(p) for p in sliced],
         "paging": {"start": start, "count": count, "total": len(posts)},
     }
 
@@ -156,11 +179,12 @@ def list_posts(author_id=None, start=0, count=50):
 def get_post(post_id):
     for p in _posts_rows():
         if p["id"] == post_id:
-            return p
+            return _post_view(p)
     return {"error": f"Post {post_id} not found"}
 
 
-def create_post(commentary, author_id=None, visibility="PUBLIC"):
+def create_post(commentary, author_id=None, visibility="PUBLIC",
+                like_count=0, comment_count=0, share_count=0):
     author_id = author_id or _profile_doc()["id"]
     post = {
         "id": _new_id(),
@@ -168,10 +192,12 @@ def create_post(commentary, author_id=None, visibility="PUBLIC"):
         "commentary": commentary,
         "visibility": visibility,
         "created_at": _now(),
-        "socialDetail": {"likeCount": 0, "commentCount": 0, "shareCount": 0},
+        "like_count": like_count,
+        "comment_count": comment_count,
+        "share_count": share_count,
     }
     _store_insert("posts", post)
-    return post
+    return _post_view(post)
 
 
 # ---------------------------------------------------------------------------

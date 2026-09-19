@@ -9,7 +9,7 @@ sys.path.insert(0, str(ROOT))
 from src.utils.inject_director import InjectScript, InjectStage
 from src.utils.inject_validator import _row_ids, validate_inject_script
 
-URLS = {"figma-api": "http://127.0.0.1:1"}
+URLS = {"jira-api": "http://127.0.0.1:1"}
 
 
 def _seed_stage():
@@ -55,7 +55,7 @@ def test_row_ids_harvests_bare_key():
 
 
 def test_stage1_patch_on_key_pk_not_fatal(tmp_path):
-    svc_dir = tmp_path / "figma-api"
+    svc_dir = tmp_path / "jira-api"
     svc_dir.mkdir()
     (svc_dir / "components.json").write_text(
         '[{"component_key": "comp-menuinsert-trim", "file_key": "FKmenuv5final", '
@@ -63,7 +63,7 @@ def test_stage1_patch_on_key_pk_not_fatal(tmp_path):
         encoding="utf-8",
     )
     stage1 = _stage(1, 0, 1, silent=[_admin_patch(
-        "s1", "figma-api", "components", "comp-menuinsert-trim",
+        "s1", "jira-api", "components", "comp-menuinsert-trim",
         {"description": "updated"})])
     fatal, warnings = validate_inject_script(
         _script(_seed_stage(), stage1), host_api_to_url=URLS, mock_data_root=tmp_path)
@@ -71,7 +71,7 @@ def test_stage1_patch_on_key_pk_not_fatal(tmp_path):
 
 
 def test_stage1_patch_on_absent_key_pk_still_fatal(tmp_path):
-    svc_dir = tmp_path / "figma-api"
+    svc_dir = tmp_path / "jira-api"
     svc_dir.mkdir()
     (svc_dir / "components.json").write_text(
         '[{"component_key": "comp-menuinsert-trim", "file_key": "FKmenuv5final", '
@@ -79,7 +79,7 @@ def test_stage1_patch_on_absent_key_pk_still_fatal(tmp_path):
         encoding="utf-8",
     )
     stage1 = _stage(1, 0, 1, silent=[_admin_patch(
-        "s1", "figma-api", "components", "comp-does-not-exist",
+        "s1", "jira-api", "components", "comp-does-not-exist",
         {"description": "updated"})])
     fatal, warnings = validate_inject_script(
         _script(_seed_stage(), stage1), host_api_to_url=URLS, mock_data_root=tmp_path)

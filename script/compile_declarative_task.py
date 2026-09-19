@@ -46,6 +46,14 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 ENV = REPO / "environment"
 
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from src.utils.task_standard import (  # noqa: E402
+    TaskWindow, render_prompt_header, render_truth_skeleton,
+    window_from_declaration, window_from_instants,
+)
+
 ALLOWED_WEIGHTS = {5, 3, 1, -1, -3, -5}
 REQUIRED_METADATA = ("difficulty", "modalities", "l1", "l2", "task_type", "required_apis")
 
@@ -173,7 +181,7 @@ def load_source(src: Path) -> dict:
 # --------------------------------------------------------------------------- #
 # Emitters
 # --------------------------------------------------------------------------- #
-def emit_task_yaml(meta: dict) -> str:
+def emit_task_yaml(meta: dict, window: TaskWindow) -> str:
     def yaml_list(values):
         return "[" + ", ".join(str(v) for v in values) + "]"
 
@@ -187,22 +195,64 @@ def emit_task_yaml(meta: dict) -> str:
         f"task_type: {meta['task_type']}",
         f"required_apis: {yaml_list(meta['required_apis'])}",
         f"distractor_apis: {distractor_s}",
+        # the bundle's CURRENT_DATE is read back off this window, so a compiled
+        # task carries its own date instead of inheriting a static default
+        f"window: {window.start.isoformat()} to {window.end.isoformat()}",
+        f"timezone: {_meta_field(meta, 'timezone')}",
         # metadata-only field; preflight requires the key to exist
         f"system_prompt: {json.dumps(meta.get('system_prompt', ''))}",
     ]
     return "\n".join(lines) + "\n"
 
 
-def emit_prompts_txt(meta: dict, prompt: str, stages: list[dict]) -> str:
-    out = []
-    banner = dict(meta.get("banner") or {})
-    banner.setdefault("task_id", meta.get("task_id", ""))
+def _meta_field(meta: dict, key: str) -> str:
+    """Read an identity field from metadata, falling back to its banner copy."""
+    value = meta.get(key) or (meta.get("banner") or {}).get(key) or ""
+    return str(value).strip()
+
+
+def resolve_source_window(meta: dict, stages: list[dict]) -> TaskWindow:
+    """The window the compiled bundle dates itself by.
+
+    An explicit ``metadata.json`` ``window`` wins; otherwise the span of the
+    stages' ``applied_at`` instants is authoritative, since those are the
+    timestamps the turn schedule actually lands on. Compiling without either
+    is refused rather than defaulted: a guessed window would silently pin the
+    bundle's CURRENT_DATE to a date the prompts never narrate.
+    """
+    tz = _meta_field(meta, "timezone")
+    declared = meta.get("window")
+    if declared:
+        window = window_from_declaration(declared, tz, "metadata.json:window")
+        if window is None:
+            raise CompileError(f"metadata.json window {declared!r} names no YYYY-MM-DD date")
+        return window
+    window = window_from_instants(
+        [s.get("applied_at") for s in stages], tz, "stages.toml:applied_at")
+    if window is None:
+        raise CompileError(
+            "cannot date this task: give metadata.json a 'window' "
+            "({\"start\": \"YYYY-MM-DD\", \"end\": \"YYYY-MM-DD\"}) or an ISO "
+            "'applied_at' on the stages — the bundle's CURRENT_DATE derives from it")
+    return window
+
+
+def emit_prompts_txt(meta: dict, prompt: str, stages: list[dict],
+                     window: TaskWindow) -> str:
+    out = [render_prompt_header(
+        task_id=meta.get("task_id", ""),
+        persona=_meta_field(meta, "persona"),
+        timezone=_meta_field(meta, "timezone"),
+        window=window,
+        turn_count=len(stages),
+    ).rstrip("\n")]
+    banner = {k: v for k, v in (meta.get("banner") or {}).items()
+              if k not in ("task_id", "persona", "timezone", "window", "turn_count")}
     banner.setdefault("Source", "compiled from declarative source by script/compile_declarative_task.py")
     for key, value in banner.items():
         if str(value).strip():
             out.append(f"# {key}: {value}")
-    if out:
-        out.append("")
+    out.append("")
 
     def header(i, stage):
         label = str(stage.get("turn_label", "")).strip()
@@ -516,6 +566,18 @@ def emit_inject(stages: list[dict], src_dir: Path, out_dir: Path) -> int:
 # --------------------------------------------------------------------------- #
 # Main
 # --------------------------------------------------------------------------- #
+def _stage_truth_md(src_dir: Path, out_dir: Path, meta: dict, window: TaskWindow) -> None:
+    """Carry the author's TRUTH.md through, or emit the 3-section skeleton.
+
+    Emitting a skeleton rather than nothing keeps the section set canonical:
+    authors fill sections in instead of inventing their own headings.
+    """
+    authored = src_dir / "TRUTH.md"
+    text = (authored.read_text(encoding="utf-8") if authored.is_file()
+            else render_truth_skeleton(meta.get("task_id", ""), window))
+    (out_dir / "TRUTH.md").write_text(text, encoding="utf-8")
+
+
 def compile_task(src_dir: Path, out_dir: Path, force: bool) -> None:
     source = load_source(src_dir)
     meta = source["metadata"]
@@ -527,11 +589,14 @@ def compile_task(src_dir: Path, out_dir: Path, force: bool) -> None:
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True)
 
-    (out_dir / "task.yaml").write_text(emit_task_yaml(meta), encoding="utf-8")
-    prompts = emit_prompts_txt(meta, source["prompt"], source["stages"])
+    window = resolve_source_window(meta, source["stages"])
+
+    (out_dir / "task.yaml").write_text(emit_task_yaml(meta, window), encoding="utf-8")
+    prompts = emit_prompts_txt(meta, source["prompt"], source["stages"], window)
     (out_dir / "prompts.txt").write_text(prompts, encoding="utf-8")
     (out_dir / "prompt.txt").write_text(source["prompt"] + "\n", encoding="utf-8")
     (out_dir / "rubric.json").write_text(emit_rubric_json(source["judge"]), encoding="utf-8")
+    _stage_truth_md(src_dir, out_dir, meta, window)
 
     test_py, weights_json, pytest_json = emit_tests(source["checks"])
     (out_dir / "test_outputs.py").write_text(test_py, encoding="utf-8")

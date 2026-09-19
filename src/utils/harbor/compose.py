@@ -121,7 +121,45 @@ LLM_PROXY_URL = "http://litellm-proxy:4000"
 DEFAULT_CURRENT_DATE = "2026-05-28"
 
 
-def runtime_env_defaults() -> dict:
+def resolve_current_date(task_dir: Optional[Path] = None) -> str:
+    """The bundle's "today", as the task's own narrative dates it.
+
+    A hard-coded date contradicts any task whose prompts.json narrates a
+    different window, so date-relative logic inside the environment disagrees
+    with the agent's simulated clock — that mismatch has already been stripped
+    out of delivered bundles by hand once. Resolution order:
+
+    1. The sim clock's T0 instant, when the turn schedule carries one.
+    2. The task's declared window start, which covers schedules whose turns
+       omit timestamps (a window with no resolvable T0 previously fell all the
+       way through to the static default and shipped the wrong date).
+    3. DEFAULT_CURRENT_DATE, only for a task that declares neither.
+    """
+    if not task_dir:
+        return DEFAULT_CURRENT_DATE
+    try:
+        from src.utils.sim_clock import compute_sim_clock
+
+        sim = compute_sim_clock({"task_dir": str(task_dir)})
+    except Exception:  # pragma: no cover - never fail a bundle over a clock read
+        sim = None
+    if sim is not None:
+        return sim.iso[:10]
+    return _window_start_date(task_dir) or DEFAULT_CURRENT_DATE
+
+
+def _window_start_date(task_dir: Path) -> Optional[str]:
+    """The declared window's first day, per src/utils/task_standard.py."""
+    try:
+        from src.utils.task_standard import resolve_window
+
+        window = resolve_window(Path(task_dir))
+    except Exception:  # pragma: no cover - never fail a bundle over a date read
+        return None
+    return window.current_date if window is not None else None
+
+
+def runtime_env_defaults(task_dir: Optional[Path] = None) -> dict:
     """Env vars every agent/verifier/solution container should see.
 
     LLAMA_API_KEY is intentionally absent: it is a secret, so it is only ever
@@ -132,7 +170,7 @@ def runtime_env_defaults() -> dict:
         "LITELLM_BASE_URL": LLM_PROXY_URL,
         "OPENAI_API_BASE": f"{LLM_PROXY_URL}/v1",
         "OPENAI_API_KEY": "placeholder",
-        "CURRENT_DATE": DEFAULT_CURRENT_DATE,
+        "CURRENT_DATE": resolve_current_date(task_dir),
     }
 
 
@@ -158,7 +196,8 @@ def _healthcheck_cmd(port: int, path: str) -> str:
 
 def generate_harbor_compose(env_dir: Path,
                             services: Optional[Iterable[Mapping]] = None,
-                            env_vars: Optional[Mapping[str, str]] = None) -> str:
+                            env_vars: Optional[Mapping[str, str]] = None,
+                            task_dir: Optional[Path] = None) -> str:
     """Render the Harbor `data/environment/docker-compose.yaml`.
 
     The `main` service waits for every mock service to become healthy and
@@ -188,7 +227,7 @@ def generate_harbor_compose(env_dir: Path,
     lines.append("    environment:")
     for key, value in env_vars.items():
         lines.append(f"      - {key}={value}")
-    runtime_env = runtime_env_defaults()
+    runtime_env = runtime_env_defaults(task_dir)
     lines.append(f"      - LITELLM_BASE_URL={runtime_env['LITELLM_BASE_URL']}")
     lines.append(f"      - OPENAI_API_BASE={runtime_env['OPENAI_API_BASE']}")
     lines.append(f"      - OPENAI_API_KEY={runtime_env['OPENAI_API_KEY']}")

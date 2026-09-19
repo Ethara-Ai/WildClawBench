@@ -84,6 +84,8 @@ def create_order(body: Optional[dict] = Body(default=None)):
         payment_method_title=body.get("payment_method_title", "Direct Bank Transfer"),
         billing=body.get("billing"),
         line_items=body.get("line_items"),
+        total=body.get("total"),
+        total_tax=body.get("total_tax"),
     )
     if isinstance(result, dict) and "error" in result:
         return JSONResponse(status_code=404, content=result)

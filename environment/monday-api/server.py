@@ -6,7 +6,7 @@ consistency with the other Kensei2 environments. Base path: /v2
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Dict, Any
 
 import monday_data
@@ -60,6 +60,24 @@ def board_items(board_id: str):
     return result
 
 
+@app.get("/v2/boards/{board_id}/groups")
+def board_groups(board_id: str):
+    result = monday_data.list_groups(board_id=board_id)
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result
+
+
+# --- Groups ---
+
+@app.get("/v2/groups")
+def groups(board_id: Optional[str] = None):
+    result = monday_data.list_groups(board_id=board_id)
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result
+
+
 # --- Items ---
 
 @app.get("/v2/items")
@@ -68,6 +86,8 @@ def list_items(board_id: Optional[str] = None, group_id: Optional[str] = None):
 
 
 class ItemCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     board_id: str
     item_name: str
     group_id: Optional[str] = None
@@ -96,20 +116,43 @@ def get_item(item_id: str):
 
 
 class ItemUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     column_id: Optional[str] = None
     text: Optional[str] = None
     value: Optional[str] = None
     group_id: Optional[str] = None
+    item_name: Optional[str] = None
+    column_values: Optional[Dict[str, Any]] = None
+
+
+#: The names ``monday_data.update_item`` actually branches on. ``text`` and
+#: ``value`` are deliberately absent: both are modifiers of ``column_id`` and
+#: neither reaches a write branch without it, so a body carrying only those is
+#: still a no-op and has to be reported as one.
+ITEM_UPDATE_FIELDS = ("column_values", "column_id", "item_name", "group_id")
 
 
 @app.put("/v2/items/{item_id}")
 def update_item(item_id: str, body: ItemUpdateBody):
+    # Mirrors update_item's own write conditions, so nothing that used to apply
+    # is refused here: the empty string is a rename, the empty dict is not.
+    if not (body.group_id is not None or body.item_name is not None
+            or body.column_id is not None or bool(body.column_values)):
+        return JSONResponse(status_code=400, content={
+            "error": "no updatable field supplied; expected one of "
+                     + ", ".join(ITEM_UPDATE_FIELDS)
+                     + " (column_id names the cell, text or value carries it)",
+        })
+
     result = monday_data.update_item(
         item_id,
         column_id=body.column_id,
         text=body.text,
         value=body.value,
         group_id=body.group_id,
+        name=body.item_name,
+        column_values=body.column_values,
     )
     if "error" in result:
         return JSONResponse(status_code=404, content=result)

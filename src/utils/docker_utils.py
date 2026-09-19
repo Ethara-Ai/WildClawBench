@@ -78,6 +78,84 @@ def _validate_env_arg(key: str, value: str) -> tuple[str, str]:
     return key, value
 
 
+# ---------------------------------------------------------------------------
+# Agent-container credential containment
+#
+# The graded agent container is adversarial and its shell output is delivered:
+# anything an `env` prints lands verbatim in chat.jsonl, which ships inside the
+# bundle and is read by the judge. Two of the three env-assembly loops in
+# start_container resolve their VALUES from the harness process environment by
+# NAME (extra_env from the task file's Env section, lobster_env from
+# --lobster-env), so a task that merely names an upstream credential has the
+# live one forwarded into the graded container.
+#
+# Upstream provider credentials belong to the sidecar and the cc-bridge only.
+# litellm_sidecar.start_litellm puts AWS_BEARER_TOKEN_BEDROCK / ANTHROPIC_API_KEY
+# / OPENAI_API_KEY / WCB_CC_BRIDGE_SECRET / ONEP_API_KEY in the SIDECAR
+# container's env, which is where they are supposed to live and is untouched
+# here. The agent needs nothing more than a base URL pointing at the sidecar
+# plus a run-scoped inbound token, so these names are dropped at the choke
+# point instead of being trusted not to be asked for.
+#
+# Beyond disclosure this is a billing-integrity guard: an agent holding an
+# upstream key (or a base URL aimed past the sidecar) calls the provider
+# directly, so the usage callback never sees the request and the run's token
+# and dollar totals under-report by whatever the agent spent off-book.
+_AGENT_DENIED_ENV_KEYS = frozenset({
+    # Anthropic, both routes. ANTHROPIC_AUTH_TOKEN has no consumer in the agent
+    # image at all (openclaw's dist never reads it; only the vendored
+    # @anthropic-ai/sdk does, as a fallback for an authToken it is already
+    # handed explicitly), so it is pure duplication of a credential channel.
+    # ANTHROPIC_OAUTH_TOKEN is worse: openclaw DOES read it, and would spend
+    # the subscription directly instead of through the bridge that performs the
+    # billing-attribution transform.
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_OAUTH_TOKEN",
+    "KENSEI_ANTHROPIC_API_KEY",
+    # Bedrock route.
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "AWS_BEARER_TOKEN_BEDROCK",
+    # Other upstreams the sidecar fronts.
+    "OPENAI_API_KEY",
+    "OPENAI_API_KEY_WHISPER",
+    "ONEP_API_KEY",
+    "OPENROUTER_API_KEY",
+    # The sidecar's and the bridges' own inbound secrets. The agent authenticates
+    # with a run-scoped token; holding the master key would let it call any model
+    # on the sidecar untagged, and holding a bridge secret would let it skip the
+    # sidecar entirely.
+    "LITELLM_MASTER_KEY",
+    "KENSEI_LITELLM_MASTER_KEY",
+    "KENSEI3_LITELLM_MASTER_KEY",
+    "WCB_CC_BRIDGE_SECRET",
+    "WCB_CODEX_BRIDGE_SECRET",
+})
+
+# The agent does need these three, but only at the values the runner assembles
+# per attempt: the sidecar's in-network base URL and a run-scoped token, which
+# arrive through extra_env_dict. Resolving them from the harness env by name
+# instead hands over the harness's live key and aims the agent at
+# api.anthropic.com, past the sidecar.
+_AGENT_HOST_RESOLVED_DENIED_ENV_KEYS = frozenset({
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_BASE_URL",
+    "ANTHROPIC_API_BASE",
+})
+
+
+def _agent_env_denied(key: str, *, host_resolved: bool) -> bool:
+    """True when ``key`` must not be injected into the graded agent container.
+
+    ``host_resolved`` marks the callers that look the value up in the harness
+    process environment by name; those carry the extra ANTHROPIC_* restriction.
+    """
+    if key in _AGENT_DENIED_ENV_KEYS:
+        return True
+    return host_resolved and key in _AGENT_HOST_RESOLVED_DENIED_ENV_KEYS
+
+
 def _validate_docker_token(name: str, token: str) -> str:
     """Validate a bare argv token (image, network, container_name, ...).
 
@@ -126,6 +204,31 @@ def remove_container(name: str) -> None:
     subprocess.run(["docker", "rm", "-f", name], capture_output=True)
 
 
+def stop_container(name: str, timeout: int = 10) -> bool:
+    """Stop ``name`` and WAIT for it to exit, leaving the container in place.
+
+    ``docker stop`` does not return until the process group is gone (SIGTERM,
+    then SIGKILL after ``timeout``), so this doubles as the join: once it
+    returns, nothing inside that container can issue another request. That is
+    the point of having it separate from ``remove_container`` — the run still
+    needs the stopped container's filesystem for later ``docker cp``, but it
+    must NOT still be serving traffic while the sidecar usage log is read.
+
+    Returns whether the container reached a stopped state; an already-stopped
+    or already-removed container is not a failure, so the caller can treat this
+    as fail-open.
+    """
+    r = subprocess.run(
+        ["docker", "stop", "-t", str(int(timeout)), name],
+        capture_output=True, text=True,
+    )
+    if r.returncode == 0:
+        return True
+    # "No such container" means there is nothing left to quiesce, which is the
+    # state the caller asked for. Anything else is a real failure to stop.
+    return "No such container" in (r.stderr or "")
+
+
 def _container_running(task_id: str) -> bool:
     r = subprocess.run(
         ["docker", "inspect", "-f", "{{.State.Running}}", task_id],
@@ -134,40 +237,220 @@ def _container_running(task_id: str) -> bool:
     return r.returncode == 0 and r.stdout.strip() == "true"
 
 
-def _map_workspace_dst(container_dst: str) -> str:
+# Every spelling of "the agent's writable workspace" seen in authored inject
+# mutations. All of them denote the SAME tree (TMP_WORKSPACE); before 2026-09
+# only the first two were rewritten, so a dst of '/data/home/...' was honored
+# verbatim and landed OUTSIDE the workspace (invisible to the agent and to the
+# artifacts diff), while a relative 'data/home/...' built a phantom
+# {TMP_WORKSPACE}/data/home tree beside the real one.
+_WORKSPACE_ALIAS_PREFIXES = (
+    "/workspace/",
+    "/app/",
+    "/root/workspace/",
+    "/root/.openclaw/workspace/",
+    "~/workspace/",
+    "/data/",
+    "data/",
+)
+# Canonical spellings: rewriting these is the designed path, not a smell, so
+# they do not emit the alias warning.
+_WORKSPACE_CANONICAL_PREFIXES = ("/workspace/", "/app/")
+_WORKSPACE_ALIAS_ROOTS = (
+    "/workspace", "/app", "/root/workspace", "/root/.openclaw/workspace",
+    "~/workspace", "/data", "data",
+)
+
+
+def _is_under(path: str, root: str) -> bool:
+    """True when ``path`` is ``root`` or lives beneath it (component-wise).
+
+    A raw ``startswith`` would accept '/tmp_workspace_evil' for the root
+    '/tmp_workspace', which is exactly the escape this guard exists to stop.
+    """
+    p = PurePosixPath(path)
+    r = PurePosixPath(root)
+    return p == r or r in p.parents
+
+
+def _map_workspace_dst(container_dst: str) -> "str | None":
     """Map an inject mutation's container path to the live agent workspace.
 
-    Inject mutations address files as ``/workspace/<rel>`` (occasionally
-    ``/app/<rel>``); the agent's writable tree lives at ``TMP_WORKSPACE``, which
+    Inject mutations address files through any of ``_WORKSPACE_ALIAS_PREFIXES``;
+    the agent's writable tree lives at ``TMP_WORKSPACE``, which
     ``/root/workspace`` and ``/root/.openclaw/workspace`` symlink to. A relative
-    path is taken as workspace-relative. Other absolute paths are honored as-is.
+    path is taken as workspace-relative.
+
+    Returns ``None`` for an absolute path that would land OUTSIDE
+    ``TMP_WORKSPACE`` — callers treat that as a failure with reason
+    ``dst_outside_workspace`` rather than silently writing to the container
+    root. Set ``WCB_INJECT_ALLOW_ABS=1`` to restore the pre-2026-09
+    honor-as-authored behaviour for deliberate out-of-workspace drops.
     """
     p = str(container_dst or "").strip()
-    for prefix in ("/workspace/", "/app/"):
+    if not p:
+        return None
+    for prefix in _WORKSPACE_ALIAS_PREFIXES:
         if p.startswith(prefix):
-            return str(PurePosixPath(TMP_WORKSPACE) / p[len(prefix):])
-    if p in ("/workspace", "/app"):
+            mapped = str(PurePosixPath(TMP_WORKSPACE) / p[len(prefix):])
+            if prefix not in _WORKSPACE_CANONICAL_PREFIXES:
+                logger.warning("inject fs: rewrote non-canonical dst %s -> %s "
+                               "(alias prefix %r)", p, mapped, prefix)
+            return mapped
+    if p in _WORKSPACE_ALIAS_ROOTS:
+        logger.warning("inject fs: rewrote workspace root %s -> %s", p, TMP_WORKSPACE)
         return TMP_WORKSPACE
-    if p.startswith(TMP_WORKSPACE) or p.startswith("/"):
-        return p
-    return str(PurePosixPath(TMP_WORKSPACE) / p)
+    if p.startswith("/"):
+        if _is_under(p, TMP_WORKSPACE):
+            return p
+        if os.environ.get("WCB_INJECT_ALLOW_ABS") == "1":
+            logger.warning("inject fs: dst %s is outside %s but "
+                           "WCB_INJECT_ALLOW_ABS=1 — honoring as authored",
+                           p, TMP_WORKSPACE)
+            return p
+        logger.warning("inject fs: REFUSING dst %s — maps outside %s "
+                       "(set WCB_INJECT_ALLOW_ABS=1 to override)",
+                       p, TMP_WORKSPACE)
+        return None
+    mapped = str(PurePosixPath(TMP_WORKSPACE) / p)
+    logger.warning("inject fs: rewrote relative dst %s -> %s", p, mapped)
+    return mapped
+
+
+class CopyOutcome:
+    """Result of one ``copy_file_into_workspace`` call.
+
+    Carries the tri-state ``ok`` the caller has always branched on PLUS the
+    container path the payload actually landed at, so the inject timeline can
+    record where a drop really went instead of the raw authored dst. Truthy
+    exactly when ``ok`` is truthy, so ``if result:`` still reads naturally.
+    """
+
+    __slots__ = ("ok", "mapped_dst", "reason")
+
+    def __init__(self, ok: "bool | None", mapped_dst: "str | None" = None,
+                 reason: str = "") -> None:
+        self.ok = ok
+        self.mapped_dst = mapped_dst
+        self.reason = reason
+
+    def __bool__(self) -> bool:
+        return bool(self.ok)
+
+    def __repr__(self) -> str:  # pragma: no cover - trivial
+        return (f"CopyOutcome(ok={self.ok!r}, mapped_dst={self.mapped_dst!r}, "
+                f"reason={self.reason!r})")
+
+
+def _container_file_size(task_id: str, dst: str) -> "int | None":
+    """Byte size of ``dst`` inside the container, or None if it is not a file."""
+    r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/sh", "-c",
+         f"if [ -f '{dst}' ]; then wc -c < '{dst}'; fi"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        return None
+    out = (r.stdout or "").strip()
+    if not out:
+        return None
+    try:
+        return int(out)
+    except ValueError:
+        return None
+
+
+def _container_file_mtime(task_id: str, dst: str) -> "int | None":
+    """Epoch SECONDS of ``dst``'s mtime inside the container, or None."""
+    r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/sh", "-c",
+         f"if [ -e '{dst}' ]; then stat -c %Y '{dst}'; fi"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        return None
+    out = (r.stdout or "").strip()
+    if not out:
+        return None
+    try:
+        return int(out)
+    except ValueError:
+        return None
+
+
+# `touch` writes whole seconds and the read-back costs one more exec, so allow a
+# couple of seconds of slack rather than demanding bit-exactness.
+_MTIME_TOLERANCE_S = 2
+
+
+def _verify_stamped_mtime(task_id: str, dst: str,
+                          mtime_epoch_ms: "int | None") -> bool:
+    """True when ``dst`` really carries the requested narrative mtime.
+
+    ``touch`` exits 0 in cases that leave the old mtime in place — a read-only
+    bind mount, an overlay shadowing the write, a dst that resolved to a
+    directory — and an unstamped drop keeps its baseline-or-older authoring
+    mtime, which is precisely the recency-invisible failure the stamp exists to
+    prevent. Verified the same way the byte-size read-back is: ask the
+    container, and report a mismatch as a placement failure.
+
+    Only an EXPLICIT stamp is checkable; without one ``_stamp_mtime`` touches
+    "now" and the container's faketime clock makes "now" unverifiable from the
+    host, so that case passes by definition.
+    """
+    if mtime_epoch_ms is None:
+        return True
+    want = int(mtime_epoch_ms) // 1000
+    got = _container_file_mtime(task_id, dst)
+    if got is None:
+        logger.error("[%s] INJECT FS NOT PLACED: %s has no readable mtime "
+                     "(requested @%d)", task_id, dst, want)
+        return False
+    if abs(got - want) > _MTIME_TOLERANCE_S:
+        logger.error("[%s] INJECT FS NOT PLACED: %s mtime @%d != requested @%d "
+                     "— the narrative stamp did not stick, so the drop stays "
+                     "invisible to recency searches", task_id, dst, got, want)
+        return False
+    return True
+
+
+def _stamp_mtime(task_id: str, dst: str, mtime_epoch_ms: "int | None") -> None:
+    """Make ``dst`` newer than the staged baseline.
+
+    ``docker cp`` preserves the HOST file's mtime, which for an authored inject
+    payload is whenever the task was written — older than the baseline files
+    staged at container start. A `find -newer` sweep (the harness's own
+    changed-file detection, and the agent's) therefore never saw mid-run drops.
+    An explicit sim epoch keeps the narrative ordering; without one a plain
+    `touch` (real now) is still strictly newer than the baseline.
+    """
+    if mtime_epoch_ms is None:
+        cmd = ["docker", "exec", task_id, "touch", "-m", dst]
+    else:
+        cmd = ["docker", "exec", task_id, "touch", "-m", "-d",
+               f"@{int(mtime_epoch_ms) // 1000}", dst]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        logger.warning("[%s] inject fs: mtime stamp failed for %s: %s",
+                       task_id, dst, (r.stderr or "").strip())
 
 
 def copy_file_into_workspace(task_id: str, host_src: "Path | None",
-                             container_dst: str, mkdir: bool = False) -> "bool | None":
+                             container_dst: str, mkdir: bool = False,
+                             mtime_epoch_ms: "int | None" = None) -> "CopyOutcome":
     """InjectDirector filesystem hook: place a host file (or mkdir) inside the
     running agent container's workspace via ``docker cp`` / ``docker exec``.
 
-    Tri-state return, because "the container does not exist yet" and "the copy
-    was attempted and failed" are different facts and the caller records them
-    differently:
+    Returns a :class:`CopyOutcome` whose ``ok`` keeps the historical tri-state,
+    because "the container does not exist yet" and "the copy was attempted and
+    failed" are different facts and the caller records them differently:
 
     * ``None``  — the container is not running, so nothing was attempted. This
       is the pre-T0 seed stage, which fires before the agent container starts
       and whose drops are redundant with the mounted ``/app`` baseline. The
       caller logs ``status="skipped_container_down"``.
     * ``False`` — a copy/mkdir was attempted and failed. A genuine defect.
-    * ``True``  — applied.
+    * ``True``  — applied AND verified present at ``mapped_dst`` with the
+      host file's byte size and, when one was requested, the narrative mtime.
 
     Collapsing the first two onto ``False`` (the pre-2026-08 behaviour) made a
     dropped payload indistinguishable from a benign seed skip, so a stage0 file
@@ -175,32 +458,66 @@ def copy_file_into_workspace(task_id: str, host_src: "Path | None",
     Per-turn drops fire mid-run while the container is up.
     """
     if not _container_running(task_id):
-        logger.info("[%s] inject fs: container not up; skip %s", task_id, container_dst)
-        return None
+        # WARNING, not INFO: mid-run this means a turn's payload silently never
+        # landed. Benign only at seed time, where the caller knows the phase.
+        logger.warning("[%s] inject fs: container not up; skip %s",
+                       task_id, container_dst)
+        return CopyOutcome(None, None, "container_down")
     dst = _map_workspace_dst(container_dst)
+    if dst is None:
+        logger.error("[%s] INJECT FS NOT PLACED: dst %s maps outside %s",
+                     task_id, container_dst, TMP_WORKSPACE)
+        return CopyOutcome(False, None, "dst_outside_workspace")
     try:
         if mkdir:
             r = subprocess.run(["docker", "exec", task_id, "mkdir", "-p", dst],
                                capture_output=True, text=True)
-            return r.returncode == 0
+            if r.returncode != 0:
+                logger.error("[%s] INJECT FS NOT PLACED: mkdir -p %s failed: %s",
+                             task_id, dst, (r.stderr or "").strip())
+                return CopyOutcome(False, dst, "mkdir_failed")
+            return CopyOutcome(True, dst)
         if host_src is None:
-            return False
+            return CopyOutcome(False, dst, "no_src")
         parent = str(PurePosixPath(dst).parent)
-        subprocess.run(["docker", "exec", task_id, "mkdir", "-p", parent],
-                       capture_output=True, text=True)
+        mk = subprocess.run(["docker", "exec", task_id, "mkdir", "-p", parent],
+                            capture_output=True, text=True)
+        if mk.returncode != 0:
+            # An unreported parent-mkdir failure surfaces later as a `docker cp`
+            # error whose stderr blames the destination, not the missing dir.
+            logger.error("[%s] INJECT FS NOT PLACED: mkdir -p %s failed: %s",
+                         task_id, parent, (mk.stderr or "").strip())
+            return CopyOutcome(False, dst, "mkdir_parent_failed")
         r = subprocess.run(["docker", "cp", str(host_src), f"{task_id}:{dst}"],
                            capture_output=True, text=True)
         if r.returncode != 0:
             logger.warning("[%s] inject fs: docker cp failed %s -> %s: %s",
                            task_id, host_src, dst, (r.stderr or "").strip())
-            return False
+            return CopyOutcome(False, dst, "cp_failed")
         # Keep agent-writable so later turns can edit (mirrors setup_workspace).
         subprocess.run(["docker", "exec", task_id, "chmod", "-R", "u+w", dst],
                        capture_output=True, text=True)
-        return True
+        _stamp_mtime(task_id, dst, mtime_epoch_ms)
+        # `docker cp` exits 0 for copies that produced nothing usable (dst was
+        # an existing directory, a bind-mounted overlay shadowed the write, ...).
+        # Read the placed file back and compare sizes so a green op means the
+        # bytes are really there.
+        try:
+            want = Path(host_src).stat().st_size
+        except OSError:
+            want = None
+        got = _container_file_size(task_id, dst)
+        if want is not None and got != want:
+            logger.error("[%s] INJECT FS NOT PLACED: %s -> %s size mismatch "
+                         "(host=%s container=%s)", task_id, host_src, dst,
+                         want, "missing" if got is None else got)
+            return CopyOutcome(False, dst, "size_mismatch")
+        if not _verify_stamped_mtime(task_id, dst, mtime_epoch_ms):
+            return CopyOutcome(False, dst, "mtime_mismatch")
+        return CopyOutcome(True, dst)
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("[%s] inject fs: error placing %s: %s", task_id, dst, exc)
-        return False
+        return CopyOutcome(False, dst, str(exc))
 
 
 def set_agent_sim_clock(task_id: str, epoch_ms: int) -> bool:
@@ -219,15 +536,70 @@ def set_agent_sim_clock(task_id: str, epoch_ms: int) -> bool:
     if not _container_running(task_id):
         logger.info("[%s] sim clock: container not up; skip re-anchor", task_id)
         return False
-    parent = str(PurePosixPath(AGENT_SIM_CLOCK_FILE).parent)
     r = subprocess.run(
         ["docker", "exec", task_id, "/bin/sh", "-c",
-         f"mkdir -p {parent} && printf '%s' '{int(epoch_ms)}' > {AGENT_SIM_CLOCK_FILE}"],
+         _write_sim_clock_anchor_sh(epoch_ms)],
         capture_output=True, text=True,
     )
     if r.returncode != 0:
         logger.warning("[%s] sim clock re-anchor failed: %s",
                        task_id, (r.stderr or "").strip())
+        return False
+    return True
+
+
+def _write_sim_clock_anchor_sh(epoch_ms: int) -> str:
+    """Shell that (re)writes the anchor file. Its MTIME is the anchor instant.
+
+    The shim derives ``simulated = anchor + (realNow - mtime)``, so the write
+    must land as one fresh file rather than an in-place edit — every process
+    that later reads it must recover the same instant this anchor took effect.
+    """
+    parent = str(PurePosixPath(AGENT_SIM_CLOCK_FILE).parent)
+    return (f"mkdir -p {parent} && "
+            f"printf '%s' '{int(epoch_ms)}' > {AGENT_SIM_CLOCK_FILE}")
+
+
+def seed_agent_sim_clock(task_id: str, epoch_ms: int, node_options: str) -> bool:
+    """Make the simulated clock reachable from ENV-SCRUBBED processes.
+
+    cron does not inherit the container's environment (nor do ``su -``, systemd
+    units, or anything else re-execing through a clean env), so both halves of
+    the shim's delivery are dropped for a cron job: NODE_OPTIONS (which
+    preloads the shim) and WCB_FAKE_CLOCK_EPOCH_MS (the anchor). Such a process
+    silently ran on the REAL host clock while the agent ran months away in
+    persona time. Two writes at container start close that:
+
+      * AGENT_SIM_CLOCK_FILE, seeded here so it exists from turn 0 — the shim
+        reads its anchor from this file regardless of env, at the path it
+        defaults to when WCB_FAKE_CLOCK_FILE is scrubbed too.
+      * /etc/environment, which cron and PAM's env module apply to jobs, so the
+        preload actually happens in the child.
+
+    Best effort: a failure leaves the env-var path (main agent process) intact
+    and is logged, never fatal.
+    """
+    lines = "".join(
+        f"{k}={v}\n" for k, v in (
+            ("NODE_OPTIONS", node_options),
+            ("WCB_FAKE_CLOCK_FILE", AGENT_SIM_CLOCK_FILE),
+            ("WCB_FAKE_CLOCK_EPOCH_MS", str(int(epoch_ms))),
+        )
+    )
+    script = (
+        f"{_write_sim_clock_anchor_sh(epoch_ms)} && "
+        f"touch /etc/environment && "
+        f"sed -i '/^NODE_OPTIONS=/d; /^WCB_FAKE_CLOCK_/d' /etc/environment && "
+        f"printf '%s' {shlex.quote(lines)} >> /etc/environment"
+    )
+    r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/sh", "-c", script],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        logger.warning(
+            "[%s] sim clock: could not seed anchor/cron env — cron jobs will "
+            "run on the REAL host clock: %s", task_id, (r.stderr or "").strip())
         return False
     return True
 
@@ -286,7 +658,9 @@ def require_image_present(image: str) -> None:
             )
         raise RuntimeError(
             f"Required Docker image not present locally: {image}\n"
-            f"Load it first (e.g. `docker load -i Images/wildclawbench-ubuntu_v1.3.tar`)\n"
+            f"`bash script/run.sh` provisions it during preflight: `docker load` the "
+            f"v1.3 base from Images/wildclawbench-ubuntu_v1.3.tar, then build the "
+            f"whisper layer on top via docker/agent-whisper.Dockerfile\n"
             f"or set DOCKER_IMAGE to a tag that exists.\n"
             f"(Checked with `docker image ls -q {image}` and an inspect fallback; "
             f"both came back empty.)"
@@ -350,12 +724,23 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
         key = line.strip()
         if not key or key.startswith("#"):
             continue
+        if _agent_env_denied(key, host_resolved=True):
+            logger.warning(
+                "[%s] REFUSED to forward %s from the harness environment into the "
+                "agent container (credential containment)", task_id, key)
+            continue
         value = os.environ.get(key, "")
         env_pairs.append((key, value))
         masked = (value[:4] + "***") if value else "(empty)"
         logger.info("[%s] Injecting env var: %s=%s", task_id, key, masked)
 
     for key in (lobster_env or []):
+        if _agent_env_denied(key, host_resolved=True):
+            logger.warning(
+                "[%s] REFUSED to forward lobster env key %s from the harness "
+                "environment into the agent container (credential containment)",
+                task_id, key)
+            continue
         value = os.environ.get(key, "")
         if not value:
             logger.warning("[%s] Lobster env key %s not found in environment, skipping", task_id, key)
@@ -366,6 +751,11 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
 
     _injected_keys: list[str] = []
     for k, v in (extra_env_dict or {}).items():
+        if _agent_env_denied(k, host_resolved=False):
+            logger.warning(
+                "[%s] REFUSED to inject %s into the agent container "
+                "(credential containment)", task_id, k)
+            continue
         env_pairs.append((k, v))
         _injected_keys.append(k)
     if _injected_keys:
@@ -379,6 +769,7 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
     # rebuild: OpenClaw runs under node, which honors NODE_OPTIONS=--require, and
     # the shim leaves the monotonic clock untouched so timeouts stay in real time.
     sim_args: list[str] = []
+    sim_node_opts = ""
     if sim_clock_epoch_ms is not None:
         shim_host = Path(__file__).resolve().parents[2] / "docker" / "agent_faketime_shim.js"
         if not shim_host.is_file():
@@ -401,10 +792,12 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
             if any(c in node_opts for c in _FORBIDDEN_VALUE_CHARS):
                 raise ValueError("NODE_OPTIONS contains a forbidden control char")
             sim_args = ["-v", f"{shim_host}:{shim_ctr}:ro", "-e", f"NODE_OPTIONS={node_opts}"]
+            sim_node_opts = node_opts
             env_pairs.append(("WCB_FAKE_CLOCK_EPOCH_MS", str(int(sim_clock_epoch_ms))))
             # Turn-0 anchor rides the env var; later turns re-anchor by writing
             # AGENT_SIM_CLOCK_FILE (env is immutable on a running container).
-            # The shim falls back to the env value while the file is absent.
+            # Both are seeded into the container below as well, because a
+            # process started from a scrubbed env (cron) inherits neither.
             env_pairs.append(("WCB_FAKE_CLOCK_FILE", AGENT_SIM_CLOCK_FILE))
             if sim_tz:
                 env_pairs.append(("TZ", sim_tz))
@@ -430,6 +823,9 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
     if r.returncode != 0:
         raise RuntimeError(f"Container startup failed:\n{r.stderr}")
     logger.info("[%s] Container ID: %s", task_id, r.stdout.strip()[:12])
+
+    if sim_node_opts and sim_clock_epoch_ms is not None:
+        seed_agent_sim_clock(task_id, int(sim_clock_epoch_ms), sim_node_opts)
 
     if tmp_path and os.path.exists(tmp_path):
         mkdir_cmd = ["docker", "exec", task_id, "mkdir", "-p", "/tmp_workspace/tmp"]
@@ -1968,8 +2364,8 @@ def _injected_payloads(inject_timeline: "Path | None") -> "dict[str, str]":
             continue
         if not rec.get("ok"):
             continue
-        mapped = _map_workspace_dst(str(rec.get("dst") or ""))
-        if not mapped.startswith(TMP_WORKSPACE):
+        mapped = rec.get("mapped_dst") or _map_workspace_dst(str(rec.get("dst") or ""))
+        if not mapped or not _is_under(mapped, TMP_WORKSPACE):
             continue
         rel = mapped[len(TMP_WORKSPACE):].lstrip("/")
         if rel:
@@ -2178,7 +2574,19 @@ def inject_persona_into_workspace(task_id: str, persona_dir: str) -> None:
         )
 
 
-def inject_data_into_workspace(task_id: str, data_dir: str) -> None:
+def _t0_epoch_ms_for_data_dir(data_dir: str) -> "int | None":
+    """T0 simulated epoch for the task owning ``<task_dir>/data``, or None."""
+    try:
+        from src.utils.sim_clock import compute_sim_clock
+
+        sim = compute_sim_clock({"task_dir": str(Path(data_dir).parent)})
+    except Exception:  # pragma: no cover - never break staging over a clock read
+        return None
+    return sim.epoch_ms if sim is not None else None
+
+
+def inject_data_into_workspace(task_id: str, data_dir: str,
+                               mtime_epoch_ms: "int | None" = None) -> None:
     """Stage legacy `data/` input artifacts at /root/workspace/home.
 
     Pre-23b0fc7 tasks ship their input documents in `<task>/data/` rather than
@@ -2189,7 +2597,14 @@ def inject_data_into_workspace(task_id: str, data_dir: str) -> None:
     hint promises the agent). MUST run AFTER setup_workspace + the persona inject
     so it lands on top of the bootstrapped workspace. Best-effort: a failure is
     logged, never raised. Only invoked when the task loader set `data_dir` (i.e.
-    the task ships input documents in <task>/data/)."""
+    the task ships input documents in <task>/data/).
+
+    Baseline files are stamped at the task's T0 simulated instant (derived from
+    ``<task_dir>/prompts.json`` when the caller passes no explicit
+    ``mtime_epoch_ms``) so every later per-turn inject drop is strictly newer:
+    `find -newer` sweeps depend on that ordering, and `docker cp` otherwise
+    preserves whatever authoring-time host mtimes the payloads happen to carry.
+    """
     home = f"{TMP_WORKSPACE}/home"
     mk = subprocess.run(
         ["docker", "exec", task_id, "/bin/bash", "-c", f"mkdir -p {home}"],
@@ -2205,6 +2620,20 @@ def inject_data_into_workspace(task_id: str, data_dir: str) -> None:
     if r.returncode != 0:
         logger.error("[%s] data→workspace copy failed: %s", task_id, r.stderr)
         return
+    t0_ms = mtime_epoch_ms if mtime_epoch_ms is not None \
+        else _t0_epoch_ms_for_data_dir(data_dir)
+    if t0_ms is not None:
+        stamp = subprocess.run(
+            ["docker", "exec", task_id, "/bin/bash", "-c",
+             f"find {home} -exec touch -m -d @{int(t0_ms) // 1000} {{}} +"],
+            capture_output=True, text=True,
+        )
+        if stamp.returncode != 0:
+            logger.warning("[%s] data→workspace mtime stamp failed: %s",
+                           task_id, (stamp.stderr or "").strip())
+        else:
+            logger.info("[%s] data→workspace baseline stamped at T0 epoch_ms=%s",
+                        task_id, t0_ms)
     count_r = subprocess.run(
         ["docker", "exec", task_id, "/bin/bash", "-c",
          f"find {home} -type f 2>/dev/null | wc -l"],

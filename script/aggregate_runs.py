@@ -47,6 +47,9 @@ def _run_exclusion_reason(score: dict) -> str | None:
             return "injection_failed"
         if score.get("eval_skipped"):
             return "unmeasured"
+        # Judge no-signal sentinel (mirror of run_batch.py:_run_exclusion_reason).
+        if score.get("error"):
+            return "no_signal"
     return None
 
 

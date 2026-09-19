@@ -81,11 +81,13 @@ TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 # 0 restores unbounded (known to 400 every council member).
 _DEFAULT_JUDGE_MAX_EVIDENCE = 450_000
 
-# Claude via the OAuth subscription bridge. The judge on this route is now
-# Sonnet 5 (claude-sonnet-5), which documents a 1,000,000-token context window
-# by default on the Claude API (no beta header) — a large increase over the
-# Sonnet 4.5 era, when this route capped at 200,000 tokens and this constant
-# was 300,000 chars.
+# Claude via the OAuth subscription bridge. The judge on this route defaults
+# to Sonnet 4.6 (claude-sonnet-4-6, judge_litellm._judge_oauth_bridge_model),
+# which documents a 1,000,000-token context window on the Claude API (no beta
+# header) — a large increase over the Sonnet 4.5 era, when this route capped
+# at 200,000 tokens and this constant was 300,000 chars. (Sonnet 5 is still
+# selectable via KENSEI_JUDGE_OAUTH_BRIDGE_MODEL and documents the same 1M
+# window.)
 #
 # We do NOT budget to the full 1M window: the usable context on a Claude Max
 # *subscription* surface (as opposed to the plain Anthropic API) is NOT
@@ -803,6 +805,7 @@ _DELIVERABLE_DIR_NAMES = ("results", "deliverables", "output", "out", "artifacts
 _DELIVERABLE_EXTS = {
     ".csv", ".tsv", ".md", ".markdown", ".json", ".txt", ".text",
     ".yaml", ".yml", ".html", ".htm", ".xml", ".log",
+    ".py", ".sh", ".js", ".svg",
 }
 # Binary deliverable formats. These are made VISIBLE to the grader (listed in
 # the deliverables manifest, collected by `_collect_deliverable_files`) so
@@ -813,7 +816,7 @@ _DELIVERABLE_EXTS = {
 # `_is_text_deliverable` in a follow-up step; until then binaries appear as
 # presence-only entries.
 _BINARY_DELIVERABLE_EXTS = {
-    ".pdf", ".xlsx", ".docx", ".pptx",
+    ".pdf", ".xlsx", ".docx", ".pptx", ".ipynb",
 }
 # Image deliverables: surfaced to the judge with a stdlib dimension marker
 # (PNG IHDR / JPEG SOF read with `struct` — NO Pillow, preserving the stdlib-only
@@ -824,7 +827,17 @@ _BINARY_DELIVERABLE_EXTS = {
 _IMAGE_DELIVERABLE_EXTS = {
     ".png", ".jpg", ".jpeg", ".webp", ".gif",
 }
-_ALL_DELIVERABLE_EXTS = _DELIVERABLE_EXTS | _BINARY_DELIVERABLE_EXTS | _IMAGE_DELIVERABLE_EXTS
+# Audio deliverables: transcribed host-side by a local sherpa-onnx model
+# (src/utils/judge_asr.py) since the judges accept no audio modality. When ASR
+# is unavailable they degrade to a presence marker carrying the stdlib wav
+# duration when readable. Files over _AUDIO_MAX_TRANSCRIBE_BYTES are disclosed
+# with a presence marker instead of being transcribed.
+_AUDIO_DELIVERABLE_EXTS = {
+    ".wav", ".mp3", ".m4a",
+}
+_AUDIO_MAX_TRANSCRIBE_BYTES = 50_000_000
+_ALL_DELIVERABLE_EXTS = (_DELIVERABLE_EXTS | _BINARY_DELIVERABLE_EXTS
+                         | _IMAGE_DELIVERABLE_EXTS | _AUDIO_DELIVERABLE_EXTS)
 # Raw-byte cap for TEXT files found by the root-level scan only. Text bodies are
 # pasted verbatim, so raw size is their evidence cost. Documents (pdf/docx/xlsx/
 # pptx) are bounded by _EXTRACT_CHAR_CAP instead and images contribute only a
@@ -1044,6 +1057,10 @@ def _is_image_deliverable(path: Path) -> bool:
     return path.suffix.lower() in _IMAGE_DELIVERABLE_EXTS
 
 
+def _is_audio_deliverable(path: Path) -> bool:
+    return path.suffix.lower() in _AUDIO_DELIVERABLE_EXTS
+
+
 _DOCX_W_T = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
 _XLSX_SS_T = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t"
 _XLSX_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
@@ -1135,6 +1152,27 @@ def _extract_document_text(path: Path) -> str | None:
                         slide_parts.extend(n.text or "" for n in slide.iter(_PPTX_A_T))
             text = " ".join(p for p in slide_parts if p).strip()
             return text or None
+        if ext == ".ipynb":
+            # Notebooks are JSON, but raw inclusion would dump megabytes of
+            # base64 image outputs into evidence. Keep cell sources + textual
+            # outputs (stream / text-plain / error traces); drop binary blobs.
+            nb = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+            parts_nb: list[str] = []
+            for cell in nb.get("cells", []):
+                src = "".join(cell.get("source", []) or [])
+                if src.strip():
+                    parts_nb.append(f"[{cell.get('cell_type', 'cell')}]\n{src}")
+                for out in cell.get("outputs", []) or []:
+                    if out.get("output_type") == "stream":
+                        parts_nb.append("".join(out.get("text", []) or []))
+                    elif out.get("output_type") == "error":
+                        parts_nb.append("\n".join(out.get("traceback", []) or []))
+                    else:
+                        txt = (out.get("data") or {}).get("text/plain")
+                        if txt:
+                            parts_nb.append("".join(txt if isinstance(txt, list) else [txt]))
+            text = "\n".join(parts_nb).strip()
+            return text or None
         if ext == ".pdf":
             try:
                 import pypdf
@@ -1186,6 +1224,26 @@ def _deliverable_evidence_marker(
             return _presence_marker(
                 label, path,
                 f"image pixels are not attached for standalone image files ({size})",
+            ), []
+        if _is_audio_deliverable(path):
+            size = _file_size(path)
+            if size is not None and size > _AUDIO_MAX_TRANSCRIBE_BYTES:
+                return _presence_marker(
+                    label, path,
+                    f"audio exceeds the {_AUDIO_MAX_TRANSCRIBE_BYTES}-byte transcription cap",
+                ), []
+            from . import judge_asr
+            transcript = judge_asr.transcribe(path)
+            if transcript:
+                return (
+                    f"\n----- DELIVERABLE: {label} (audio, transcribed offline) -----\n"
+                    f"{transcript}"
+                ), []
+            duration = judge_asr.wav_duration_marker(path)
+            return _presence_marker(
+                label, path,
+                f"audio transcript unavailable ({duration})" if duration
+                else "audio transcript unavailable",
             ), []
         if _is_binary_deliverable(path):
             extracted = _extract_document_text(path)
@@ -1275,7 +1333,8 @@ def _budget_transcript(transcript: str, budget: int) -> str:
 # unrelated "tmp"/"build" in the host path (e.g. pytest tmp_path) never
 # triggers the demotion.
 _SCRATCH_DIR_NAMES = {
-    "_scratch", "build", "extract", "scratch", "tmp", "temp",
+    "_scratch", ".scratch", ".tmp", ".cache", "build", "extract", "scratch",
+    "tmp", "temp", "work", "intermediate",
     "__pycache__", "node_modules", ".git",
 }
 
@@ -1284,7 +1343,8 @@ _SCRATCH_DIR_NAMES = {
 # list mirrors _ALL_DELIVERABLE_EXTS.
 _RUBRIC_FILE_RE = re.compile(
     r"[\w][\w.\-]*\.(?:pdf|html?|csv|tsv|md|markdown|json|xlsx|docx|pptx"
-    r"|txt|text|xml|ya?ml|log|png|jpe?g|webp|gif)\b",
+    r"|txt|text|xml|ya?ml|log|png|jpe?g|webp|gif|py|sh|js|svg|ipynb"
+    r"|wav|mp3|m4a)\b",
     re.IGNORECASE,
 )
 
@@ -1314,7 +1374,12 @@ def _in_scratch_subdir(path: Path) -> bool:
             anchor = i
     if anchor < 0:
         return False
-    return any(p in _SCRATCH_DIR_NAMES for p in parts[anchor + 1:])
+    # Enumerating names can never keep up with what agents invent (neo-version
+    # 2026-09-08: .scratch/cmp_pdf.txt was graded in place of the delivered
+    # PDF), so a dot/underscore prefix — the universal convention for a hidden
+    # work area — counts as scratch on top of the explicit list.
+    return any(p in _SCRATCH_DIR_NAMES or p[:1] in (".", "_")
+               for p in parts[anchor + 1:])
 
 
 # Evidence-budget note naming collected files whose contents were cut or not
@@ -1486,12 +1551,14 @@ def _gather_evidence(
     named = rubric_names or frozenset()
     _PRIMARY = ("report", "flagged")
 
+    _SCRATCH_RANK = 3
+
     def _rank(path: Path) -> int:
         stem = path.stem.lower()
         if path.name.lower() in named:
             return 0
         if _in_scratch_subdir(path):
-            return 3
+            return _SCRATCH_RANK
         if any(k in stem for k in _PRIMARY):
             return 1
         return 2
@@ -1512,6 +1579,20 @@ def _gather_evidence(
         block, block_images = _deliverable_evidence_marker(f, label, skip_reason)
         rendered.append((f, label, block, block_images))
     rendered.sort(key=lambda r: (_rank(r[0]), len(r[2]), r[0].name, r[1]))
+
+    # Ordering alone does not stop the judge citing scratch: a demoted block
+    # that still reads "DELIVERABLE: cmp_pdf.txt" is quoted as one. When a
+    # rubric-NAMED file was collected, scratch CONTENT is excluded outright and
+    # replaced by one naming line; with no named file it is kept (it may be the
+    # only evidence there is) but its header never claims deliverable status.
+    scratch_labels = [label for f, label, _, _ in rendered if _rank(f) == _SCRATCH_RANK]
+    drop_scratch = bool(scratch_labels) and any(_rank(f) == 0 for f, _, _, _ in rendered)
+    if drop_scratch:
+        rendered = [r for r in rendered if _rank(r[0]) != _SCRATCH_RANK]
+    scratch_note = (
+        "\n----- SCRATCH (agent work-product, not graded): "
+        + ", ".join(scratch_labels) + " -----\n"
+    ) if drop_scratch else ""
 
     # Image attachment is decided BEFORE budgeting so every placeholder of an
     # image that will not be attached is disclosed in the block text, and that
@@ -1536,11 +1617,17 @@ def _gather_evidence(
             block if _is_presence_block(block, label)
             else _presence_marker(label, f, _REASON_EVIDENCE_BUDGET)
         )
+        if _rank(f) == _SCRATCH_RANK:
+            block = block.replace("----- DELIVERABLE: ", "----- SCRATCH: ", 1)
+            presence = presence.replace("----- DELIVERABLE: ", "----- SCRATCH: ", 1)
         blocks.append((
             label, block,
             [i for i in block_images if i.label in selected_labels],
             presence,
         ))
+
+    if scratch_note:
+        blocks.append(("SCRATCH", scratch_note, [], scratch_note))
 
     no_deliverables = (
         "\n(no deliverable files were collected under any of: "
@@ -1641,14 +1728,28 @@ def _judge_cost_usd(
     # validate_judge_pricing(), called at grade_with_rubric() startup; callers
     # that bypass grade_with_rubric must run that validator themselves first.
     # Subscription judging (sonnet via the Claude Max OAuth bridge) is not
-    # metered per-token — it draws on the flat Max plan — so the per-token list
-    # price would be a misleading "charge". Force cost_usd=0 (priced_ok=True) for
-    # that path; real cost is reconciled separately later. Token counts are kept.
+    # metered per-token — it draws on the flat Max plan — so there is no
+    # "charge" to read off. It is priced from token counts at the published
+    # Bedrock sonnet card instead, the same figure the trajectory's own OAuth
+    # cost is derived from, so one run's dollars are comparable end to end and
+    # with a Bedrock run. Recording $0 here instead made a regraded judge free
+    # while the identical batch-graded judge carried list-price dollars.
     if family == "sonnet":
         try:
             from . import judge_litellm  # local import: avoid import-time cost
             if judge_litellm._judge_oauth_bridge_url():
-                return 0.0, True
+                from .oauth_pricing import estimate_cost_usd
+                estimated, priced_ok = estimate_cost_usd(
+                    judge_litellm._judge_oauth_bridge_model(),
+                    input_tokens=in_tok,
+                    output_tokens=out_tok,
+                    cache_read_tokens=c_read,
+                    cache_write_tokens=c_write,
+                )
+                if priced_ok:
+                    return estimated, True
+                # An overridden bridge model off the card falls through to the
+                # family rate, which is the same published sonnet price.
         except Exception:
             pass
     rate = _judge_rate_for(model, family)
@@ -2601,9 +2702,10 @@ def _grade_council(
     satisfied negative criterion (forbidden behavior occurred) subtracts |weight|.
     The denominator is the sum of positive weights only.
 
-    Always returns a scores dict; on total council failure (zero surviving members
-    and therefore no Sonnet verdict) every criterion abstains and overall_score is
-    0.0. No single-judge fallback exists. If the roster has no sonnet-family member,
+    Always returns a scores dict; on total council failure (no member cast a
+    single verdict) every criterion abstains, overall_score is 0.0 and the dict
+    carries an `error` key, so callers treat it as the no-signal sentinel rather
+    than a genuine 0% grade. No single-judge fallback exists. If the roster has no sonnet-family member,
     the tiebreak is unavailable and non-unanimous criteria abstain as before."""
     results = _run_council(members, system, user_for_member, len(rubrics))
     surviving = [r for r in results if r.get("ok") and isinstance(r.get("verdicts"), list)]
@@ -2862,7 +2964,7 @@ def _grade_council(
     # SQLite store / ctrf.json) derives its tests_* counts from criteria_* via the
     # tr_meta adapter at eval/run_batch.py:962-968, which already falls back to
     # criteria_* when no real pytest ran. See NOMENCLATURE.md for the channel boundary.
-    return {
+    graded = {
         "overall_score": round(overall, 4),
         "rubric_weights_percentage": round(overall * 100.0, 2),
         "criteria_total": n,
@@ -2893,6 +2995,21 @@ def _grade_council(
         "abstention_flags": abstention_flags,
         "usage": council_usage,
     }
+    # No member cast a single verdict (every member failed, or every surviving
+    # member returned an empty list): the 0.0 above is not a grade. Mark it as
+    # the no-signal sentinel the GPT-primary path already emits, so pass@K
+    # excludes the run and _graded_chunks' refusal/parse retries can see it.
+    if n and not any(r["verdicts"] for r in surviving):
+        failed_detail = "; ".join(
+            f"{_short_judge_label(r.get('model', '?'))}="
+            f"{(r.get('error') or 'unknown').strip()[:160]}"
+            for r in results if not r.get("ok")
+        ) or "surviving members returned no verdicts"
+        graded["error"] = (
+            f"judge council cast no verdicts ({len(surviving)}/{n_members} "
+            f"members succeeded; {failed_detail})"
+        )
+    return graded
 
 
 _DEFAULT_RUBRIC_BATCH_SIZE = 40
@@ -3287,20 +3404,46 @@ def grade_with_rubric(
         }
         return _grade_council(chunk, system, user_for_member, members)
 
-    def _graded_chunks(chunk: list, depth: int = 0) -> list:
+    def _graded_chunks(chunk: list, depth: int = 0, retried: bool = False) -> list:
         # Refusal re-split (ajax_moreno 2026-09-04, empirically validated on
         # gama): safety refusals are prompt-COMPOSITION dependent — the same 31
         # criteria that refused as one block graded cleanly as 16-criterion
         # chunks. On a refused chunk, halve and retry each side (depth<=2);
         # halves that still fail degrade to synthetic abstains as before, so
         # the blast radius shrinks from the whole chunk to the poisoned core.
+        # Parse-truncation retry (koji 2026-09-06): near-limit multimodal
+        # payloads on the bridge non-deterministically truncate the response
+        # mid-verdict-list (finish_reason still "stop"; the identical call
+        # completed 40/40 on replay). A partial verdict list surfaces as a
+        # "parse:" error — retry the SAME chunk once, then fall through to
+        # halving (smaller chunks emit shorter lists, likelier to survive).
         res = _grade_chunk(chunk)
         err = str(res.get("error") or "").lower()
-        if (res.get("error") and depth < 2 and len(chunk) > 4
-                and ("refus" in err or "safety filter" in err)):
+        # A truncated response can ALSO parse "successfully" with fewer
+        # verdicts than criteria (Judge call ok, verdicts=10/36): no error is
+        # raised and the tail abstains as partial coverage. Detect via
+        # per-member verdict counts, not just parse errors.
+        # Only the sonnet (source-of-truth) member's count matters: kimi/glm
+        # truncating mid-rubric is EXPECTED small-context behavior that the
+        # tiebreak already absorbs — retrying on it would loop every 3-member
+        # council run.
+        counts = ((res.get("judge_council") or {}).get("per_member_verdict_count")
+                  or {})
+        sonnet_count = counts.get("sonnet")
+        partial = (not res.get("error") and sonnet_count is not None
+                   and int(sonnet_count or 0) < len(chunk))
+        if (("parse:" in err or partial) and not retried):
             logger.warning(
-                "judge chunk of %d criteria refused upstream — re-splitting "
-                "and retrying halves (depth %d)", len(chunk), depth + 1)
+                "judge chunk of %d criteria returned a partial/unparseable "
+                "verdict list — retrying once at full size", len(chunk))
+            return _graded_chunks(chunk, depth, retried=True)
+        if ((res.get("error") or partial) and depth < 2 and len(chunk) > 4
+                and ("refus" in err or "safety filter" in err
+                     or "parse:" in err or partial)):
+            logger.warning(
+                "judge chunk of %d criteria failed or stayed partial — "
+                "re-splitting and retrying halves (depth %d)",
+                len(chunk), depth + 1)
             mid = (len(chunk) + 1) // 2
             return (_graded_chunks(chunk[:mid], depth + 1)
                     + _graded_chunks(chunk[mid:], depth + 1))
@@ -3611,14 +3754,65 @@ def extract_usage_from_litellm_log(
 ) -> dict:
     """Sum agent usage rows for one run.
 
-    Attribution order:
+    Attribution order — ownership is decided BEFORE kind, always:
       1. ``run_key`` exact match — rows the usage callback tagged with this
          run's per-attempt key. Immune to concurrent runs on a shared sidecar.
-      2. Time-window fallback (legacy) — ONLY when no tagged row matches.
-         Unsafe under parallelism: the ±2s-padded window sweeps in every
-         concurrent run's traffic (measured 1.4x-62.7x inflation on the
-         2026-08 deliveries). Retained for old logs and master-key
-         deployments where the bearer cannot carry the run key.
+         The kind filter runs on that selection, not before it, so a run whose
+         every row is ``failure`` (a 429 storm, a credential rotation) reports
+         ZERO rather than inheriting whatever else was on the wire.
+      2. No row carries this key, but the file carries OTHER runs' keys — a
+         shared sidecar log with a co-tenant. Zero, loudly, and no window: the
+         window here can only return someone else's money. This is also where
+         a master-key caller lands, which passes ``run_key=""``.
+      3. Time-window fallback (legacy) — ONLY when NO row anywhere in the file
+         carries a run_key, i.e. a genuine single-run log from before the key
+         was threaded through. Sound there because there is no second tenant;
+         unsafe everywhere else, which is why (2) no longer reaches it. Every
+         use of it warns, whether or not a run_key was supplied.
+
+    ``usage_source`` stays the reader's coarse signal — ``litellm_run_key`` for
+    (1), ``litellm`` for everything else, unchanged — and ``usage_attribution``
+    names which of the four outcomes produced the figure: ``run_key``,
+    ``run_key_zero_billable``, ``run_key_absent_window_refused`` /
+    ``no_run_key_window_refused``, or ``time_window_legacy``.
+
+    Reconciling ``sources.agent`` against a raw log, which is where this gets
+    read next: every selected row is summed once, with no dedup, no retry
+    filtering and no per-model exclusion. A disagreement with a hand-rolled
+    total of usage.jsonl is therefore always a disagreement about WHICH rows,
+    and on the 2026-09-18 sean_callahan run — which reconciled to neither raw
+    channel and prompted this note — there were exactly two causes, both
+    correct:
+
+      The log keeps growing after this has read it. Totals are collected when
+      the agent finishes while its container is still up, so post-agent
+      traffic lands afterwards: that run logged "Agent finished" at 06:45:14,
+      this read 156 rows at 06:45:16, and a 157th arrived at 06:45:23.
+      ``sources.agent`` is a snapshot and is exact for the rows it saw; `wc -l`
+      on the same file later is not counting the same population.
+
+      usage_oauth.jsonl is a different channel, not a second opinion on this
+      one. The OAuth bridge callback writes it, and it records chat
+      completions only: it carries the startup preflight probe as an ordinary
+      agent row rather than kind="preflight", and carries no /v1/embeddings row
+      at all. Add the probe back and drop the embeddings and the two logs agree
+      exactly — 136 rows and 302/126615/14168432/1124998 on both, on that run.
+
+    Rows the usage callback named as openclaw's own (``purpose``) stay IN this
+    total; only ``preflight`` and ``failure`` kinds are skipped. Compaction,
+    embeddings and image-tool calls are the agent's spend and belong in the
+    agent's bill. The label exists so the per-message back-fill in
+    eval/run_batch.py can account for them on their own ledger line, not so
+    this can drop them — naming a row must never move money out of the total.
+
+    The same holds, by construction, for a row whose four token columns are all
+    zero: it adds 0 to every token column here and +1 to ``request_count``, so
+    the ``zero_token_calls`` bucket that back-fill splits out needs nothing from
+    this side. The ``request_count`` term is the deliberate half. A zero-token
+    row is still a request that was made — the sidecar logged it because
+    something called the model — and dropping it from the count would make this
+    disagree with `wc -l` on its own selection and would quietly hide exactly
+    the anomaly worth seeing. It is counted; it simply bills nothing.
     """
     totals = {
         "input_tokens": 0,
@@ -3654,17 +3848,72 @@ def extract_usage_from_litellm_log(
             row = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if row.get("kind") in ("preflight", "failure"):
-            continue
         rows.append(row)
 
+    # Ownership FIRST, kind SECOND — the same order the per-message path uses
+    # (eval/run_batch.py:636 tags, :646 filters kinds) and the whole of the fix
+    # to the all-failed run. Filtering kinds first emptied `tagged` for a run
+    # whose every request errored, and an empty `tagged` meant "fall to the
+    # window", so a 429 storm or a mid-batch credential rotation billed the run
+    # every co-tenant row inside its span while its own spend was provably nil.
     tagged = [r for r in rows if run_key and r.get("run_key") == run_key]
+    # Does THIS FILE carry per-run tagging at all? The usage callback spreads
+    # the column conditionally on success rows (litellm_usage_callback.py:581)
+    # and writes it unconditionally on failure rows (:623), where it may be the
+    # empty string — so the question is whether some row carries a non-empty
+    # key, not whether the column appears.
+    log_carries_tags = any(r.get("run_key") for r in rows)
+
+    def _billable(row: dict) -> bool:
+        return row.get("kind") not in ("preflight", "failure")
+
     if tagged:
-        selected = tagged
+        # This run is IN the log. Its bill is its own rows and nothing else,
+        # whatever survives the kind filter — including nothing.
+        selected = [r for r in tagged if _billable(r)]
         totals["usage_source"] = "litellm_run_key"
+        totals["usage_attribution"] = "run_key"
+        if not selected:
+            totals["usage_attribution"] = "run_key_zero_billable"
+            logger.warning(
+                "usage extraction: all %d row(s) tagged with run_key %s in %s "
+                "are preflight/failure kinds — this run's billable total is "
+                "ZERO. The time window is NOT consulted: the run is present in "
+                "the log and provably issued no billable traffic, so sweeping "
+                "the window here would bill it a co-tenant's spend.",
+                len(tagged), run_key, log_path)
+    elif log_carries_tags:
+        # Rows in this file are tagged, just none with this key: a shared
+        # sidecar log with at least one co-tenant in it. The window would take
+        # that co-tenant's rows, so it is refused outright and the total is
+        # zero. The two ways to get here are worth telling apart in the log.
+        selected = []
+        if run_key:
+            reason = f"no row carries run_key {run_key}"
+            totals["usage_attribution"] = "run_key_absent_window_refused"
+        else:
+            reason = ("no run_key was supplied — master-key auth leaves the "
+                      "main agent's rows untagged (runner.py:1444)")
+            totals["usage_attribution"] = "no_run_key_window_refused"
+        logger.warning(
+            "usage extraction: %s in %s, but the file DOES carry %d tagged "
+            "row(s) belonging to other run(s). Refusing the time-window "
+            "fallback, which would bill this run their traffic, and reporting "
+            "ZERO. usage_attribution=%s",
+            reason, log_path, sum(1 for r in rows if r.get("run_key")),
+            totals["usage_attribution"])
     else:
+        # Nothing anywhere in this file is tagged: a genuine single-run legacy
+        # log, written before the run key was threaded through or by a sidecar
+        # that cannot tag. The window is the only selector available, and it is
+        # sound here precisely because there is no second tenant to confuse it
+        # with. Warned unconditionally — the old `if run_key:` gate kept the
+        # master-key caller, which passes run_key="" (runner.py:1444), silent
+        # on exactly the path that over-attributes.
         selected = []
         for row in rows:
+            if not _billable(row):
+                continue
             ts_str = row.get("ts", "")
             try:
                 ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00")).timestamp()
@@ -3672,11 +3921,16 @@ def extract_usage_from_litellm_log(
                 continue
             if lo <= ts <= hi:
                 selected.append(row)
-        if run_key:
-            logger.warning(
-                "usage extraction: no rows tagged with run_key %s in %s — "
-                "falling back to the time window, which OVER-ATTRIBUTES under "
-                "parallel runs", run_key, log_path)
+        totals["usage_attribution"] = "time_window_legacy"
+        logger.warning(
+            "usage extraction: %s in %s and NO row in it carries a run_key at "
+            "all, so selection fell back to the ±2s time window [%.3f, %.3f] "
+            "and took %d row(s). This OVER-ATTRIBUTES whenever another run "
+            "shares the log and is wrong outright under faketime. "
+            "usage_attribution=time_window_legacy, usage_source=litellm",
+            f"run_key {run_key} matched nothing" if run_key
+            else "no run_key was supplied (master-key auth, runner.py:1444)",
+            log_path, lo, hi, len(selected))
 
     for row in selected:
         totals["request_count"] += 1

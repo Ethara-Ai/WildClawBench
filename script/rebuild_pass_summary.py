@@ -101,10 +101,12 @@ def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict |
     crit_total = int(s.get("criteria_total", s.get("tests_total", 0)) or 0)
     crit_passed = int(s.get("criteria_passed", s.get("tests_passed", 0)) or 0)
     crit_failed = int(s.get("criteria_failed", s.get("tests_failed", 0)) or 0)
+    no_signal = s.get("error")  # judge no-signal sentinel (mirror of run_batch)
     rubric_reward = _finite_float(s.get("rubric_based_reward"))
-    if rubric_reward is None:
+    if rubric_reward is None and not no_signal:
         rubric_reward = _finite_float(s.get("overall_score"))
-    rubric_pct = _finite_float(s.get("rubric_weights_percentage"))
+    rubric_pct = (None if no_signal
+                  else _finite_float(s.get("rubric_weights_percentage")))
     if rubric_pct is None and rubric_reward is not None:
         rubric_pct = rubric_reward * 100.0
     t_total = int(tr.get("tests_total", 0) or 0)
@@ -142,6 +144,8 @@ def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict |
     }
     if s.get("__last_resort_stub__"):
         entry["__last_resort_stub__"] = True
+    if no_signal:
+        entry["no_signal"] = str(no_signal)[:300]
     if s.get("injection_ok") is False:
         entry["injection_ok"] = False
     if s.get("run_incomplete"):
@@ -174,6 +178,8 @@ def _run_exclusion_reason(r: dict) -> str | None:
             return "injection_failed"
         if r.get("eval_skipped"):
             return "unmeasured"
+        if r.get("no_signal") or r.get("error"):
+            return "no_signal"
     return None
 
 
@@ -208,6 +214,7 @@ def _pass_summary_doc(model_type: str, per_run: list) -> dict:
             ("incomplete", "runs_excluded_incomplete"),
             ("injection_failed", "runs_excluded_injection_failed"),
             ("unmeasured", "runs_excluded_unmeasured"),
+            ("no_signal", "runs_excluded_no_signal"),
         ):
             if reason_counts.get(_reason):
                 doc[_key] = reason_counts[_reason]

@@ -101,6 +101,8 @@ def _to_int(v, default=0):
 def _parse_json(v, default=None):
     if not v:
         return default if default is not None else {}
+    if isinstance(v, (list, dict)):
+        return v
     return json.loads(v)
 
 
@@ -295,8 +297,9 @@ def update_entry(entry_id, fields):
         if e["id"] == entry_id:
             if fields:
                 e["fields"].update(fields)
-            e["updated_at"] = _now()
-            _store_patch("entries", e, {"fields": e["fields"], "updated_at": e["updated_at"]})
+                e["updated_at"] = _now()
+                _store_patch("entries", e,
+                             {"fields": e["fields"], "updated_at": e["updated_at"]})
             return _entry_obj(e)
     return {"error": f"Entry {entry_id} not found"}
 
@@ -329,7 +332,24 @@ def get_asset(asset_id):
 # Space
 # ---------------------------------------------------------------------------
 
-def get_space():
-    return deepcopy(_space_doc())
+def _space_obj(s):
+    return deepcopy(s)
+
+
+def list_spaces():
+    return _collection([_space_obj(_space_doc())])
+
+
+def get_space(space_id=None):
+    """The seeded space, addressed by id.
+
+    ``space_id`` was accepted and thrown away, so every id answered 200 with the
+    one seeded space and an agent holding the wrong id got no signal that it was
+    wrong. Called with no id for the callers that only ever wanted the singleton.
+    """
+    space = _space_doc()
+    if space_id is not None and str(space_id) != str(space.get("id")):
+        return {"error": f"Space {space_id} not found"}
+    return _space_obj(space)
 
 _store.eager_load()

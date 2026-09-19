@@ -1181,3 +1181,191 @@ def test_malformed_connector_not_copied_into_bundle(tmp_path):
     out = dest / "environment" / "skills"
     assert (out / "github-api-connector").is_dir()
     assert not (out / "canvas-lms-api-connector").exists()
+
+
+# ============================================================================
+# CURRENT_DATE parity. repackage_to_bundle is deliberately isolated from the
+# eval package, so its sim-clock port must stay byte-identical to Harbor's —
+# a drift here silently ships two bundles that disagree about "today".
+# ============================================================================
+
+_PROMPTS_SCHEMAS = [
+    ({"timezone": "America/Chicago",
+      "turns": [{"turn": "T0", "timestamp": "2026-11-03T07:38:00-06:00"}]},
+     "2026-11-03"),
+    ({"window": {"start": "2026-09-14", "timezone": "America/New_York"},
+      "turns": [{"turn": "T0", "day": 2, "time": "09:15"}]},
+     "2026-09-15"),
+    ({"turns": [{"turn": "T0"}]}, "2026-05-28"),
+    ({"turns": []}, "2026-05-28"),
+    ({"timezone": "Not/AZone",
+      "turns": [{"turn": "T0", "day": 1, "time": "09:15"}]}, "2026-05-28"),
+]
+
+
+@pytest.mark.parametrize("payload,expected", _PROMPTS_SCHEMAS)
+def test_current_date_parity_with_harbor(tmp_path, payload, expected):
+    rp = _load_repackage_module()
+    from src.utils.harbor.compose import resolve_current_date
+
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    (task_dir / "prompts.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    local = rp._compose_current_date(task_dir)
+    assert local == expected
+    assert local == resolve_current_date(task_dir), "CURRENT_DATE emitter drift"
+
+
+def test_current_date_falls_back_without_task_dir():
+    rp = _load_repackage_module()
+    from src.utils.harbor.compose import resolve_current_date
+
+    assert rp._compose_current_date(None) == "2026-05-28"
+    assert rp._compose_current_date(None) == resolve_current_date(None)
+
+
+def _two_service_env(tmp_path):
+    env_dir = tmp_path / "env"
+    env_dir.mkdir()
+    for name, port, env_var in (
+        ("gmail-api", 8017, "GMAIL_API_URL"),
+        ("xero-api", 8087, "XERO_API_URL"),
+    ):
+        svc_dir = env_dir / name
+        svc_dir.mkdir()
+        (svc_dir / "service.toml").write_text(
+            f'[service]\nname = "{name}"\nport = {port}\n'
+            f'env_var_name = "{env_var}"\nhealthcheck_path = "/health"\n'
+        )
+    return env_dir
+
+
+def test_compose_byte_equal_with_harbor_when_task_dir_supplied(tmp_path):
+    rp = _load_repackage_module()
+    harbor_compose = _load_harbor_compose_gen()
+    env_dir = _two_service_env(tmp_path)
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    (task_dir / "prompts.json").write_text(json.dumps({
+        "timezone": "America/Chicago",
+        "turns": [{"turn": "T0", "timestamp": "2026-11-03T07:38:00-06:00"}],
+    }), encoding="utf-8")
+
+    harbor = harbor_compose(env_dir, task_dir=task_dir)
+    local = rp._generate_environment_compose(env_dir, task_dir=task_dir)
+    assert harbor == local, "compose byte-equal drift with derived CURRENT_DATE"
+    assert "      - CURRENT_DATE=2026-11-03\n" in local
+
+
+def test_staged_compose_uses_input_task_narrative_date(tmp_path):
+    rp = _load_repackage_module()
+    bundle = tmp_path / "bundle"
+    env_dir = bundle / "data" / "environment"
+    env_dir.mkdir(parents=True)
+    (env_dir / "gmail-api").mkdir()
+    (env_dir / "gmail-api" / "service.toml").write_text(
+        '[service]\nname = "gmail-api"\nport = 8017\n'
+        'env_var_name = "GMAIL_API_URL"\nhealthcheck_path = "/health"\n'
+    )
+    input_task_dir = tmp_path / "input_task"
+    input_task_dir.mkdir()
+    (input_task_dir / "prompts.json").write_text(json.dumps({
+        "timezone": "America/Chicago",
+        "turns": [{"turn": "T0", "timestamp": "2026-11-03T07:38:00-06:00"}],
+    }), encoding="utf-8")
+
+    rp._stage_environment_dockerfile_and_compose(bundle, False, input_task_dir)
+    text = (env_dir / "docker-compose.yaml").read_text()
+    assert "      - CURRENT_DATE=2026-11-03\n" in text
+
+    rp._stage_environment_dockerfile_and_compose(bundle, False)
+    assert "      - CURRENT_DATE=2026-05-28\n" in (
+        env_dir / "docker-compose.yaml").read_text()
+
+
+# ---- _build_rubric_block abstention marker ----
+#
+# A criterion the judge council could not resolve is stored
+# resolved_by="human_eval" and contributes 0 to the reward numerator. Bundling
+# flattens it to passed=false, which for a NEGATIVE weight is arithmetically
+# identical to "the violation happened" — so a whole-run council failure ships
+# as a pile of penalties. The "abstained" marker keeps the two distinguishable
+# (see script/check_negative_semantics.py). The key is emitted ONLY when true,
+# so the report.json schema stays byte-identical for every existing run.
+
+
+def _score_criterion(cid, weight, satisfied, passed, resolved_by="unanimous"):
+    return {
+        "id": cid,
+        "weight": weight,
+        "satisfied": satisfied,
+        "passed": passed,
+        "resolved_by": resolved_by,
+        "human_eval": "required" if resolved_by == "human_eval" else "",
+        "criterion": f"criterion {cid + 1}",
+        "is_positive": weight >= 0,
+        "rationale": f"rationale {cid + 1}",
+    }
+
+
+def test_build_rubric_block_marks_human_eval_criteria_abstained():
+    rp = _load_repackage_module()
+    score = {"criteria": [
+        _score_criterion(0, 5, True, True),
+        _score_criterion(1, -3, False, False, resolved_by="human_eval"),
+    ]}
+    rubric = rp._build_rubric_block(score, infer_meta=False)
+    assert "abstained" not in rubric[0]
+    assert rubric[1]["abstained"] is True
+    assert rubric[1]["passed"] is False
+    assert rubric[1]["score"] == -3
+
+
+def test_build_rubric_block_omits_abstained_key_when_no_abstentions():
+    """Schema stability: resolved criteria must not gain the key at all, so
+    existing report.json consumers see byte-identical entries."""
+    rp = _load_repackage_module()
+    score = {"criteria": [
+        _score_criterion(0, 5, True, True),
+        _score_criterion(1, 3, False, False, resolved_by="sonnet"),
+        _score_criterion(2, -3, False, True),
+    ]}
+    rubric = rp._build_rubric_block(score, infer_meta=False)
+    assert all("abstained" not in item for item in rubric)
+    assert [item["passed"] for item in rubric] == [True, False, True]
+    assert rubric[1]["justification"] == "rationale 2"
+
+
+def test_build_rubric_block_detects_abstention_via_human_eval_required():
+    """grading.py writes resolved_by AND human_eval together; either alone is
+    enough to identify the abstention."""
+    rp = _load_repackage_module()
+    score = {"criteria": [dict(_score_criterion(0, 5, False, False),
+                               resolved_by="", human_eval="required")]}
+    assert rp._build_rubric_block(score, infer_meta=False)[0]["abstained"] is True
+
+
+def test_build_rubric_block_abstained_entry_keeps_key_order():
+    rp = _load_repackage_module()
+    score = {"criteria": [
+        _score_criterion(0, -5, False, False, resolved_by="human_eval")]}
+    item = rp._build_rubric_block(score, infer_meta=False)[0]
+    assert list(item) == [
+        "number", "criterion", "type", "evaluation_target", "importance",
+        "score", "is_positive", "passed", "abstained", "justification",
+    ]
+
+
+def test_whole_run_abstention_is_marked_on_every_criterion():
+    """The shipped failure mode: the council died, every criterion abstained,
+    and the two negative weights read as -8 points of penalty downstream."""
+    rp = _load_repackage_module()
+    weights = [5, 3, -3, -5, 5]
+    score = {"criteria": [
+        _score_criterion(i, w, False, False, resolved_by="human_eval")
+        for i, w in enumerate(weights)
+    ]}
+    rubric = rp._build_rubric_block(score, infer_meta=False)
+    assert all(item["abstained"] is True for item in rubric)
+    assert all(item["passed"] is False for item in rubric)

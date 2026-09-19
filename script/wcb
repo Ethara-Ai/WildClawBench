@@ -580,8 +580,15 @@ _wcb_setup() {
 # ===========================================================================
 
 # --- image / path constants (mirrors root+script run.sh; single source here) --
+# This is BASE_IMAGE in run.sh terms: the tarball artifact this script
+# provisions, and the default image tasks run on. The opt-in
+# wildclawbench-ubuntu:v1.4 (base + whisper, DOCKER_IMAGE=...v1.4) is built by
+# run.sh's preflight_agent_image() on top of this one.
 _WCB_AGENT_IMAGE="wildclawbench-ubuntu:v1.3"
-_WCB_AGENT_IMAGE_SHA="60eec8752cb597e180780ff08d7569c1892c169521f1f2b069c2efeb006a4078"
+# Real content ID of the v1.3 image, verified on both production hosts. The
+# previous value here never matched any layer set, so the retag rung below
+# silently no-op'd and every tag-table loss fell through to a 28GB re-load.
+_WCB_AGENT_IMAGE_SHA="88cd069e8ead5f4497093671a6d9e39e80259d75d4524f230b52ce439fcb2870"
 _WCB_AGENT_TAR="Images/wildclawbench-ubuntu_v1.3.tar"
 _WCB_MOCK_IMAGE="kensei3-mocks:v1"
 _WCB_HEADROOM_IMAGE="wildclawbench-litellm-headroom:v2"

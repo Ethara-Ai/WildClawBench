@@ -585,9 +585,11 @@ def test_oauth_bridge_route_injected_for_sonnet(monkeypatch):
     assert kwargs["api_base"] == "http://127.0.0.1:18765"
     assert kwargs["api_key"] == "sk-wcb-oauth-stub"
     assert kwargs["extra_headers"] == {"x-wcb-bridge-secret": "testsecret"}
-    assert kwargs["model"] == "anthropic/claude-sonnet-5"
+    assert kwargs["model"] == "anthropic/claude-sonnet-4-6"
     assert "aws_region_name" not in kwargs
-    assert "temperature" not in kwargs, "sonnet-5 rejects explicit temperature"
+    assert kwargs.get("temperature") == 0, (
+        "sonnet-4.6 accepts temperature; verdicts must be reproducible"
+    )
 
 
 def test_oauth_bridge_route_custom_model(monkeypatch):

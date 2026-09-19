@@ -14,8 +14,9 @@ from src.utils.inject_validator import (
     run_authoring_validation,
     validate_inject_script,
 )
+from src.utils.skills_inference import catalog_apis
 
-URLS = {"google-classroom-api": "http://127.0.0.1:1", "mailchimp-api": "http://127.0.0.1:2"}
+URLS = {"zendesk-api": "http://127.0.0.1:1", "trello-api": "http://127.0.0.1:2"}
 
 
 def _seed_stage(silent=None, loud=None):
@@ -44,14 +45,14 @@ def _script(*stages):
 
 
 def test_slug_normalization_success_no_fatal(tmp_path):
-    svc_dir = tmp_path / "google-classroom-api"
+    svc_dir = tmp_path / "zendesk-api"
     svc_dir.mkdir()
     (svc_dir / "coursework.json").write_text(
         '[{"id": "901110051", "dueDate": {"year": 2027, "month": 1, "day": 20}}]',
         encoding="utf-8",
     )
     stage1 = _stage(1, 0, 1, silent=[_rest_patch(
-        "s1", "google-classroom-api", "901110051",
+        "s1", "zendesk-api", "901110051",
         {"dueDate": {"year": 2027, "month": 1, "day": 27}})])
     warnings = run_authoring_validation(
         _script(_seed_stage(), stage1), host_api_to_url=URLS, mock_data_root=tmp_path)
@@ -62,7 +63,7 @@ def test_bare_slug_without_api_suffix_is_fatal():
     # The injector does NOT auto-normalize a bare slug; authors must write the
     # canonical '<name>-api' slug. A bare 'google-classroom' is unresolvable.
     stage1 = _stage(1, 0, 1, silent=[_rest_patch(
-        "s1", "google-classroom", "901110051",
+        "s1", "zendesk", "901110051",
         {"dueDate": {"year": 2027, "month": 1, "day": 27}})])
     with pytest.raises(InjectAuthoringError) as ei:
         run_authoring_validation(_script(stage1), host_api_to_url=URLS, mock_data_root=None)
@@ -80,7 +81,7 @@ def test_unresolvable_slug_is_fatal():
 
 def test_zero_field_op_is_fatal():
     stage1 = _stage(1, 0, 1, silent=[_rest_patch(
-        "s1", "google-classroom-api", "901110051", {})])
+        "s1", "zendesk-api", "901110051", {})])
     with pytest.raises(InjectAuthoringError) as ei:
         run_authoring_validation(_script(stage1), host_api_to_url=URLS, mock_data_root=None)
     assert any(d["status"] == "empty" for d in ei.value.defects)
@@ -89,7 +90,7 @@ def test_zero_field_op_is_fatal():
 def test_stage1_missing_target_is_fatal():
     seed = _seed_stage()
     stage1 = _stage(1, 0, 1, silent=[_rest_patch(
-        "s1", "google-classroom-api", "999999999",
+        "s1", "zendesk-api", "999999999",
         {"dueDate": {"year": 2027, "month": 1, "day": 27}})])
     fatal, warnings = validate_inject_script(
         _script(seed, stage1), host_api_to_url=URLS, mock_data_root=None)
@@ -99,12 +100,12 @@ def test_stage1_missing_target_is_fatal():
 def test_stage2_patch_of_stage1_upsert_not_fatal():
     seed = _seed_stage()
     upsert_op = {
-        "id": "u1", "service": "google-classroom-api",
+        "id": "u1", "service": "zendesk-api",
         "admin": {"op": "upsert", "table": "coursework", "row": {"id": "555000111"}},
     }
     stage1 = _stage(1, 0, 1, loud=[upsert_op])
     stage2 = _stage(2, 2, 3, silent=[_rest_patch(
-        "s2", "google-classroom-api", "555000111",
+        "s2", "zendesk-api", "555000111",
         {"dueDate": {"year": 2027, "month": 2, "day": 1}})])
     fatal, warnings = validate_inject_script(
         _script(seed, stage1, stage2), host_api_to_url=URLS, mock_data_root=None)
@@ -115,10 +116,10 @@ def test_stage2_patch_of_stage1_upsert_not_fatal():
 def test_stage2_missing_target_is_warning_not_fatal():
     seed = _seed_stage()
     stage1 = _stage(1, 0, 1, silent=[_rest_patch(
-        "s1", "google-classroom-api", "seedrow",
+        "s1", "zendesk-api", "seedrow",
         {"dueDate": {"year": 2027, "month": 1, "day": 27}})])
     stage2 = _stage(2, 2, 3, silent=[_rest_patch(
-        "s2", "google-classroom-api", "never-seen",
+        "s2", "zendesk-api", "never-seen",
         {"dueDate": {"year": 2027, "month": 2, "day": 1}})])
     fatal, warnings = validate_inject_script(
         _script(seed, stage1, stage2),
@@ -138,25 +139,25 @@ from src.utils.inject_director import InjectApplier, is_defect  # noqa: E402
 
 
 def _amara_stages():
-    # Canonical 'google-classroom-api' slug + bare top-level nested dueDate body,
+    # Canonical 'zendesk-api' slug + bare top-level nested dueDate body,
     # matching the schema-corrected inject/stage{0..3}/mutations.json files.
     seed = _seed_stage(silent=[_rest_patch(
-        "s0_due_seed", "google-classroom-api", "901110051",
+        "s0_due_seed", "zendesk-api", "901110051",
         {"dueDate": {"year": 2027, "month": 1, "day": 20}})])
     stage1 = _stage(1, 2, 3, name="day2_hold", silent=[_rest_patch(
-        "s1_due_hold", "google-classroom-api", "901110051",
+        "s1_due_hold", "zendesk-api", "901110051",
         {"dueDate": {"year": 2027, "month": 1, "day": 20}})])
     stage2 = _stage(2, 4, 5, name="day3_registrar_move", silent=[_rest_patch(
-        "s2_due_move", "google-classroom-api", "901110051",
+        "s2_due_move", "zendesk-api", "901110051",
         {"dueDate": {"year": 2027, "month": 1, "day": 27}})])
     stage3 = _stage(3, 6, 7, name="day4_hold_live", silent=[_rest_patch(
-        "s3_due_live", "google-classroom-api", "901110051",
+        "s3_due_live", "zendesk-api", "901110051",
         {"dueDate": {"year": 2027, "month": 1, "day": 27}})])
     return seed, stage1, stage2, stage3
 
 
 def test_amara_scenario_passes_preflight(tmp_path):
-    svc_dir = tmp_path / "google-classroom-api"
+    svc_dir = tmp_path / "zendesk-api"
     svc_dir.mkdir()
     (svc_dir / "coursework.json").write_text(
         '[{"id": "901110051", "dueDate": {"year": 2027, "month": 1, "day": 20}}]',
@@ -206,7 +207,7 @@ def test_amara_scenario_applies_nested_duedate_end_to_end(tmp_path):
         "dueDate": {"year": 2027, "month": 1, "day": 20},
     }]}
     ap = _live_classroom_applier(
-        tmp_path, tables, urls={"google-classroom-api": "http://x"})
+        tmp_path, tables, urls={"zendesk-api": "http://x"})
     _seed, stage1, stage2, stage3 = _amara_stages()
 
     # Fire each non-seed stage's silent op; the registrar move (stage2) shifts
@@ -215,7 +216,7 @@ def test_amara_scenario_applies_nested_duedate_end_to_end(tmp_path):
         op = stage.silent[0]
         rec = ap._apply_api_mutation(op, stage, stage.to_turn, silent=True)
         assert "resolved_service" not in rec
-        assert rec["service"] == "google-classroom-api"
+        assert rec["service"] == "zendesk-api"
         assert rec["ok"] is True and rec["status"] == "applied"
         assert "unmapped_fields" not in rec
         assert is_defect(rec) is False
@@ -287,6 +288,29 @@ def test_fs_copy_with_absent_src_is_fatal(tmp_path):
     assert any(d["status"] == "fs-src-not-found" for d in ei.value.defects)
 
 
+@pytest.mark.parametrize("mtime", ["2026-12-20 03:10:00", "yesterday", ""])
+def test_fs_op_with_unusable_mtime_override_is_fatal(tmp_path, mtime):
+    stage, stage_dir = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-mt", "action": "copy", "src": "note.txt",
+         "dst": "/workspace/note.txt", "mtime": mtime}])
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    with pytest.raises(InjectAuthoringError) as ei:
+        run_authoring_validation(
+            _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert any(d["status"] == "fs-invalid-mtime" for d in ei.value.defects)
+
+
+@pytest.mark.parametrize("mtime", ["2026-12-20T03:10:00-05:00", 1797754200000])
+def test_fs_op_with_usable_mtime_override_passes(tmp_path, mtime):
+    stage, stage_dir = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-mt", "action": "copy", "src": "note.txt",
+         "dst": "/workspace/note.txt", "mtime": mtime}])
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    warnings = run_authoring_validation(
+        _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert warnings == []
+
+
 def test_fs_mkdir_with_src_is_warning(tmp_path):
     stage, _ = _fs_stage_ondisk(tmp_path, [
         {"id": "fs-mk", "action": "mkdir",
@@ -294,3 +318,139 @@ def test_fs_mkdir_with_src_is_warning(tmp_path):
     warnings = run_authoring_validation(
         _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
     assert any(d["status"] == "fs-mkdir-with-src" for d in warnings)
+
+
+def test_fs_dst_outside_workspace_is_fatal(tmp_path):
+    stage, stage_dir = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-abs", "action": "copy",
+         "src": "note.txt", "dst": "/data/home/note.txt"}])
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    with pytest.raises(InjectAuthoringError) as ei:
+        run_authoring_validation(
+            _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert any(d["status"] == "fs-dst-not-workspace" for d in ei.value.defects)
+
+
+@pytest.mark.parametrize("dst", [
+    "/root/workspace/note.txt", "~/workspace/note.txt", "data/home/note.txt",
+    "/tmp_workspace/note.txt", "relative/note.txt"])
+def test_fs_non_canonical_dst_spellings_are_fatal(tmp_path, dst):
+    stage, stage_dir = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-alias", "action": "copy", "src": "note.txt", "dst": dst}])
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    with pytest.raises(InjectAuthoringError) as ei:
+        run_authoring_validation(
+            _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert any(d["status"] == "fs-dst-not-workspace" for d in ei.value.defects)
+
+
+def test_fs_mkdir_dst_outside_workspace_is_fatal(tmp_path):
+    stage, _ = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-mk", "action": "mkdir", "dst": "/data/newdir"}])
+    with pytest.raises(InjectAuthoringError) as ei:
+        run_authoring_validation(
+            _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert any(d["status"] == "fs-dst-not-workspace" for d in ei.value.defects)
+
+
+def test_fs_dst_tree_shape_mismatch_is_warning(tmp_path):
+    """data/home/ staging puts inputs at /workspace/home/home/<rel>; a single-home
+    dst lands beside them, not among them."""
+    (tmp_path / "data" / "home" / "Pictures").mkdir(parents=True)
+    stage, stage_dir = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-shape", "action": "copy",
+         "src": "note.txt", "dst": "/workspace/home/Pictures/note.txt"}])
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    warnings = run_authoring_validation(
+        _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert any(d["status"] == "fs-dst-tree-mismatch" for d in warnings)
+
+
+def test_fs_dst_matching_staged_home_home_tree_is_clean(tmp_path):
+    (tmp_path / "data" / "home" / "Pictures").mkdir(parents=True)
+    stage, stage_dir = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-shape-ok", "action": "copy",
+         "src": "note.txt", "dst": "/workspace/home/home/Pictures/note.txt"}])
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    warnings = run_authoring_validation(
+        _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert not any(d["status"] == "fs-dst-tree-mismatch" for d in warnings)
+
+
+def test_fs_tree_shape_warning_absent_without_staged_data_home(tmp_path):
+    stage, stage_dir = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-plain", "action": "copy",
+         "src": "note.txt", "dst": "/workspace/home/Pictures/note.txt"}])
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    warnings = run_authoring_validation(
+        _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert not any(d["status"] == "fs-dst-tree-mismatch" for d in warnings)
+
+
+# --------------------------------------------------------------------------- #
+# Catalog gate: an op may only name a service the fleet actually ships.
+#
+# Resolving against host_api_to_url is a different question. The mock image
+# bakes a port manifest that outlives any fleet composition, so a service
+# pruned off disk can still publish a port and hand the injector a URL; its
+# admin calls then miss for the whole run. The catalog is read off disk at
+# validation time so restoring a service fixes its ops with no code change.
+# --------------------------------------------------------------------------- #
+ABSENT = "no-such-service-api"
+OFF_CATALOG_URLS = {**URLS, ABSENT: "http://127.0.0.1:3"}
+
+
+def _off_catalog_stage():
+    return _stage(1, 0, 1, silent=[{
+        "id": "loud_partner_page_reassurance", "service": ABSENT,
+        "admin": {"op": "patch", "table": "posts", "pk": "urn:li:share:c105",
+                  "set": {"commentary": "corridor campaign continues"}},
+    }])
+
+
+def test_a_service_the_fleet_does_not_ship_is_fatal():
+    assert ABSENT not in catalog_apis()
+    with pytest.raises(InjectAuthoringError) as ei:
+        run_authoring_validation(_script(_seed_stage(), _off_catalog_stage()),
+                                 host_api_to_url=OFF_CATALOG_URLS, mock_data_root=None)
+    defect = next(d for d in ei.value.defects if d["status"] == "service-not-in-catalog")
+    assert ABSENT in defect["reason"]
+    assert defect["id"] == "loud_partner_page_reassurance"
+
+
+def test_a_service_on_disk_clears_the_gate():
+    fatal, _ = validate_inject_script(
+        _script(_seed_stage(), _stage(1, 0, 1, silent=[_rest_patch(
+            "s1", "zendesk-api", "901110051", {"dueDate": {"year": 2027}})])),
+        host_api_to_url=URLS, mock_data_root=None)
+    assert not any(d["status"] == "service-not-in-catalog" for d in fatal)
+
+
+def test_the_gate_reads_the_live_catalog_rather_than_a_fixed_list(monkeypatch):
+    # A sibling restoring the service to environment/ must fix its ops without
+    # anyone editing this module.
+    monkeypatch.setattr("src.utils.inject_validator.catalog_apis",
+                        lambda *a, **k: [*catalog_apis(), ABSENT])
+    fatal, _ = validate_inject_script(
+        _script(_seed_stage(), _off_catalog_stage()),
+        host_api_to_url=OFF_CATALOG_URLS, mock_data_root=None)
+    assert not any(d["status"] == "service-not-in-catalog" for d in fatal)
+
+
+def test_an_empty_catalog_accuses_nobody(monkeypatch):
+    # Stripped checkout: nothing to validate against is not "everything is wrong".
+    monkeypatch.setattr("src.utils.inject_validator.catalog_apis", lambda *a, **k: [])
+    fatal, _ = validate_inject_script(
+        _script(_seed_stage(), _off_catalog_stage()),
+        host_api_to_url=OFF_CATALOG_URLS, mock_data_root=None)
+    assert not any(d["status"] == "service-not-in-catalog" for d in fatal)
+
+
+def test_a_slug_in_neither_the_stack_nor_the_catalog_still_reads_as_unresolved():
+    # The two checks answer different questions; the URL one keeps precedence so
+    # a bare slug still gets the "use the canonical '<name>-api' slug" hint.
+    with pytest.raises(InjectAuthoringError) as ei:
+        run_authoring_validation(_script(_seed_stage(), _stage(1, 0, 1, silent=[
+            _rest_patch("s1", "zendesk", "901110051", {"dueDate": {}})])),
+            host_api_to_url=URLS, mock_data_root=None)
+    assert [d["status"] for d in ei.value.defects] == ["unresolved"]

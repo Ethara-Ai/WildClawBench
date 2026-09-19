@@ -5,7 +5,7 @@ Mirrors the Google Calendar API v3 surface (subset).
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Dict, Any
 
 import google_calendar_data
@@ -76,12 +76,16 @@ def get_event(calendar_id: str, event_id: str):
 
 
 class TimeBlock(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     dateTime: Optional[str] = None
     date: Optional[str] = None
     timeZone: Optional[str] = None
 
 
 class Attendee(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     email: str
     displayName: Optional[str] = ""
     responseStatus: Optional[str] = "needsAction"
@@ -90,6 +94,8 @@ class Attendee(BaseModel):
 
 
 class EventCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     summary: str
     description: Optional[str] = ""
     location: Optional[str] = ""
@@ -98,6 +104,8 @@ class EventCreateBody(BaseModel):
     attendees: Optional[List[Attendee]] = None
     recurrence: Optional[List[str]] = None
     visibility: Optional[str] = "default"
+    creator: Optional[str] = None
+    organizer: Optional[str] = None
 
 
 @app.post("/calendar/v3/calendars/{calendar_id}/events", status_code=201)
@@ -110,12 +118,15 @@ def create_event(calendar_id: str, body: EventCreateBody):
 
 
 class EventUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     summary: Optional[str] = None
     description: Optional[str] = None
     location: Optional[str] = None
     start: Optional[TimeBlock] = None
     end: Optional[TimeBlock] = None
     attendees: Optional[List[Attendee]] = None
+    recurrence: Optional[List[str]] = None
     status: Optional[str] = None
     visibility: Optional[str] = None
 

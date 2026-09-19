@@ -292,9 +292,10 @@ def update_monitor(monitor_id, name=None, query=None, message=None,
                 _changes["priority"] = priority
             if tags is not None:
                 _changes["tags"] = tags
-            _changes["modified"] = _now_iso()
-            m.update(_changes)
-            _store_patch("monitors", m, _changes)
+            if _changes:
+                _changes["modified"] = _now_iso()
+                m.update(_changes)
+                _store_patch("monitors", m, _changes)
             return m
     return {"error": f"Monitor {monitor_id} not found"}
 

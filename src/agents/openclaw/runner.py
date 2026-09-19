@@ -33,6 +33,7 @@ from src.utils.docker_utils import (
     start_container,
     write_turn_marker,
 )
+from src.utils.litellm_sidecar import AUTH_MODE_MASTER_KEY, sidecar_auth_mode
 from src.utils.sim_clock import compute_sim_clock
 from src.utils.grading import (
     extract_preflight_usage_from_litellm_log,
@@ -67,6 +68,12 @@ MODEL_NAMES: dict[str, str] = {
 
 _GPT_PREFIXES = ("gpt", "o1", "o3", "o4", "llama", "mistral", "kimi", "deepseek", "gemini", "qwen")
 
+# Fallback for the agent container's ANTHROPIC_API_KEY when no per-attempt run
+# key has been minted yet. Same role as WCB_CC_STUB_KEY / sk-wcb-oauth-stub on
+# the cc-bridge: a value that satisfies a client which refuses to start without
+# one, carrying no authority of its own.
+_AGENT_ENV_STUB_KEY = "sk-wcb-agent-stub"
+
 
 def _normalize_openrouter_model(model: str) -> str:
     if model.startswith("openrouter/"):
@@ -76,6 +83,95 @@ def _normalize_openrouter_model(model: str) -> str:
     if any(model.lower().startswith(p) for p in _GPT_PREFIXES):
         return f"openrouter/openai/{model}"
     return f"openrouter/anthropic/{model}"
+
+
+# ---------------------------------------------------------------------------
+# Inline-eval obfuscation guard -- container side.
+#
+# openclaw's exec path runs a prefilter that flags "Python/Perl/Ruby with
+# base64 or encoded execution" as obfuscation and routes the call to a human
+# approval channel (exec.approval.waitDecision ~120s) that headless benchmark
+# runs do not have. tools.exec.security="full" does NOT cover this prefilter
+# (see trajectory/builder.py classify_child_completion); only
+# tools.exec.strictInlineEval=false silences it, and that key is unrecognized
+# -- and therefore config-breaking -- on openclaw < 2026.3.31.
+#
+# The gate is decided INSIDE the agent container, from the installed package's
+# version, so the decision lives here as standalone source: _set_model embeds
+# it verbatim in the config script it pipes to `docker exec`, and the unit
+# tests exec() the same source. Two properties the previous inline
+# `try: int(...) / except Exception: pass` form did not have:
+#
+#   * version components are parsed by numeric PREFIX, so the prerelease and
+#     build-tagged strings openclaw actually publishes ("2026.4.0-rc.1") no
+#     longer raise ValueError and silently skip the guard on a build that DOES
+#     ship the prefilter;
+#   * both npm global roots are probed, and the outcome is REPORTED back to the
+#     harness on stdout instead of being swallowed, so a container that ends up
+#     unguarded shows up in the run log rather than only surfacing afterwards
+#     as an "/approve" plea in a trajectory.
+#
+# An undeterminable version still skips the key (writing an unrecognized key
+# disables the WHOLE config) -- but now it says so out loud.
+# ---------------------------------------------------------------------------
+
+#: stdout marker the in-container config script uses to report the outcome.
+_EXEC_GUARD_MARKER = "WCB_EXEC_GUARD="
+
+#: First openclaw release whose config validator recognizes strictInlineEval.
+_STRICT_INLINE_EVAL_MIN_VERSION = (2026, 3, 31)
+
+EXEC_GUARD_SOURCE = rf'''
+import json as _wcb_json
+import pathlib as _wcb_pathlib
+import re as _wcb_re
+
+_WCB_OC_PKG_PATHS = (
+    "/usr/lib/node_modules/openclaw/package.json",
+    "/usr/local/lib/node_modules/openclaw/package.json",
+)
+_WCB_STRICT_INLINE_EVAL_MIN = {_STRICT_INLINE_EVAL_MIN_VERSION}
+
+
+def _wcb_openclaw_version(paths=_WCB_OC_PKG_PATHS):
+    """Installed openclaw version as an int tuple, or None if undeterminable.
+
+    Components are read by numeric prefix so "2026.4.0-rc.1" parses as
+    (2026, 4, 0) instead of blowing up on int("0-rc"). A component with no
+    leading digits truncates the tuple; fewer than two components is treated
+    as unusable and the next candidate path is tried.
+    """
+    for _path in paths:
+        try:
+            _raw = _wcb_json.loads(_wcb_pathlib.Path(_path).read_text())["version"]
+        except Exception:
+            continue
+        _parts = []
+        for _chunk in str(_raw).split(".")[:3]:
+            _m = _wcb_re.match(r"\s*(\d+)", _chunk)
+            if _m is None:
+                break
+            _parts.append(int(_m.group(1)))
+        if len(_parts) >= 2:
+            return tuple(_parts)
+    return None
+
+
+def _wcb_arm_exec_guard(exec_cfg, paths=_WCB_OC_PKG_PATHS):
+    """Silence the inline-eval prefilter; return what actually happened.
+
+    "armed" -- key written; "not-required" -- build predates the prefilter;
+    "unknown-version" -- version undeterminable, key withheld to keep the
+    config loadable (the caller warns about this one).
+    """
+    _version = _wcb_openclaw_version(paths)
+    if _version is None:
+        return "unknown-version"
+    if _version >= _WCB_STRICT_INLINE_EVAL_MIN:
+        exec_cfg["strictInlineEval"] = False
+        return "armed"
+    return "not-required"
+'''
 
 
 class OpenClawAgent(BaseAgent):
@@ -121,22 +217,49 @@ class OpenClawAgent(BaseAgent):
         self._run_keys: dict[str, str] = {}
 
     def _run_key_bearer_live(self) -> bool:
-        # The per-run key can ride the bearer only when the sidecar does NOT
-        # enforce a master key (any other bearer 401s). Config.from_env() can
-        # never yield an empty litellm_master_key (its s() helper substitutes
-        # the default), so WCB_SIDECAR_NO_MASTER_KEY=1 is the explicit operator
-        # switch — it also strips master-key auth from the sidecar itself
-        # (litellm_sidecar.py), keeping both sides consistent. Security note:
-        # keyless mode removes the only auth between co-tenant containers and
-        # the sidecar; enable deliberately.
-        if os.environ.get("WCB_SIDECAR_NO_MASTER_KEY", "").strip() == "1":
+        # The per-run key can ride the bearer whenever the sidecar is not
+        # enforcing a master key, because a master-key proxy 401s every other
+        # bearer. That used to mean attribution was only available on a sidecar
+        # with no inbound auth at all; it is now the default, and the sidecar
+        # authenticates the run key itself (litellm_sidecar.sidecar_auth_mode,
+        # src/utils/litellm_run_key_auth.py), so the bearer that identifies the
+        # run is also the bearer that admits it. Only WCB_SIDECAR_MASTER_KEY=1
+        # turns this off, and then the main agent's rows go out untagged.
+        if sidecar_auth_mode() != AUTH_MODE_MASTER_KEY:
             return True
+        # Master-key mode with no key to enforce leaves the proxy open, so the
+        # run key still rides the bearer rather than being thrown away.
         return not self.litellm_master_key
 
     def _agent_bearer(self, task_id: str) -> str:
         if self._run_key_bearer_live():
             return self._run_keys.get(task_id) or "sk-litellm"
         return self.litellm_master_key
+
+    def _agent_env_bearer(self, task_id: str) -> str:
+        """Run-scoped value for the agent container's ANTHROPIC_API_KEY.
+
+        openclaw takes the bearer it actually sends from providers.anthropic.apiKey
+        in openclaw.json (_write_openclaw_config below); the env var exists only
+        because openclaw's own key resolution refuses a provider with no key in
+        sight at all, and because the vendored @anthropic-ai/sdk reads
+        ANTHROPIC_API_KEY as its apiKey default. Neither path needs the sidecar's
+        master key, and under master-key auth that key is shared by every
+        concurrent run: the agent that reads it out of its own environment can
+        call any model on the sidecar with no run key attached, so the spend
+        lands in no run's totals. A container env var is also the one credential
+        channel the agent leaks by accident — a single `env` in any turn puts it
+        in chat.jsonl, which is snapshotted, graded and shipped in the bundle.
+
+        The per-attempt run key is the right value on both counts: it is a
+        run-scoped identifier that is already in the container as WCB_RUN_KEY, so
+        it adds no exposure, and on a keyless sidecar it is the bearer the sidecar
+        expects anyway. Under master-key auth it is deliberately not a credential
+        the sidecar accepts — if openclaw ever does fall back to the env var the
+        run fails with a 401 naming this attempt instead of quietly succeeding on
+        a shared admin key.
+        """
+        return self._run_keys.get(task_id) or _AGENT_ENV_STUB_KEY
 
     @property
     def expects_gateway(self) -> bool:
@@ -227,10 +350,30 @@ class OpenClawAgent(BaseAgent):
         )
         return False
 
-    def _count_run_key_rows(self, run_key: str) -> int:
+    def _count_run_key_rows(self, run_key: str, successes_only: bool = False) -> int:
+        # successes_only serves the EMPTY-turn check: a turn whose every request
+        # fails writes only "kind": "failure" rows (aleksei 1P 2026-09-06 —
+        # relay 400s on turns 14-16 counted as traffic, so three dead turns
+        # graded as complete). The success test is a JSON parse of the row's
+        # "kind" — only "agent" counts: a substring match fails OPEN on
+        # writer formatting drift, and "preflight" probe rows would mask a
+        # genuinely empty turn. The stall guard keeps counting
+        # ALL rows: a fast-failing route is live, not stalled.
         try:
             with open(self.litellm_usage_log, "r", encoding="utf-8") as fh:
-                return fh.read().count(run_key)
+                if not successes_only:
+                    return fh.read().count(run_key)
+                n = 0
+                for line in fh:
+                    if run_key not in line:
+                        continue
+                    try:
+                        kind = json.loads(line).get("kind")
+                    except ValueError:
+                        kind = None
+                    if kind == "agent":
+                        n += 1
+                return n
         except OSError:
             return 0
 
@@ -265,12 +408,14 @@ class OpenClawAgent(BaseAgent):
         return min(max(grace, OpenClawAgent._EMPTY_TURN_GRACE_FLOOR_S),
                    OpenClawAgent._EMPTY_TURN_GRACE_MAX_S)
 
-    def _wait_for_new_run_key_rows(self, run_key: str, baseline: int) -> int:
+    def _wait_for_new_run_key_rows(self, run_key: str, baseline: int,
+                                   successes_only: bool = False) -> int:
         """Row count for *run_key*, re-read until it exceeds *baseline* or the
         empty-turn grace expires. Returns at once when a new row is already
         there, so a normal turn pays nothing. Bounded by an iteration count as
-        well as the clock so it terminates under a frozen/stubbed clock."""
-        rows = self._count_run_key_rows(run_key)
+        well as the clock so it terminates under a frozen/stubbed clock.
+        *successes_only* counts only non-failure rows (see _count_run_key_rows)."""
+        rows = self._count_run_key_rows(run_key, successes_only=successes_only)
         if rows > baseline:
             return rows
         grace = self._empty_turn_grace_seconds()
@@ -280,7 +425,7 @@ class OpenClawAgent(BaseAgent):
             if time.monotonic() >= deadline:
                 break
             time.sleep(poll)
-            rows = self._count_run_key_rows(run_key)
+            rows = self._count_run_key_rows(run_key, successes_only=successes_only)
             if rows > baseline:
                 return rows
         return rows
@@ -290,14 +435,110 @@ class OpenClawAgent(BaseAgent):
         """Kill the IN-CONTAINER `openclaw agent` CLI processes. Killing the
         host-side `docker exec` Popen does NOT reach them (same pathology the
         codex runner fixed with _terminate_codex_processes). Pattern is scoped
-        to 'openclaw agent' so the long-lived `openclaw gateway` survives."""
+        to 'openclaw agent' so the long-lived `openclaw gateway` survives.
+
+        After the kill, remove the stale lock of the PARENT chat session:
+        openclaw records the holder pid in the lock and every later attempt
+        waits 10s then dies with 'session file locked (timeout 10000ms)' in
+        an endless failover loop (aleksei 1P run_4 2026-09-07 - stall-retry
+        killed pid 1967, its chat.jsonl.lock survived, and turns looped on
+        FailoverError for hours; the exact path comes from that incident
+        log). Scoped to chat* deliberately: a bare sessions/*.lock also
+        deletes locks of gateway-hosted sub-agent child sessions that the
+        pkill deliberately does NOT kill - a real two-writer exposure."""
         subprocess.run(
             ["docker", "exec", task_id, "/bin/bash", "-lc",
              "pkill -TERM -f 'openclaw agent' 2>/dev/null || true; "
              "sleep 2; "
-             "pkill -KILL -f 'openclaw agent' 2>/dev/null || true"],
+             "pkill -KILL -f 'openclaw agent' 2>/dev/null || true; "
+             "sleep 1; "
+             "rm -f /root/.openclaw/agents/*/sessions/chat.jsonl.lock "
+             "/root/.openclaw/agents/*/sessions/chat.lock 2>/dev/null || true"],
             capture_output=True, text=True, timeout=30,
         )
+
+    # The session store the retry loop must not double-write into. Hard-coded
+    # to the same agent directory the stale-lock cleanup above already targets:
+    # the agent CLI runs as the container's root under the default "main" agent.
+    _SESSION_PATH = "/root/.openclaw/agents/main/sessions/chat.jsonl"
+
+    @classmethod
+    def _session_line_count(cls, task_id: str) -> int | None:
+        """Rows currently in the container's chat session, or None when the
+        count could NOT be established (no docker, exec failure, unparsable
+        output). A missing session file is 0, not None — turn 0 legitimately
+        runs before openclaw creates the file. The distinction is load-bearing:
+        _restore_session_to must never treat a failed probe as "was empty" and
+        truncate a live session. `-lc` is a login shell, so only the LAST
+        stdout line is the count."""
+        try:
+            r = subprocess.run(
+                ["docker", "exec", task_id, "/bin/bash", "-lc",
+                 f"[ -f {cls._SESSION_PATH} ] && "
+                 f"awk 'END{{print NR}}' {cls._SESSION_PATH} || echo 0"],
+                capture_output=True, text=True, timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if r.returncode != 0:
+            return None
+        try:
+            return int((r.stdout or "").strip().splitlines()[-1].strip())
+        except (IndexError, ValueError):
+            return None
+
+    @classmethod
+    def _restore_session_to(cls, task_id: str, lines_before: int | None,
+                            turn_index: int) -> None:
+        """Roll the session back to its pre-attempt state so a retry's re-send
+        is the only copy of that turn's user message.
+
+        openclaw persists the user message as soon as the turn starts, so an
+        aborted attempt (stalled+killed, or empty) leaves that row behind and
+        the retry appends an identical second one — six shipped runs recorded
+        two identical user rows (T14/T16/T19 x2), which shifts the judge's turn
+        count and the per-turn feedback anchor by one.
+
+        Inspection, never assumption: one observed run stalled twice and still
+        recorded 18/18 user turns (the retry ran embedded after a gateway
+        1008), so rows are removed ONLY when the live count actually exceeds
+        the pre-attempt snapshot. Must run after _terminate_agent_invocations
+        (kill + lock removal) so nothing is writing while we rewrite."""
+        if lines_before is None:
+            logger.warning(
+                "[%s] session-restore skipped for turn %d: pre-attempt line "
+                "count unknown — retry may duplicate the user message",
+                task_id, turn_index + 1)
+            return
+        now = cls._session_line_count(task_id)
+        if now is None or now <= lines_before:
+            logger.debug(
+                "[%s] session-restore: turn %d left no orphan rows "
+                "(before=%d after=%s)", task_id, turn_index + 1,
+                lines_before, now)
+            return
+        try:
+            r = subprocess.run(
+                ["docker", "exec", task_id, "/bin/bash", "-lc",
+                 f"head -n {int(lines_before)} {cls._SESSION_PATH} "
+                 f"> {cls._SESSION_PATH}.wcbtmp && "
+                 f"mv {cls._SESSION_PATH}.wcbtmp {cls._SESSION_PATH}"],
+                capture_output=True, text=True, timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            logger.warning("[%s] session-restore failed for turn %d: %s",
+                           task_id, turn_index + 1, exc)
+            return
+        if r.returncode != 0:
+            logger.warning("[%s] session-restore failed for turn %d: %s",
+                           task_id, turn_index + 1,
+                           (r.stderr or "").strip()[:200])
+            return
+        logger.info(
+            "[%s] session-restore: dropped %d orphan row(s) from turn %d's "
+            "aborted attempt before re-send (before=%d stalled=%d after=%s)",
+            task_id, now - lines_before, turn_index + 1, lines_before, now,
+            cls._session_line_count(task_id))
 
     def _break_stuck_llm_connections(self, task_id: str) -> None:
         """Best-effort RST of the container's sockets to the sidecar so the
@@ -410,13 +651,14 @@ class OpenClawAgent(BaseAgent):
 
             # WCB_AUDIO_TRANSCRIBE_URL points the audio-extract skill at the
             # in-cluster LiteLLM sidecar's /v1/audio/transcriptions endpoint
-            # (litellm_sidecar.py:142-170 registers whisper-1 there). The
-            # agent container has no internet egress under the --internal
-            # bridge, so this URL is the only working transcription path;
-            # without it the agent silently drops audio inputs (see
-            # ruth_flynn trajectory 925303a7-0a9d-40be-86b4-51da4d6e6544
-            # turns 41-57 where every fallback - whisper CLI, pip install,
-            # OPENAI_API_KEY env probe - failed in turn).
+            # (litellm_sidecar.py:330-367 registers whisper-1 there, gated on
+            # an OpenAI chat OR whisper key). The agent container has no
+            # internet egress under the --internal bridge, so this URL is the
+            # preferred transcription path; without it the agent silently
+            # drops audio inputs (see ruth_flynn trajectory
+            # 925303a7-0a9d-40be-86b4-51da4d6e6544 turns 41-57 where every
+            # fallback - whisper CLI, pip install, OPENAI_API_KEY env probe -
+            # failed in turn).
             extra_env_dict = dict(spec.task.get("env_dict") or {})
             # WCB_RUN_KEY lets in-container helpers we control (subagent
             # director, audio-extract skill) tag their sidecar requests via the
@@ -431,15 +673,23 @@ class OpenClawAgent(BaseAgent):
             # tests/test_subagent_model_parity.py.
             extra_env_dict["WILDCLAW_MODEL"] = spec.model
             if self.litellm_config_yaml and self.litellm_container_name:
-                extra_env_dict.setdefault(
-                    "WCB_AUDIO_TRANSCRIBE_URL",
-                    f"http://{self.litellm_container_name}:{self.litellm_port}"
-                    f"/v1/audio/transcriptions",
-                )
-                extra_env_dict.setdefault(
-                    "WCB_AUDIO_TRANSCRIBE_AUTH",
-                    self._agent_bearer(spec.task_id),
-                )
+                # Advertise the route ONLY when the sidecar actually serves it.
+                # A sidecar existing does not imply a transcription route: on a
+                # Bedrock-only / OAuth / Codex-bridge profile with no whisper
+                # key the yaml carries no whisper-1 block, and handing the skill
+                # a URL that 400s "Invalid model name" is worse than handing it
+                # nothing - unset is the signal to use its local-whisper
+                # fallback (environment/skills/audio-extract).
+                if "model_name: whisper-1" in self.litellm_config_yaml:
+                    extra_env_dict.setdefault(
+                        "WCB_AUDIO_TRANSCRIBE_URL",
+                        f"http://{self.litellm_container_name}:{self.litellm_port}"
+                        f"/v1/audio/transcriptions",
+                    )
+                    extra_env_dict.setdefault(
+                        "WCB_AUDIO_TRANSCRIBE_AUTH",
+                        self._agent_bearer(spec.task_id),
+                    )
                 # openclaw's Anthropic-messages SDK client ignores the per-provider
                 # baseUrl in openclaw.json for provider_key 'anthropic' and dials
                 # api.anthropic.com directly, bypassing the litellm sidecar +
@@ -447,15 +697,22 @@ class OpenClawAgent(BaseAgent):
                 # the raw system[] trips the "extra usage" 400). ANTHROPIC_BASE_URL
                 # is the SDK-honored override (same pattern as claudecode/runner.py
                 # :370). No /v1 suffix: the client appends /v1/messages itself.
+                # The KEY that rides with them is deliberately NOT the sidecar
+                # bearer: see _agent_env_bearer. ANTHROPIC_AUTH_TOKEN is not set
+                # at all — nothing in the agent image reads it (openclaw's own
+                # dist never mentions it; the vendored @anthropic-ai/sdk reads it
+                # only as a default for an authToken openclaw already passes
+                # explicitly), so it only ever duplicated a credential into the one
+                # place the agent can print by accident. docker_utils refuses the
+                # name outright, so a task file cannot reintroduce it either.
                 if "claude" in (spec.model or "").lower():
                     base_url_root = (
                         f"http://{self.litellm_container_name}:{self.litellm_port}"
                     )
-                    stub = self._agent_bearer(spec.task_id)
                     extra_env_dict.setdefault("ANTHROPIC_BASE_URL", base_url_root)
                     extra_env_dict.setdefault("ANTHROPIC_API_BASE", base_url_root)
-                    extra_env_dict.setdefault("ANTHROPIC_AUTH_TOKEN", stub)
-                    extra_env_dict.setdefault("ANTHROPIC_API_KEY", stub)
+                    extra_env_dict.setdefault(
+                        "ANTHROPIC_API_KEY", self._agent_env_bearer(spec.task_id))
 
             # Sub-agent spawn runtime (src/utils/subagent_director.py) discovers
             # the LiteLLM sidecar from these container env vars. Only set on the
@@ -750,11 +1007,12 @@ class OpenClawAgent(BaseAgent):
                 # A silently dead in-flight request wedges openclaw with no
                 # surfaced error (stochastic ~0.1%/request; killed 39 delivery
                 # runs + 3 repro runs). One stall-guarded retry of the SAME
-                # turn converts a lost run into a recovered turn. Retry may
-                # duplicate the user message in-session if the gateway kept
-                # the aborted exchange — accepted: better than a dead run. The
-                # turn deadline is shared across attempts so a stalled+retried
-                # turn never exceeds a single turn budget.
+                # turn converts a lost run into a recovered turn. The aborted
+                # attempt's orphaned user row is rolled back before the
+                # re-send (_restore_session_to), so a retry cannot leave two
+                # identical user turns in the session. The turn deadline is
+                # shared across attempts so a stalled+retried turn never
+                # exceeds a single turn budget.
                 outcome = "timeout"
                 turn_deadline = time.time() + spec.timeout_seconds
                 _run_key = self._run_keys.get(spec.task_id, "")
@@ -762,15 +1020,42 @@ class OpenClawAgent(BaseAgent):
                                      and self._run_key_bearer_live())
                 rows_before_turn = (self._count_run_key_rows(_run_key)
                                     if _rows_guarded else 0)
+                succ_before_turn = (
+                    self._count_run_key_rows(_run_key, successes_only=True)
+                    if _rows_guarded else 0)
+                if turn_index == 0:
+                    if not _rows_guarded:
+                        logger.warning(
+                            "[%s] run-integrity guards DISABLED for this run: "
+                            "empty-turn detection and the stall guard both "
+                            "require run-key tagging (keyless sidecar mode) — "
+                            "a dead LLM route will grade as a complete run",
+                            spec.task_id)
+                    elif (self._stall_seconds() > 0
+                          and self._stall_seconds() >= spec.timeout_seconds):
+                        logger.warning(
+                            "[%s] WCB_TURN_STALL_SECONDS (%.0f) >= per-turn "
+                            "budget (%ds): the stall guard can never fire "
+                            "before the turn times out",
+                            spec.task_id, self._stall_seconds(),
+                            spec.timeout_seconds)
                 for turn_attempt in range(2):
                     # Each attempt is judged on ITS OWN sidecar rows. Re-read
                     # the baseline before a retry: a late row from the previous
                     # attempt must not make a genuinely empty retry look alive
                     # (which silently disabled "empty twice -> abort").
-                    rows_before_attempt = (
-                        rows_before_turn if turn_attempt == 0 or not _rows_guarded
-                        else self._count_run_key_rows(_run_key))
+                    succ_before_attempt = (
+                        succ_before_turn if turn_attempt == 0 or not _rows_guarded
+                        else self._count_run_key_rows(_run_key, successes_only=True))
                     attempt_budget = max(60, int(turn_deadline - time.time()))
+                    # Pre-attempt session snapshot for the rollback below.
+                    # Probed only when a retry is actually reachable: both
+                    # retry paths require _rows_guarded (stall detection and
+                    # empty detection are run-key features), so an unguarded
+                    # run pays no docker exec here.
+                    session_lines = (
+                        self._session_line_count(spec.task_id)
+                        if _rows_guarded and turn_attempt == 0 else None)
                     agent_proc = run_background(
                         spec.task_id,
                         bash_cmd=(
@@ -802,24 +1087,29 @@ class OpenClawAgent(BaseAgent):
                         # the outer loop would re-fire before_turn injections
                         # and ClawMark stage mutations); a second empty means
                         # the route is dead: abort instead of laddering to
-                        # schedule end. The retry re-sends a message whose
-                        # empty exchange the session already recorded, so the
-                        # turn is also logged in turns_duplicated.
+                        # schedule end. The empty exchange the session already
+                        # recorded is rolled back before the re-send;
+                        # turns_duplicated stays as the "a retry fired here"
+                        # marker, no longer a claim that a duplicate exists.
                         # The row for a healthy turn can land just AFTER the
                         # CLI exits (async usage callback), so give the log a
                         # grace window before declaring the turn empty.
                         if _rows_guarded and self._empty_turn_limit() > 0:
-                            rows_now = self._wait_for_new_run_key_rows(
-                                _run_key, rows_before_attempt)
-                            if rows_now <= rows_before_attempt:
+                            # Only SUCCESSFUL rows count: a turn whose every
+                            # request failed wrote only failure rows and is empty.
+                            succ_now = self._wait_for_new_run_key_rows(
+                                _run_key, succ_before_attempt, successes_only=True)
+                            if succ_now <= succ_before_attempt:
                                 turns_empty.append(turn_index)
                                 if turn_attempt == 0:
                                     logger.warning(
-                                        "[%s] Agent turn %d EMPTY (no LLM "
-                                        "traffic within %.1fs grace) — "
+                                        "[%s] Agent turn %d EMPTY (no successful "
+                                        "LLM traffic within %.1fs grace) — "
                                         "retrying the same turn once",
                                         spec.task_id, turn_index + 1,
                                         self._empty_turn_grace_seconds())
+                                    self._restore_session_to(
+                                        spec.task_id, session_lines, turn_index)
                                     turns_duplicated.append(turn_index)
                                     continue
                                 outcome = "empty"
@@ -830,7 +1120,8 @@ class OpenClawAgent(BaseAgent):
                                     "run_incomplete.",
                                     spec.task_id, turn_index + 1)
                                 break
-                            rows_before_turn = rows_now
+                            succ_before_turn = succ_now
+                            rows_before_turn = self._count_run_key_rows(_run_key)
                         logger.info("[%s] Agent turn %d finished",
                                     spec.task_id, turn_index + 1)
                         break
@@ -844,6 +1135,10 @@ class OpenClawAgent(BaseAgent):
                         self._terminate_agent_invocations(spec.task_id)
                         agent_proc.kill()
                         agent_proc.wait()
+                        # After the kill + lock removal: nothing is writing,
+                        # so the orphaned user row can be rolled back safely.
+                        self._restore_session_to(
+                            spec.task_id, session_lines, turn_index)
                         turns_duplicated.append(turn_index)
                         continue
                     logger.warning("[%s] Agent turn %d %s", spec.task_id,
@@ -853,7 +1148,10 @@ class OpenClawAgent(BaseAgent):
                     # A turn that produced real sidecar traffic before wedging
                     # did genuine work that turns_completed will not credit;
                     # record it so the loss is visible as partial, not zero.
-                    if _rows_guarded and self._count_run_key_rows(_run_key) > rows_before_turn:
+                    # Successful rows only — a turn that 400-stormed and then
+                    # timed out did NO genuine work.
+                    if _rows_guarded and self._count_run_key_rows(
+                            _run_key, successes_only=True) > succ_before_turn:
                         turns_partial.append(turn_index)
                     self._terminate_agent_invocations(spec.task_id)
                     agent_proc.kill()
@@ -1197,16 +1495,26 @@ class OpenClawAgent(BaseAgent):
 
         usage: dict
         preflight_usage: dict | None = None
+        # Tagged extraction only when the MAIN agent's bearer carried the
+        # key: under master-key auth only subagent/audio helper requests
+        # are tagged (they send x-wcb-run-key explicitly), and matching on
+        # that subset would undercount worse than the window does. Resolved
+        # outside the log branch because the per-message back-fill in
+        # eval/run_batch.py needs the same key even when this call site has
+        # no log to read.
+        run_key = (self._run_keys.get(task_id, "")
+                   if self._run_key_bearer_live() else "")
+        # Stamped by run_task the instant the agent process returned (and again
+        # after a stall-recovery turn), on the HOST clock — the only clock
+        # comparable with the sidecar's UTC row timestamps, since the agent's own
+        # clock runs under the faketime shim. Kept out of the window fallback
+        # below, which is a reconstruction rather than a measurement.
+        measured_window = self._task_windows.get(task_id)
+        agent_finished_ts = measured_window[1] if measured_window else None
         if self.litellm_usage_log:
-            window = self._task_windows.get(task_id)
+            window = measured_window
             if window is None:
                 window = (time.time() - max(elapsed_time, 1.0), time.time())
-            # Tagged extraction only when the MAIN agent's bearer carried the
-            # key: under master-key auth only subagent/audio helper requests
-            # are tagged (they send x-wcb-run-key explicitly), and matching on
-            # that subset would undercount worse than the window does.
-            run_key = (self._run_keys.get(task_id, "")
-                       if self._run_key_bearer_live() else "")
             if run_key:
                 usage = extract_usage_from_litellm_log(
                     Path(self.litellm_usage_log), window[0], window[1],
@@ -1291,6 +1599,18 @@ class OpenClawAgent(BaseAgent):
         usage["elapsed_time"] = round(elapsed_time, 2)
         if preflight_usage is not None:
             usage["__preflight__"] = preflight_usage
+        if run_key:
+            # Private channel to eval/run_batch.py's per-message back-fill, so
+            # the delivered per-message blocks are attributed by the SAME key
+            # as the totals above. Dunder-prefixed and stripped by save_usage:
+            # in keyless sidecar mode this key IS the agent's bearer and must
+            # never reach usage.json.
+            usage["__run_key__"] = run_key
+        if agent_finished_ts is not None:
+            # Same private channel, carrying the agent-finish boundary. The
+            # back-fill needs it to tell a turn's row from traffic the container
+            # issued after the agent was done, which no field on the row records.
+            usage["__agent_finished_ts__"] = float(agent_finished_ts)
         return usage
 
     def _set_model(self, task_id: str, model: str, thinking: str | None = None) -> None:
@@ -1373,6 +1693,47 @@ class OpenClawAgent(BaseAgent):
                 # other OpenAI-compatible sidecar model (e.g. the first-party
                 # vendor model) a mismatched id would leave openclaw unable to resolve
                 # the selected model.
+                #
+                # contextWindow drives openclaw's auto-compaction: declare it
+                # BIGGER than the upstream's real window and the agent never
+                # compacts, grows the session past the ceiling, and every call
+                # 400s for the rest of the run (aleksei 1P 2026-09-06: relay
+                # window measured 262,144 tokens by probe — 262,012 accepted,
+                # 270,012 rejected with the same generic "invalid parameters" —
+                # while this config declared 1,050,000; turns 14-16 died
+                # silently). The 1P vendor model therefore declares the
+                # measured 256K window (override: KENSEI_1P_CONTEXT_WINDOW);
+                # gpt-5.5 keeps the 1M+ window.
+                _onep_id = (os.environ.get("KENSEI_1P_MODEL")
+                            or os.environ.get("ONEP_MODEL") or "").strip()
+                if _onep_id and openclaw_model_id == _onep_id:
+                    try:
+                        context_window = int(
+                            os.environ.get("KENSEI_1P_CONTEXT_WINDOW", "262144")
+                        )
+                    except ValueError:
+                        context_window = 262144
+                    # Relay output is hard-capped at 32,000 tokens (observed:
+                    # two aleksei run_4 responses stopped at exactly 32000).
+                    # Declaring 128000 wastes ~half the 256K window on output
+                    # reserve and compacts far too early.
+                    try:
+                        max_tokens = int(
+                            os.environ.get("KENSEI_1P_MAX_TOKENS", "32768")
+                        )
+                    except ValueError:
+                        max_tokens = 32768
+                else:
+                    context_window = 1050000
+                    max_tokens = 128000
+                    if "gpt-5" not in openclaw_model_id.lower():
+                        logger.warning(
+                            "openclaw provider config: non-anthropic model %r "
+                            "is not the configured 1P model — defaulting to "
+                            "contextWindow 1050000; if its real window is "
+                            "smaller the agent will never compact (set "
+                            "KENSEI_1P_MODEL or add a per-model entry)",
+                            openclaw_model_id)
                 litellm_provider = {
                     "baseUrl": base_url_v1,
                     "apiKey": self._agent_bearer(task_id),
@@ -1381,7 +1742,8 @@ class OpenClawAgent(BaseAgent):
                     "models": [
                         {"id": openclaw_model_id, "name": openclaw_model_id,
                          "input": ["text", "image"], "reasoning": True,
-                         "contextWindow": 1050000, "maxTokens": 128000},
+                         "contextWindow": context_window,
+                         "maxTokens": max_tokens},
                     ],
                 }
             # Also register an `openai` provider that points at the SAME sidecar.
@@ -1482,23 +1844,18 @@ exec_cfg["security"] = "full"
 #     benchmark image ships 2026.3.11, whose validator rejected it as an
 #     "Unrecognized key" (gateway.log 2026-06-13 darren_weston) -- same
 #     failure class as the 2026-06-02 megan-davis Unrecognized-keys run.
-# So we version-gate: read the installed openclaw version and only set
-# strictInlineEval=false when >=2026.3.31 (e.g. local 2026.4.x). On older
-# builds (2026.3.11) the prefilter does not exist and security="full"
-# above already suffices, so skipping the key is both correct and safe.
-# Unreadable/unparseable version -> skip (fail safe, keep config valid).
-try:
-    _ocv = json.loads(pathlib.Path("/usr/lib/node_modules/openclaw/package.json").read_text())["version"]
-    if tuple(int(x) for x in _ocv.split(".")[:3]) >= (2026, 3, 31):
-        exec_cfg["strictInlineEval"] = False
-except Exception:
-    pass
+# So we version-gate INSIDE the container -- see EXEC_GUARD_SOURCE for the
+# probe, why a numeric-prefix parse is required, and why the outcome is
+# echoed back to the harness instead of being swallowed.
+{EXEC_GUARD_SOURCE}
+_guard_state = _wcb_arm_exec_guard(exec_cfg)
 sandbox_cfg = defaults.setdefault("sandbox", {{}})
 sandbox_cfg["mode"] = "off"
 web = tools.setdefault("web", {{}})
 web["search"] = {{"enabled": False}}
 web["fetch"] = {{"enabled": False}}
 p.write_text(json.dumps(d, indent=2))
+print({json.dumps(_EXEC_GUARD_MARKER)} + _guard_state)
 """
         else:
             normalized = _normalize_openrouter_model(model)
@@ -1522,24 +1879,21 @@ tools["deny"] = [
 ]
 # Mirror the LiteLLM branch: see comments there for the full rationale,
 # including why the chrome/chromium/etc. root-key writes were removed and
-# why strictInlineEval is version-gated (it is unrecognized on the EC2
-# image's openclaw 2026.3.11 and disables the whole config if written;
-# only >=2026.3.31 accepts it). openclaw issues #60054/#59625.
+# why strictInlineEval is version-gated in-container (it is unrecognized on
+# the EC2 image's openclaw 2026.3.11 and disables the whole config if
+# written; only >=2026.3.31 accepts it). openclaw issues #60054/#59625.
 exec_cfg = tools.setdefault("exec", {{}})
 exec_cfg["host"] = "gateway"
 exec_cfg["security"] = "full"
-try:
-    _ocv = json.loads(pathlib.Path("/usr/lib/node_modules/openclaw/package.json").read_text())["version"]
-    if tuple(int(x) for x in _ocv.split(".")[:3]) >= (2026, 3, 31):
-        exec_cfg["strictInlineEval"] = False
-except Exception:
-    pass
+{EXEC_GUARD_SOURCE}
+_guard_state = _wcb_arm_exec_guard(exec_cfg)
 sandbox_cfg = defaults.setdefault("sandbox", {{}})
 sandbox_cfg["mode"] = "off"
 web = tools.setdefault("web", {{}})
 web["search"] = {{"enabled": False}}
 web["fetch"] = {{"enabled": False}}
 p.write_text(json.dumps(d, indent=2))
+print({json.dumps(_EXEC_GUARD_MARKER)} + _guard_state)
 """
         r = subprocess.run(
             ["docker", "exec", "-i", task_id, "python3", "-"],
@@ -1549,7 +1903,45 @@ p.write_text(json.dumps(d, indent=2))
         )
         if r.returncode != 0:
             raise RuntimeError(f"Model setup failed:\n{r.stderr}")
+        self._log_exec_guard_state(task_id, r.stdout)
         logger.info("[%s] Model set in openclaw.json: %s", task_id, primary)
+
+    def _log_exec_guard_state(self, task_id: str, stdout: str | None) -> None:
+        """Surface what the container-side inline-eval guard actually did.
+
+        The config script reports its outcome instead of failing: an
+        unrecognized ``strictInlineEval`` would disable the whole openclaw
+        config, so an undeterminable version MUST still skip the write.
+        Skipping it *silently* is what let an unguarded container go unnoticed
+        until an ``/approve`` plea turned up in a trajectory, so the un-armed
+        case is a WARNING here.
+        """
+        state = ""
+        for line in (stdout or "").splitlines():
+            stripped = line.strip()
+            if stripped.startswith(_EXEC_GUARD_MARKER):
+                state = stripped[len(_EXEC_GUARD_MARKER):]
+        if state == "armed":
+            logger.info(
+                "[%s] exec obfuscation guard armed "
+                "(tools.exec.strictInlineEval=false)", task_id,
+            )
+        elif state == "not-required":
+            logger.info(
+                "[%s] exec obfuscation guard not required (installed openclaw "
+                "predates the inline-eval prefilter)", task_id,
+            )
+        else:
+            logger.warning(
+                "[%s] exec obfuscation guard NOT armed (%s): the openclaw "
+                "version could not be determined inside the container, so "
+                "tools.exec.strictInlineEval was left unwritten to keep the "
+                "config loadable. If this build ships the inline-eval "
+                "prefilter, base64/encoded exec calls will stall ~120s on an "
+                "approval channel headless runs do not have and the lane will "
+                "die on an '/approve' plea.",
+                task_id, state or "no marker on stdout",
+            )
 
     def _inject_auth(self, task_id: str) -> None:
         # LiteLLM holds Bedrock/OpenAI creds via its own env; no agent-side key.

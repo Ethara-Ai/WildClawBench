@@ -29,6 +29,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from eval.run_batch import _condense_transcript_for_judge, recompute_combined  # noqa: E402
 from script.backfill_pass_summary import _ctrf_test_result, rebuild_model_dir  # noqa: E402
+from src.utils.auth_provider import resolve_provider  # noqa: E402
 from src.utils.grading import grade_with_rubric  # noqa: E402
 
 _USAGE_KEYS = (
@@ -55,6 +56,10 @@ def _update_usage_json(run_dir: Path, scores: dict) -> None:
 
     combined = recompute_combined(sources, task_id=run_dir.parents[2].name)
     out = {k: combined[k] for k in _USAGE_KEYS}
+    # The run's own route, not this regrade's. A pre-provenance usage.json has
+    # no such record, so it falls back to the provider this process is
+    # configured for — the same env var that decided how the judge just ran.
+    out["auth_provider"] = usage.get("auth_provider") or resolve_provider()
     out["sources"] = sources
     for k, v in usage.items():
         if k not in out and k != "sources":
@@ -228,7 +233,10 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
     # stays self-consistent. Without this, a regrade leaves tests_total/passed/
     # failed and combined_reward stale or absent. Formula from run_batch.py:1154.
     test_result = _ctrf_test_result(run_dir)
-    rubric_reward = scores.get("overall_score")
+    # Judge no-signal sentinel (`error` key): not a rubric measurement, so it
+    # must not become a 0.0 rubric/combined reward (mirror of run_batch.py
+    # _augment_score_with_combined_rewards).
+    rubric_reward = None if scores.get("error") else scores.get("overall_score")
     if test_result["tests_total"] and test_result["tests_total"] > 0:
         test_reward = test_result["reward"]
         scores["tests_total"] = test_result["tests_total"]

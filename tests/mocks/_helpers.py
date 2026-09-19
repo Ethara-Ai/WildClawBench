@@ -160,6 +160,20 @@ def load_app(api_dir: Path):
                 del sys.modules[k]
 
 
+def data_module(app, module_name: str):
+    """Reach a server's data module through a route closure.
+
+    `load_app` evicts the modules it imported from `sys.modules`, so the app's
+    own route globals are the only handle on the exact store instance the app
+    is serving from."""
+    for route in app.routes:
+        fn = getattr(route, "endpoint", None)
+        g = getattr(fn, "__globals__", None)
+        if g and module_name in g:
+            return g[module_name]
+    raise LookupError(f"{module_name} not reachable from app routes")
+
+
 def list_routes(app) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     for route in app.routes:

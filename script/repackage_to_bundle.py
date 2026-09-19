@@ -97,8 +97,10 @@ import re
 import shutil
 import sys
 import unicodedata
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 # Fallback only: used when a run's actual model id can't be recovered from its
@@ -750,6 +752,15 @@ def _pick_rationale(c: dict[str, Any]) -> str:
     return ""
 
 
+def _is_abstention(c: dict[str, Any]) -> bool:
+    """True when the judge council could not resolve this criterion.
+
+    grading.py records the abstention as ``resolved_by="human_eval"`` +
+    ``human_eval="required"`` (src/utils/grading.py:1975-1979).
+    """
+    return c.get("resolved_by") == "human_eval" or c.get("human_eval") == "required"
+
+
 def _norm_criterion(text: Any) -> str:
     return re.sub(r"\s+", " ", str(text or "")).strip().lower()
 
@@ -814,6 +825,14 @@ def _build_rubric_block(
             "is_positive": is_positive,
             "passed": passed,
         }
+        # An abstention flattens to passed=false, which for a NEGATIVE weight is
+        # arithmetically identical to "the violation happened" — a whole-run
+        # council failure then reads as a pile of penalties (see
+        # script/check_negative_semantics.py). Mark it so consumers can tell the
+        # two apart. Emitted ONLY when true: adding a key to every entry would
+        # break existing report.json consumers and the byte-parity emitters.
+        if _is_abstention(c):
+            item["abstained"] = True
         if not passed:
             item["justification"] = _pick_rationale(c)
         rubric.append(item)
@@ -917,6 +936,10 @@ def build_report(
         report["injection_ok"] = False
     if score.get("eval_skipped"):
         report["eval_skipped"] = score.get("eval_skipped")
+    # Judge no-signal sentinel (score.json carries `error`): the 0.0 above is a
+    # placeholder, not a grade. Emitted only when present, like eval_skipped.
+    if score.get("error"):
+        report["no_signal"] = str(score.get("error"))[:300]
     return report
 
 
@@ -1551,7 +1574,14 @@ def _generate_environment_dockerfile(
         "    ca-certificates \\",
         "    && rm -rf /var/lib/apt/lists/*",
         "",
-        "RUN pip install --no-cache-dir --break-system-packages pymupdf pillow",
+        "RUN pip install --no-cache-dir --break-system-packages pymupdf pillow "
+        "openpyxl python-docx python-pptx",
+        "",
+        "RUN pip install --no-cache-dir --break-system-packages openai-whisper \\",
+        "    && mkdir -p /opt/wb_whisper_models \\",
+        "    && python3 -c \"import whisper; whisper.load_model('small', "
+        "download_root='/opt/wb_whisper_models')\" \\",
+        "    && mkdir -p /root/.cache && ln -sfn /opt/wb_whisper_models /root/.cache/whisper",
         "",
     ]
     if has_skills:
@@ -1580,12 +1610,83 @@ _LLM_PROXY_URL = "http://litellm-proxy:4000"
 _DEFAULT_CURRENT_DATE = "2026-05-28"
 
 
-def _compose_runtime_env_defaults() -> dict[str, str]:
+def _sim_clock_window_start(window: Any) -> str | None:
+    """sim_clock.py:_window_start_date."""
+    if isinstance(window, dict):
+        start = window.get("start")
+        return str(start) if start else None
+    if isinstance(window, str) and window.strip():
+        return window.strip().split()[0]
+    return None
+
+
+def _sim_clock_iso(task_dir: Path | None) -> str | None:
+    """Inline port of src/utils/sim_clock.py::compute_sim_clock -> ISO string.
+
+    Kept in lockstep with sim_clock.py by test_current_date_parity_with_harbor;
+    this script is deliberately isolated from the eval package and cannot import
+    it. Only the ISO prefix is needed here, so no epoch/tz object is built.
+    """
+    if task_dir is None:
+        return None
+    pj = Path(task_dir) / "prompts.json"
+    if not pj.is_file():
+        return None
+    try:
+        data = json.loads(pj.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    turns = data.get("turns")
+    if not isinstance(turns, list) or not turns:
+        return None
+    t0 = turns[0]
+    if not isinstance(t0, dict):
+        return None
+
+    window = data.get("window")
+    tz_name = (data.get("timezone") or "").strip()
+    if not tz_name and isinstance(window, dict):
+        tz_name = str(window.get("timezone") or "").strip()
+
+    ts = t0.get("timestamp")
+    if isinstance(ts, str) and ts.strip():
+        try:
+            dt = datetime.fromisoformat(ts.strip())
+        except ValueError:
+            dt = None
+        if dt is not None and dt.tzinfo is not None:
+            return dt.isoformat()
+
+    day = t0.get("day")
+    time_str = t0.get("time")
+    start_date = _sim_clock_window_start(window)
+    if isinstance(day, int) and isinstance(time_str, str) and start_date and tz_name:
+        try:
+            base = datetime.strptime(start_date, "%Y-%m-%d").date()
+            hh, mm = (int(x) for x in time_str.split(":")[:2])
+            tz = ZoneInfo(tz_name)
+        except (ValueError, ZoneInfoNotFoundError):
+            return None
+        local = datetime(base.year, base.month, base.day, hh, mm,
+                         tzinfo=tz) + timedelta(days=max(0, day - 1))
+        return local.isoformat()
+    return None
+
+
+def _compose_current_date(task_dir: Path | None = None) -> str:
+    """compose.py:resolve_current_date."""
+    iso = _sim_clock_iso(task_dir)
+    return iso[:10] if iso else _DEFAULT_CURRENT_DATE
+
+
+def _compose_runtime_env_defaults(task_dir: Path | None = None) -> dict[str, str]:
     return {
         "LITELLM_BASE_URL": _LLM_PROXY_URL,
         "OPENAI_API_BASE": f"{_LLM_PROXY_URL}/v1",
         "OPENAI_API_KEY": "placeholder",
-        "CURRENT_DATE": _DEFAULT_CURRENT_DATE,
+        "CURRENT_DATE": _compose_current_date(task_dir),
     }
 
 
@@ -1700,6 +1801,7 @@ def _generate_environment_compose(
     env_dir: Path,
     services: list[dict[str, Any]] | None = None,
     env_vars: dict[str, str] | None = None,
+    task_dir: Path | None = None,
 ) -> str:
     """Inline port of src/utils/harbor/compose.py::generate_harbor_compose."""
     if services is None:
@@ -1721,7 +1823,7 @@ def _generate_environment_compose(
     lines.append("    environment:")
     for key, value in env_vars.items():
         lines.append(f"      - {key}={value}")
-    runtime_env = _compose_runtime_env_defaults()
+    runtime_env = _compose_runtime_env_defaults(task_dir)
     lines.append(f"      - LITELLM_BASE_URL={runtime_env['LITELLM_BASE_URL']}")
     lines.append(f"      - OPENAI_API_BASE={runtime_env['OPENAI_API_BASE']}")
     lines.append(f"      - OPENAI_API_KEY={runtime_env['OPENAI_API_KEY']}")
@@ -1986,6 +2088,7 @@ def _stage_data_instruction(
 def _stage_environment_dockerfile_and_compose(
     bundle: Path,
     verbose: bool,
+    input_task_dir: Path | None = None,
 ) -> tuple[bool, bool]:
     """Emit bundle/data/environment/Dockerfile and docker-compose.yaml.
 
@@ -2013,7 +2116,8 @@ def _stage_environment_dockerfile_and_compose(
         for svc in services
         if svc.get("env_var_name")
     }
-    compose_text = _generate_environment_compose(env_dir, services=services, env_vars=env_vars)
+    compose_text = _generate_environment_compose(
+        env_dir, services=services, env_vars=env_vars, task_dir=input_task_dir)
     (env_dir / "docker-compose.yaml").write_text(compose_text, encoding="utf-8")
     if verbose:
         print(
@@ -2354,7 +2458,7 @@ def _stage_task_toml(
         )
         or _TOML_DEFAULTS["healthcheck_command"]
     )
-    runtime_env = _compose_runtime_env_defaults()
+    runtime_env = _compose_runtime_env_defaults(input_task_dir)
     environment_env = {**env_vars, **runtime_env}
     verifier_env = {**environment_env, "TEST_DIR": "/tests"}
     solution_env = dict(environment_env)
@@ -2653,7 +2757,7 @@ def convert_task(
     # a separate dir and is untouched.
     shutil.rmtree(bundle / "data" / TESTS_SUBDIR, ignore_errors=True)
     _stage_data_instruction(input_task_dir, bundle, verbose)
-    _stage_environment_dockerfile_and_compose(bundle, verbose)
+    _stage_environment_dockerfile_and_compose(bundle, verbose, input_task_dir)
     _stage_task_toml(input_task_dir, bundle, verbose)
     copy_inject(input_task_dir, bundle, verbose)
 
@@ -2715,6 +2819,8 @@ def convert_task(
                 run_summ["injection_ok"] = False
             if report.get("eval_skipped"):
                 run_summ["eval_skipped"] = report.get("eval_skipped")
+            if report.get("no_signal"):
+                run_summ["no_signal"] = report.get("no_signal")
             per_run_summ.append(run_summ)
             produced_any = True
             if verbose:
@@ -2746,6 +2852,8 @@ def convert_task(
                         return "injection_failed"
                     if r.get("eval_skipped"):
                         return "unmeasured"
+                    if r.get("no_signal"):
+                        return "no_signal"
                 return None
 
             reasons = {id(r): _bundle_exclusion_reason(r) for r in per_run_summ}
@@ -2773,6 +2881,7 @@ def convert_task(
                     ("incomplete", "runs_excluded_incomplete"),
                     ("injection_failed", "runs_excluded_injection_failed"),
                     ("unmeasured", "runs_excluded_unmeasured"),
+                    ("no_signal", "runs_excluded_no_signal"),
                 ):
                     if reason_counts.get(_reason):
                         summary_doc[_key] = reason_counts[_reason]
@@ -2872,7 +2981,7 @@ def stage_output_data(
 
     _stage_test_runners_and_solver(input_task_dir, task_dir, verbose)
     _stage_data_instruction(input_task_dir, task_dir, verbose)
-    _stage_environment_dockerfile_and_compose(task_dir, verbose)
+    _stage_environment_dockerfile_and_compose(task_dir, verbose, input_task_dir)
     _stage_task_toml(input_task_dir, task_dir, verbose)
     copy_inject(input_task_dir, task_dir, verbose)
     return True

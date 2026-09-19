@@ -218,6 +218,23 @@ def _fake_inject_module(stages=None, load_exc=None):
     return m
 
 
+def _fake_gate_module(findings=()):
+    """Stand in for the world-correctness gate (section 7).
+
+    These are wiring tests: they assert what preflight_task PRINTS and what it
+    exits with, against fixtures whose services are made up. The gate imports
+    and runs real ones, and has its own calibration suite in
+    tests/test_inject_preflight.py.
+    """
+    m = types.ModuleType("src.utils.inject_preflight")
+    m.FATAL, m.WARN = "FATAL", "WARN"
+    m.gate_task = lambda task, **kw: types.SimpleNamespace(
+        findings=tuple(findings),
+        fatal=tuple(f for f in findings if f.severity == "FATAL"),
+        ops=0, elapsed_ms=0)
+    return m
+
+
 def test_pf_check_inject_full_battery(pf, tmp_path, capsys, monkeypatch):
     task = _mk_task(tmp_path)
     # stage source dirs with/without verify.sh
@@ -321,8 +338,22 @@ def test_pf_main_missing_green_and_red(pf, tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["preflight_task.py", str(tmp_path / "nope")])
     assert pf.main() == 2
     capsys.readouterr()
-    # fully green task -> exit 0
+    # fully green task -> exit 0. "Green" now includes the three task-format
+    # standards (derived date, TRUTH.md sections, prompt header block), so the
+    # fixture has to declare a window and carry both files.
     task = _mk_task(tmp_path)
+    (task / "task.yaml").write_text(
+        "task_type: ops\nsystem_prompt: be helpful\n"
+        "required_apis: [widget]\ndistractor_apis: []\n"
+        "window: 2026-10-06 to 2026-10-11\ntimezone: America/Chicago\n",
+        encoding="utf-8")
+    (task / "TRUTH.md").write_text(
+        "# TRUTH\n\n## 1. Focal Event\n\nx\n\n## 2. Canonical Solve Path\n\ny\n"
+        "\n## 3. Value Lock\n\nz\n", encoding="utf-8")
+    (task / "prompts.txt").write_text(
+        "# task_id: TASK\n# persona: Widget Tester\n# timezone: America/Chicago\n"
+        "# window: 2026-10-06 to 2026-10-11 (6 days)\n# turn_count: 2\n\n"
+        "--- TURN T0\nhi\n--- TURN T1\nbye\n", encoding="utf-8")
     md = task / "mock_data" / "widget-api"
     md.mkdir()
     (md / "items.csv").write_text("id,name\n1,a\n", encoding="utf-8")
@@ -333,6 +364,7 @@ def test_pf_main_missing_green_and_red(pf, tmp_path, capsys, monkeypatch):
                       loud=[{"id": "l0", "service": "widget-api"}])]
     monkeypatch.setitem(sys.modules, "src.utils.inject_director",
                         _fake_inject_module(stages))
+    monkeypatch.setitem(sys.modules, "src.utils.inject_preflight", _fake_gate_module())
     monkeypatch.setattr(sys, "argv", ["preflight_task.py", str(task)])
     assert pf.main() == 0
     assert "SUMMARY" in capsys.readouterr().out
@@ -502,3 +534,41 @@ def test_diversify_rewrites_every_branch(tmp_path, monkeypatch, capsys):
     assert g["block_types"]({"message": {"content": "nope"}}) == []
     assert g["block_types"]({"message": {"content": [_th()]}}) == ["thinking"]
     assert g["first_toolcall"]({"message": {"content": "nope"}}) is None
+
+
+# ======================================================================
+# _seed_dst_to_data_rel — must recognise every workspace alias the runtime
+# mapper normalizes, or the mirrored-payload check silently never runs.
+# ======================================================================
+
+@pytest.mark.parametrize("dst,expected", [
+    ("/workspace/home/Pictures/x.png", "Pictures/x.png"),
+    ("/app/home/Pictures/x.png", "Pictures/x.png"),
+    ("/root/workspace/home/Pictures/x.png", "Pictures/x.png"),
+    ("/root/.openclaw/workspace/home/Pictures/x.png", "Pictures/x.png"),
+    ("~/workspace/home/Pictures/x.png", "Pictures/x.png"),
+    ("/data/home/Pictures/x.png", "Pictures/x.png"),
+    ("data/home/Pictures/x.png", "Pictures/x.png"),
+])
+def test_seed_dst_to_data_rel_recognises_every_alias(pf, dst, expected):
+    assert pf._seed_dst_to_data_rel(dst) == expected
+
+
+@pytest.mark.parametrize("dst", ["/etc/passwd", "/workspace/notes/x.txt", "", None])
+def test_seed_dst_to_data_rel_ignores_non_data_dsts(pf, dst):
+    assert pf._seed_dst_to_data_rel(dst) is None
+
+
+def test_seed_dst_alias_payload_mirror_check_now_fires(pf, tmp_path, monkeypatch):
+    """An aliased seed dst must still be checked against its data/ counterpart."""
+    task = tmp_path / "aliased_task"
+    (task / "data").mkdir(parents=True)
+    results = []
+    monkeypatch.setattr(pf, "rec", lambda level, msg: results.append((level, msg)))
+
+    pf._check_seed_payload_mirrored(
+        task, "seed", {"id": "fs-1", "action": "copy",
+                       "dst": "/root/workspace/home/Pictures/x.png"})
+
+    assert results and results[0][0] == pf.FAIL
+    assert "data/Pictures/x.png" in results[0][1]

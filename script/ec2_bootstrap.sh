@@ -34,7 +34,10 @@ echo "docker: $($DOCKER --version)"
 step "2. python deps"
 python3 -m pip install -q --user -r requirements.txt || die "pip install failed"
 
-step "3. agent image wildclawbench-ubuntu:v1.3 (linux/amd64, ~28GB)"
+# Base only. This is the default image tasks run on. Opting into
+# DOCKER_IMAGE=wildclawbench-ubuntu:v1.4 makes run.sh's preflight layer whisper
+# on top of it.
+step "3. agent base image wildclawbench-ubuntu:v1.3 (linux/amd64, ~28GB)"
 if $DOCKER image inspect wildclawbench-ubuntu:v1.3 >/dev/null 2>&1; then
   echo "image already loaded — skipping"
 else

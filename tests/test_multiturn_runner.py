@@ -75,7 +75,39 @@ class _ScriptedSource:
         return "scripted"
 
 
-def _neutralize(monkeypatch, procs, events, cmds):
+class _Completed:
+    def __init__(self, returncode=0, stdout="", stderr=""):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+class _FakeSession:
+    """Stands in for the container's chat.jsonl under the session-restore
+    guard: answers the `awk END{print NR}` row probe and applies `head -n N`.
+    Every other docker exec (connection kill, process kill) reports failure,
+    which those best-effort call sites already tolerate."""
+
+    def __init__(self, lines=0, exists=True):
+        self.lines = lines
+        self.exists = exists
+        self.probes = 0
+        self.truncated_to: list[int] = []
+
+    def __call__(self, cmd, *a, **k):
+        script = cmd[-1] if isinstance(cmd, (list, tuple)) and cmd else ""
+        if "awk" in script:
+            self.probes += 1
+            return _Completed(0, f"{self.lines if self.exists else 0}\n")
+        if "head -n" in script:
+            n = int(script.split("head -n ")[1].split()[0])
+            self.truncated_to.append(n)
+            self.lines = min(self.lines, n)
+            return _Completed(0, "")
+        return _Completed(1, "", "stubbed")
+
+
+def _neutralize(monkeypatch, procs, events, cmds, session=None):
     for name in (
         "start_container", "inject_lobster_workspace", "inject_data_into_workspace",
         "inject_persona_into_workspace", "inject_openclaw_models",
@@ -89,6 +121,10 @@ def _neutralize(monkeypatch, procs, events, cmds):
         if bash_cmd and "openclaw agent" in bash_cmd:
             events.append(("send", len(cmds)))
             cmds.append(bash_cmd)
+            if session is not None:
+                # openclaw persists the user message as the turn starts —
+                # the row an aborted attempt would orphan.
+                session.lines += 1
         return next(it)
 
     monkeypatch.setattr(ocr, "run_background", fake_run_background)
@@ -100,12 +136,16 @@ def _neutralize(monkeypatch, procs, events, cmds):
     monkeypatch.setattr(ocr.time, "time", lambda: 5000.0)
 
 
-def _agent(monkeypatch):
+def _agent(monkeypatch, guarded=False):
     a = OpenClawAgent(gateway_port=8080, image_model="")
     for m in ("_set_bootstrap_limits", "_index_memory", "_set_model",
               "_inject_auth", "_set_image_model"):
         monkeypatch.setattr(a, m, lambda *x, **k: None)
     monkeypatch.setattr(a, "_wait_for_llm_route_ready", lambda *x, **k: True)
+    if guarded:
+        # Both retry paths (stall and empty) require run-key tagging.
+        a.litellm_usage_log = "/tmp/wcb-test-usage.jsonl"
+        monkeypatch.setattr(a, "_run_key_bearer_live", lambda *x, **k: True)
     return a
 
 
@@ -285,3 +325,103 @@ def test_agent_log_aggregates_across_turns(monkeypatch, tmp_path):
     text = agent_log.read_text(encoding="utf-8")
     assert "stale content" not in text
     assert text == "turn-0 output\nturn-1 output\nturn-2 output\n"
+
+
+# --- session-restore guard (duplicate user turns) --------------------------
+#
+# A retry re-sends a turn the session already stored, so without the rollback
+# chat.jsonl ends up with two identical user rows (T14/T16/T19 x2 across six
+# shipped runs), shifting the judge's turn count and the feedback anchor.
+
+
+def _turn_outcomes(monkeypatch, agent, outcomes):
+    it = iter(outcomes)
+    monkeypatch.setattr(agent, "_turn_wait_outcome", lambda *a, **k: next(it))
+
+
+def test_stall_retry_restores_session_before_resend(monkeypatch, tmp_path):
+    events, cmds = [], []
+    session = _FakeSession(lines=5)
+    _neutralize(monkeypatch, [_FakeProc() for _ in range(4)], events, cmds, session)
+    monkeypatch.setattr(ocr.subprocess, "run", session)
+    a = _agent(monkeypatch, guarded=True)
+    _turn_outcomes(monkeypatch, a, ["stalled", "ok"])
+    rows = iter(range(100))
+    monkeypatch.setattr(a, "_count_run_key_rows", lambda *x, **k: next(rows))
+    spec = _spec(tmp_path, turn_source=_ScriptedSource(["m0"], events))
+
+    result = a.run_task(spec)
+
+    assert result.error is None
+    assert len(cmds) == 2                    # same turn sent twice
+    assert session.truncated_to == [5]       # rolled back to the pre-attempt state
+    assert session.lines == 6                # exactly ONE user row for the turn
+    assert result.turns_duplicated == [0]
+    assert result.turns_completed == 1
+
+
+def test_empty_turn_retry_restores_session(monkeypatch, tmp_path):
+    monkeypatch.delenv("WCB_EMPTY_TURN_LIMIT", raising=False)
+    events, cmds = [], []
+    session = _FakeSession(lines=5)
+    _neutralize(monkeypatch, [_FakeProc() for _ in range(4)], events, cmds, session)
+    monkeypatch.setattr(ocr.subprocess, "run", session)
+    a = _agent(monkeypatch, guarded=True)
+    _turn_outcomes(monkeypatch, a, ["ok", "ok"])
+    # First attempt produces no successful row; the retry does. Keyed on the
+    # number of attempts sent so HarnessV2's empty-turn grace polling (extra
+    # reads of the count) cannot shift the sequence.
+    def _rows(run_key, successes_only=False):
+        return max(0, len(cmds) - 1) if successes_only else 0
+
+    monkeypatch.setattr(a, "_count_run_key_rows", _rows)
+    spec = _spec(tmp_path, turn_source=_ScriptedSource(["m0"], events))
+
+    result = a.run_task(spec)
+
+    assert len(cmds) == 2
+    assert session.truncated_to == [5]
+    assert session.lines == 6
+    assert result.turns_empty == [0]
+    assert result.turns_duplicated == [0]
+
+
+def test_no_restore_when_attempt_left_no_orphan_row(monkeypatch, tmp_path):
+    """Not every retry duplicates: one observed run stalled twice and still
+    recorded 18/18 user turns (the retry ran embedded after a gateway 1008).
+    The guard inspects the live count and leaves such a session untouched."""
+    events, cmds = [], []
+    session = _FakeSession(lines=5)
+    # session=None -> sends do NOT append a row, i.e. the aborted attempt
+    # never got as far as persisting the user message.
+    _neutralize(monkeypatch, [_FakeProc() for _ in range(4)], events, cmds)
+    monkeypatch.setattr(ocr.subprocess, "run", session)
+    a = _agent(monkeypatch, guarded=True)
+    _turn_outcomes(monkeypatch, a, ["stalled", "ok"])
+    rows = iter(range(100))
+    monkeypatch.setattr(a, "_count_run_key_rows", lambda *x, **k: next(rows))
+    spec = _spec(tmp_path, turn_source=_ScriptedSource(["m0"], events))
+
+    result = a.run_task(spec)
+
+    assert len(cmds) == 2
+    assert session.truncated_to == []
+    assert session.lines == 5
+    assert result.turns_duplicated == [0]
+
+
+def test_unguarded_run_never_probes_the_session(monkeypatch, tmp_path):
+    # No run-key guards -> no retry is reachable -> the snapshot must not cost
+    # a docker exec per turn.
+    events, cmds = [], []
+    session = _FakeSession(lines=5)
+    _neutralize(monkeypatch, [_FakeProc() for _ in range(5)], events, cmds, session)
+    monkeypatch.setattr(ocr.subprocess, "run", session)
+    a = _agent(monkeypatch)
+    spec = _spec(tmp_path, turn_source=_ScriptedSource(["m0", "m1", "m2"], events))
+
+    result = a.run_task(spec)
+
+    assert result.turns_completed == 3
+    assert session.probes == 0
+    assert session.truncated_to == []

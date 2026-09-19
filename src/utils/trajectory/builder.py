@@ -15,7 +15,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Iterable, List, Mapping, Optional
+from typing import Any, Callable, Iterable, List, Mapping, NamedTuple, Optional
 
 from src.utils.jsonl_reader import sanitize_jsonl_message
 from src.utils.store import Task
@@ -89,6 +89,7 @@ def _wrap_messages_with_turn_feedback(
     current_is_auto_hint = False
     current_auto_hint_iteration = 0
     turn_idx = 0
+    prev_user_text = ""
 
     for msg in messages:
         inner = msg.get("message", {})
@@ -112,7 +113,17 @@ def _wrap_messages_with_turn_feedback(
                     matched = True
                 elif user_text in expected or expected in user_text:
                     matched = True
-            if matched or user_text:
+            # A user row repeating the previous one is the harness re-sending
+            # a stalled turn, not a new turn: advancing here would shift every
+            # later turn's feedback onto the wrong message. Compared with the
+            # agent's timestamp prefix removed — that strip only runs at the
+            # end of build_trajectory_from_jsonl, and a stall retry is >=600s
+            # later, so the two copies never carry the same stamp.
+            bare_user_text = _TURN_TS_RE.sub("", user_text, count=1).strip()
+            duplicate_resend = bool(bare_user_text) and bare_user_text == prev_user_text
+            if bare_user_text:
+                prev_user_text = bare_user_text
+            if (matched or user_text) and not duplicate_resend:
                 current_accepted = turn_feedback[turn_idx][1]
                 current_hints = turn_feedback[turn_idx][2]
                 current_is_auto_hint = turn_feedback[turn_idx][3]
@@ -622,6 +633,18 @@ def build_published_trajectory(
     """
     messages = _project_published_messages(traj.get("messages") or [])
 
+    # The caller's status is run-level ("no fatal error" => success), which is
+    # blind to a parent killed by the exec approval gate: the run exits clean
+    # while its last word is an /approve plea, and the trajectory publishes as
+    # success, poisoning downstream scoring and delivery triage. Child lanes
+    # have been derived from that ending since the 2026-07-06 audit; parents
+    # take the SAME signal here. Only that signal — the classifier's `aborted`
+    # verdicts are child-lane shape checks, and only a rubber-stamp status is
+    # overridden, so an explicit failure verdict always wins.
+    completion_status = completion_status or ""
+    if completion_status in ("", "success") and ends_with_approval_plea(messages):
+        completion_status = "blocked_on_approval"
+
     inner_meta = (traj.get("trajectory") or {}).get("meta_info") or {}
     platform = inner_meta.get("platform") or "Linux"
     # task_type prefers the explicit field, else falls back to the L2 taxonomy
@@ -704,6 +727,64 @@ def _slug(text: str) -> str:
 # in the FINAL message, so completion is derived from the ending instead.
 _APPROVE_PLEA_RE = re.compile(r"^\s*/approve\b")
 
+_APPROVAL_ENDED_REASON = "ended pleading for exec approval (no channel in headless runs)"
+
+
+class _FinalTurn(NamedTuple):
+    """The parsed ending of a projected message list. A non-empty
+    ``abort_reason`` means it does not end on a readable assistant turn, and
+    ``text``/``has_tool_call`` carry no signal."""
+
+    text: str = ""
+    has_tool_call: bool = False
+    abort_reason: str = ""
+
+
+def _parse_final_turn(messages: List[Any]) -> _FinalTurn:
+    if not messages:
+        return _FinalTurn(abort_reason="no messages recorded")
+    last = messages[-1] if isinstance(messages[-1], dict) else {}
+    inner = last.get("message") if isinstance(last.get("message"), dict) else {}
+    role = inner.get("role")
+    if role != "assistant":
+        return _FinalTurn(abort_reason=f"ends on role={role!r}, not an assistant report")
+    content = inner.get("content")
+    if isinstance(content, str):
+        return _FinalTurn(text=content)
+    if isinstance(content, list):
+        if not content:
+            return _FinalTurn(abort_reason="final assistant turn has empty content (stream cut)")
+        return _FinalTurn(
+            text="".join(
+                b.get("text", "") for b in content
+                if isinstance(b, dict) and b.get("type") == "text"
+            ),
+            has_tool_call=any(
+                isinstance(b, dict) and b.get("type") in ("toolCall", "tool_use")
+                for b in content
+            ),
+        )
+    return _FinalTurn(abort_reason="final assistant turn has no content")
+
+
+def _turn_is_approval_plea(final: _FinalTurn) -> bool:
+    return not final.abort_reason and bool(_APPROVE_PLEA_RE.match(final.text))
+
+
+def ends_with_approval_plea(messages: List[Any]) -> bool:
+    """True when the FINAL message is an assistant turn opening with an
+    ``/approve <id>`` plea — the fingerprint of a lane the exec approval gate
+    killed (headless runs have no channel to answer it; the obfuscation
+    detector is NOT covered by exec.security=full).
+
+    The single detector for both lanes: classify_child_completion routes its
+    ``blocked_on_approval`` verdict through it, and build_published_trajectory
+    stamps the parent from it. Matching is anchored to the start of the final
+    turn, so an agent that merely mentions approval — or pleaded mid-run and
+    then recovered — is not flagged.
+    """
+    return _turn_is_approval_plea(_parse_final_turn(messages))
+
 
 def classify_child_completion(messages: List[Any]) -> tuple[str, str]:
     """Derive (completion_status, ended_reason) from a child's projected messages.
@@ -713,41 +794,19 @@ def classify_child_completion(messages: List[Any]) -> tuple[str, str]:
       * ``aborted`` — ends mid-flight: empty assistant content (stream cut),
         thinking-only final turn, a toolCall with no toolResult after it, or
         a non-assistant final message.
-      * ``blocked_on_approval`` — final text is an ``/approve <id>`` plea:
-        the exec approval gate fired and headless runs have no channel to
-        answer it (obfuscation detector is NOT covered by exec.security=full).
+      * ``blocked_on_approval`` — final text is an ``/approve <id>`` plea
+        (see :func:`ends_with_approval_plea`).
     """
-    if not messages:
-        return "aborted", "no messages recorded"
-    last = messages[-1] if isinstance(messages[-1], dict) else {}
-    inner = last.get("message") if isinstance(last.get("message"), dict) else {}
-    role = inner.get("role")
-    if role != "assistant":
-        return "aborted", f"ends on role={role!r}, not an assistant report"
-    content = inner.get("content")
-    if isinstance(content, str):
-        text = content
-        has_tool_call = False
-    elif isinstance(content, list):
-        if not content:
-            return "aborted", "final assistant turn has empty content (stream cut)"
-        text = "".join(
-            b.get("text", "") for b in content
-            if isinstance(b, dict) and b.get("type") == "text"
-        )
-        has_tool_call = any(
-            isinstance(b, dict) and b.get("type") in ("toolCall", "tool_use")
-            for b in content
-        )
-    else:
-        return "aborted", "final assistant turn has no content"
-    if _APPROVE_PLEA_RE.match(text or ""):
-        return "blocked_on_approval", "ended pleading for exec approval (no channel in headless runs)"
-    if has_tool_call:
+    final = _parse_final_turn(messages)
+    if final.abort_reason:
+        return "aborted", final.abort_reason
+    if _turn_is_approval_plea(final):
+        return "blocked_on_approval", _APPROVAL_ENDED_REASON
+    if final.has_tool_call:
         # A toolResult always lands as the NEXT message; a trailing toolCall
         # means the lane died waiting for it.
         return "aborted", "final turn issues a toolCall with no toolResult"
-    if not (text or "").strip():
+    if not final.text.strip():
         return "aborted", "final assistant turn is thinking-only (no report text)"
     return "success", "ends with assistant report text"
 

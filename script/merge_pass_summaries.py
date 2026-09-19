@@ -84,6 +84,8 @@ def _run_exclusion_reason(r: dict) -> str | None:
             return "injection_failed"
         if r.get("eval_skipped"):
             return "unmeasured"
+        if r.get("no_signal") or r.get("error"):
+            return "no_signal"
     return None
 
 
@@ -245,6 +247,7 @@ def merge_pass_summaries(
                 ("incomplete", "runs_excluded_incomplete"),
                 ("injection_failed", "runs_excluded_injection_failed"),
                 ("unmeasured", "runs_excluded_unmeasured"),
+            ("no_signal", "runs_excluded_no_signal"),
             ):
                 if reason_counts.get(_reason):
                     legacy_doc[_key] = reason_counts[_reason]
@@ -283,6 +286,7 @@ def merge_pass_summaries(
             ("incomplete", "runs_excluded_incomplete"),
             ("injection_failed", "runs_excluded_injection_failed"),
             ("unmeasured", "runs_excluded_unmeasured"),
+            ("no_signal", "runs_excluded_no_signal"),
         ):
             if reason_counts.get(_reason):
                 doc[_key] = reason_counts[_reason]

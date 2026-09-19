@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping, Sequence
 from dotenv import load_dotenv
 
 # Load .env BEFORE importing src.utils modules: several resolve env at import time
@@ -37,6 +37,7 @@ from src.utils.endpoint_utils import (
 from src.utils.task_parser import parse_task_md
 from src.utils.docker_utils import (
     remove_container,
+    stop_container,
     close_proc_log,
     collect_output_from_container,
     snapshot_persona_and_data_from_container,
@@ -52,6 +53,7 @@ from src.utils.grading import (
 from src.utils import grading
 from src.utils.config import Config
 from src.utils.auth_provider import (
+    BEDROCK,
     OAUTH,
     PROVIDER_ENV_VAR,
     AuthProviderError,
@@ -78,14 +80,17 @@ from src.utils.skills_inference import (
 )
 from src.utils.testgen import generate_task_tests
 from src.utils.litellm_sidecar import (
+    AUTH_MODE_MASTER_KEY,
     CC_BRIDGE_INTERNAL_PORT,
     CODEX_BRIDGE_INTERNAL_PORT,
     build_litellm_config_yaml,
     create_network,
     ensure_litellm_headroom_image,
+    overflow_guard_enabled,
     pick_free_loopback_port,
     pull_litellm_image,
     remove_network,
+    sidecar_auth_mode,
     start_bridge,
     start_codex_bridge,
     start_litellm,
@@ -97,7 +102,11 @@ from src.utils.litellm_sidecar import (
     verify_litellm_upstream_reachable,
     wait_for_litellm_healthy,
 )
-from src.utils.trajectory.builder import build_published_trajectory, build_trajectory_from_jsonl
+from src.utils.trajectory.builder import (
+    _TURN_TS_RE,
+    build_published_trajectory,
+    build_trajectory_from_jsonl,
+)
 from src.utils.trajectory.local_media import replace_inline_media_with_files
 from src.utils.store import Task as StoreTask
 from src.utils.env_overlay_snapshot import stage_environment_with_overlays
@@ -358,31 +367,445 @@ def _parse_iso(ts: str):
         return None
 
 
-def _backfill_per_message_cost(traj: dict, usage_log_path: str) -> int:
+def _usage_row_purpose(r: Mapping[str, Any]) -> str:
+    """The openclaw-internal call this row is, or "" when it can be a turn.
+
+    OpenClaw compacts its own context and summarizes fetched media on the
+    session's credentials, so those requests reach the sidecar under the
+    agent's run_key while producing no assistant message. The usage callback
+    names them at write time (``purpose``) off the fixed prompts the agent SDK
+    sends them with — see src/utils/litellm_usage_callback.py, which also
+    records why cache-ttl and session titles are not in that set.
+
+    Logs written before the callback carried ``purpose`` still identify the
+    duration-billed whisper row by its shape, which is the one internal call
+    the row schema always described: audio seconds and no tokens at all.
+    """
+    tagged = str(r.get("purpose") or "").strip()
+    if tagged:
+        return tagged
+    try:
+        audio = float(r.get("audio_seconds", 0.0) or 0.0)
+        tokens = int(r.get("total_tokens", 0) or 0)
+    except (TypeError, ValueError):
+        return ""
+    return "transcription" if (audio > 0.0 and tokens == 0) else ""
+
+
+def _message_text(inner: Mapping[str, Any]) -> str:
+    """A chat.jsonl message's text, flattened out of whichever shape it is in.
+
+    openclaw writes ``content`` as a block list on this image build; the
+    plain-string form is accepted for older trajectories and for the
+    normalized shape the trajectory builder can hand back.
+    """
+    content = inner.get("content")
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for block in content:
+        if isinstance(block, str):
+            parts.append(block)
+        elif isinstance(block, dict) and isinstance(block.get("text"), str):
+            parts.append(block["text"])
+    return "\n".join(parts)
+
+
+def _inner_message(m: Mapping[str, Any]) -> Mapping[str, Any]:
+    """The role/content payload, past chat.jsonl's ``{id, message, ...}`` envelope."""
+    return m.get("message") if isinstance(m.get("message"), dict) else m
+
+
+def _count_heartbeat_turns_in_transcript(
+        msgs: Sequence[Mapping[str, Any]]) -> int:
+    """User messages in the delivered transcript that are the gateway's own.
+
+    The gateway prunes a heartbeat's user+assistant pair out of chat.jsonl by
+    truncating the file back to its pre-heartbeat size
+    (dist/health-BxAgqqNt.js:302 pruneHeartbeatTranscript) — but only from the
+    three paths that call it: a skipped run (:575), the bare HEARTBEAT_OK token
+    (:604), and a reply identical to the previous heartbeat's (:629). A
+    heartbeat that produces real output reaches none of them and keeps its
+    turns, which then read as a human prompt and a genuine answer that nobody
+    asked for.
+
+    That variant is otherwise silent. It is loud in the token ledger, because
+    the classifier now names the row and the counts stop matching — but the
+    transcript is what the judge reads, and nothing in it says which turn the
+    container wrote for itself. So it is counted here and stamped, using the
+    SAME fingerprints the classifier matches the request with, so the two
+    cannot drift apart.
+
+    Counting only. Excluding the turn would change what is judged, and whether
+    a self-issued turn should be judged is a grading decision, not an
+    accounting one.
+    """
+    from src.utils.litellm_usage_callback import _is_heartbeat_prompt
+
+    return _count_self_issued_turns(msgs, _is_heartbeat_prompt)
+
+
+def _count_self_issued_turns(
+        msgs: Sequence[Mapping[str, Any]],
+        is_self_issued: Callable[[list[dict]], bool]) -> int:
+    """Transcript user messages that ``is_self_issued`` claims as the container's.
+
+    Each predicate is handed a one-message list because that is the shape it
+    reads — the LAST user message of a request — and a transcript entry is
+    exactly one. Passing the predicate itself, rather than re-expressing the
+    prompt here, is what keeps the transcript count and the row label reading
+    the same constants.
+    """
+    count = 0
+    for m in msgs:
+        message = _inner_message(m)
+        if str(message.get("role", "")).lower() != "user":
+            continue
+        if is_self_issued([{"role": "user", "content": _message_text(message)}]):
+            count += 1
+    return count
+
+
+def _count_memory_flush_turns_in_transcript(
+        msgs: Sequence[Mapping[str, Any]]) -> int:
+    """User messages in the delivered transcript that are the pre-compaction flush.
+
+    The flush is the heartbeat's twin with the prune removed. OpenClaw spends a
+    whole agent turn, on the SESSION's transcript, telling itself to write
+    durable memories to memory/<date>.md before compaction discards the context
+    (runMemoryFlushIfNeeded, dist/reply-BCcP6j4h.js:93697; default-ON). Nothing
+    truncates it afterwards — pruneHeartbeatTranscript is the gateway's only
+    transcript-truncating path and no flush code calls it — so the flush's
+    user+assistant pair always survives into chat.jsonl, where it reads as a
+    task nobody set and an answer nobody asked for.
+
+    That is why the label does NOT subtract the row (see
+    _TRANSCRIPT_TURN_PURPOSES) and why this count exists anyway: the row is
+    accounted for, but the JUDGE reads the transcript, and nothing in the
+    transcript says the container wrote that turn for itself.
+
+    Counting only, for the heartbeat's reason: whether a self-issued turn
+    should be judged is a grading decision, not an accounting one.
+
+    Turns, not requests. A flush writes a file, so it calls tools, so it is
+    several usage rows and several assistant messages for ONE user message
+    counted here. Do not compare this number with a row count.
+    """
+    from src.utils.litellm_usage_callback import _is_memory_flush_prompt
+
+    return _count_self_issued_turns(msgs, _is_memory_flush_prompt)
+
+
+_TURN_TOKEN_COLUMNS = (
+    "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens",
+)
+
+
+def _usage_row_bills_no_tokens(r: Mapping[str, Any]) -> bool:
+    """True when all four of a row's token columns are zero.
+
+    Shape-independent, and the only claim it makes is arithmetic: a request
+    that billed no input, no output, no cache read and no cache write moved no
+    context through the model, so no assistant message can have come out of it.
+    A real turn always bills something — at minimum the prompt it was sent —
+    which is why this is safe to subtract from the turn candidates without
+    knowing anything else about the request.
+
+    Note what this is NOT. It is not a claim about the row's producer, and it
+    is not a claim that the row cost nothing: duration-billed traffic carries
+    dollars with no tokens at all, so the rows this selects keep their own
+    ledger line rather than being dropped. It is also not the whisper
+    predicate — ``_usage_row_purpose`` names that row ``transcription`` from
+    its audio seconds first, and the purpose split runs ahead of this one.
+
+    A column that will not read as an integer is NOT zero: unreadable is not
+    provably empty, and a row this cannot measure stays a turn candidate and
+    faces the count gate like any other.
+    """
+    for column in _TURN_TOKEN_COLUMNS:
+        try:
+            if int(r.get(column, 0) or 0) != 0:
+                return False
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
+# Purposes whose turn lands in the DELIVERED transcript, so the row that paid
+# for it has an assistant message and must be matched with it rather than
+# subtracted from the turn candidates.
+#
+# Every other label names a call that produces no assistant message at all —
+# compaction and summarize are `completeSimple` round-trips, embeddings and
+# transcription are not chat routes, image and pdf are tool calls, and the
+# heartbeat's and cron's turns are not in this transcript (the gateway prunes
+# the heartbeat's pair out of chat.jsonl, and a cron job runs on its own
+# session key and therefore its own transcript file). The memory flush is the
+# one label where openclaw takes a turn ON THE SESSION and leaves it there:
+# nothing prunes it, so excluding its row would remove a request while leaving
+# the message it answered, i.e. manufacture the very count mismatch the labels
+# exist to remove.
+#
+# So the label serves REPORTING here, not exclusion. The row keeps its name in
+# the log; the transcript-side count is stamped separately
+# (_count_memory_flush_turns_in_transcript); and the row itself stays a turn
+# candidate, which is what keeps
+#     per-message + internal + post_agent + zero_token == sources.agent
+# closing with no rows_unmatched.
+_TRANSCRIPT_TURN_PURPOSES = frozenset({"memory_flush"})
+
+
+def _usage_row_is_internal_call(r: Mapping[str, Any]) -> bool:
+    """True when a labelled row is one this run must NOT attribute to a message."""
+    return _usage_row_purpose(r) not in ("", *_TRANSCRIPT_TURN_PURPOSES)
+
+
+def _usage_row_is_assistant_turn(r: Mapping[str, Any]) -> bool:
+    """True when a usage row can correspond to an assistant message.
+
+    ``failure`` and ``preflight`` rows never produce one, neither does a
+    request the callback named as one of openclaw's own — except the labels in
+    ``_TRANSCRIPT_TURN_PURPOSES``, whose turn is in the transcript — and
+    neither does one that billed no tokens in any column. Shares
+    ``_usage_row_bills_no_tokens`` and ``_usage_row_is_internal_call`` with the
+    split inside ``_attribute_per_message_cost`` so the predicate and the
+    counter cannot drift apart.
+    """
+    if r.get("kind") in ("failure", "preflight"):
+        return False
+    if _usage_row_is_internal_call(r):
+        return False
+    return not _usage_row_bills_no_tokens(r)
+
+
+_USAGE_LEDGER_TOKEN_KEYS = (
+    "input_tokens", "output_tokens", "cache_read_tokens",
+    "cache_write_tokens", "total_tokens",
+)
+
+
+def _usage_rows_ledger(rows: Sequence[Mapping[str, Any]]) -> dict:
+    """Sum rows the way extract_usage_from_litellm_log sums them, so a subset's
+    ledger is directly comparable with the run total it came out of."""
+    led: dict[str, Any] = {k: 0 for k in _USAGE_LEDGER_TOKEN_KEYS}
+    led["audio_seconds"] = 0.0
+    led["cost_usd"] = 0.0
+    led["request_count"] = 0
+    for r in rows:
+        led["request_count"] += 1
+        for k in _USAGE_LEDGER_TOKEN_KEYS:
+            led[k] += int(r.get(k, 0) or 0)
+        led["audio_seconds"] += float(r.get("audio_seconds", 0.0) or 0.0)
+        led["cost_usd"] += float(r.get("cost_usd", 0.0) or 0.0)
+    led["audio_seconds"] = round(led["audio_seconds"], 3)
+    led["cost_usd"] = round(led["cost_usd"], 6)
+    return led
+
+
+def _internal_calls_block(rows: Sequence[Mapping[str, Any]]) -> dict | None:
+    """The ledger line for the run's own non-message traffic, split by purpose.
+
+    Carried in usage.json so the per-message blocks and the agent total
+    reconcile: every row sources.agent counted is either attributed to a
+    message or listed here.
+    """
+    if not rows:
+        return None
+    by_purpose: dict[str, list[Mapping[str, Any]]] = {}
+    for r in rows:
+        by_purpose.setdefault(_usage_row_purpose(r) or "unlabelled", []).append(r)
+    block = _usage_rows_ledger(rows)
+    block["by_purpose"] = {
+        name: _usage_rows_ledger(rs) for name, rs in sorted(by_purpose.items())
+    }
+    return block
+
+
+def _usage_rows_in_message_window(rows: list[dict], msgs: list[dict]) -> list[dict]:
+    """Legacy selector: rows whose real-clock ``ts`` falls in the span of the
+    trajectory's message timestamps, padded for the final completion that the
+    sidecar logs just after the last assistant message.
+    """
+    from datetime import timedelta
+    mts = [_parse_iso(m.get("timestamp", "")) for m in msgs]
+    mts = [t for t in mts if t is not None]
+    if not mts:
+        return list(rows)
+    lo = min(mts) - timedelta(seconds=10)
+    hi = max(mts) + timedelta(seconds=180)
+    picked: list[tuple[Any, dict]] = []
+    for r in rows:
+        rts = _parse_iso(r.get("ts", ""))
+        if rts is None:
+            continue
+        try:
+            in_window = lo <= rts <= hi
+        except TypeError:
+            # One side naive, one aware: the agent's message clock and the
+            # sidecar's UTC row clock are not comparable, so the window is not
+            # computable. Previously raised straight out of the back-fill.
+            continue
+        if in_window:
+            picked.append((rts, r))
+    picked.sort(key=lambda x: x[0])
+    return [r for _, r in picked]
+
+
+def _split_post_agent_rows(
+    rows: Sequence[Mapping[str, Any]], agent_finished_ts: float | None,
+) -> tuple[list[Mapping[str, Any]], list[Mapping[str, Any]]]:
+    """Partition ``rows`` into (during the agent's run, after it finished).
+
+    ``agent_finished_ts`` is the HOST wall clock at which the agent process
+    returned, stamped by the runner and carried to here on
+    ``usage['__agent_finished_ts__']``. Rows are timestamped by the sidecar on
+    the same real UTC clock, so the two compare; the agent's own message clock
+    does not, which is why the boundary cannot be taken from chat.jsonl.
+
+    The comparison is strict and unpadded on purpose. A turn's row is written
+    when its response completes, which necessarily precedes the agent receiving
+    it and therefore precedes the agent finishing, so no genuine turn row can
+    land on the far side of the boundary. Anything that does is traffic the
+    container issued on its own after the run was over.
+
+    A row with no readable ``ts`` stays on the during-run side: the boundary is
+    an assertion about rows that are provably late, not a default.
+    """
+    if agent_finished_ts is None:
+        return list(rows), []
+    from datetime import timezone
+
+    during: list[Mapping[str, Any]] = []
+    after: list[Mapping[str, Any]] = []
+    for r in rows:
+        rts = _parse_iso(r.get("ts", ""))
+        ts_epoch = None
+        if rts is not None:
+            if rts.tzinfo is None:
+                # The sidecar writes UTC; reading a naive row as local time
+                # would shift it by the host offset and bucket it at random.
+                rts = rts.replace(tzinfo=timezone.utc)
+            try:
+                ts_epoch = rts.timestamp()
+            except (ValueError, OSError, OverflowError):
+                ts_epoch = None
+        (after if ts_epoch is not None and ts_epoch > agent_finished_ts
+         else during).append(r)
+    return during, after
+
+
+def _backfill_per_message_cost(traj: dict, usage_log_path: str,
+                               run_key: str = "", *,
+                               oauth_route: bool = False,
+                               model: str = "") -> int:
+    """Number of assistant messages ``_attribute_per_message_cost`` filled in."""
+    report = _attribute_per_message_cost(
+        traj, usage_log_path, run_key, oauth_route=oauth_route, model=model)
+    if report.get("status") not in ("attributed", "partial"):
+        return 0
+    return int(report.get("messages", 0) or 0)
+
+
+def _attribute_per_message_cost(traj: dict, usage_log_path: str,
+                                run_key: str = "", *,
+                                oauth_route: bool = False,
+                                model: str = "",
+                                agent_finished_ts: float | None = None) -> dict:
     """Populate each assistant message's token + cost block in ``traj`` from the
-    sidecar per-request usage log (usage.jsonl), order-matched within the agent
-    run's time window. Returns the number of messages back-filled.
+    sidecar per-request usage log (usage.jsonl), and report what happened.
+
+    The report is stamped into score.json and usage.json by the callers, which
+    is the whole reason it is a dict rather than a count. Until it existed, a
+    refusal to attribute was an ERROR line in harness_debug.log and nothing
+    else: the delivered artifacts showed ``cost: 0`` on every message with no
+    indication that a figure was withheld rather than measured. On the
+    2026-09-17 koji run all 87 assistant messages shipped that way.
+
+      status          attributed — every message got its own row's numbers and
+                        every selected row is accounted for.
+                      partial — same, but selected by the legacy time window,
+                        which over-attributes under parallel runs, so the
+                        figures are indicative rather than reconciled.
+                      failed — the counts did not match; nothing was written.
+      messages        assistant messages in the trajectory.
+      rows_selected   usage rows this run's key (or window) selected.
+      rows_internal   of those, the ones openclaw issued for itself.
+      rows_post_agent of those, the ones logged after the agent finished.
+      rows_zero_token of those, the ones that billed no tokens at all.
+      rows_unmatched  message rows left over, or messages left short.
+      internal_calls  ledger for rows_internal, or absent when there are none.
+      post_agent_calls   ledger for rows_post_agent, likewise.
+      zero_token_calls   ledger for rows_zero_token, likewise.
+
+    The four ledgers partition ``rows_selected`` exactly: every row is billed to
+    a message, to internal_calls, to post_agent_calls, or to zero_token_calls,
+    and the four token columns of the four add back up to ``sources.agent``.
+    Bucketing a row never removes its money from the run, only the claim that a
+    message produced it.
 
     OpenClaw writes all-zero per-message usage/cost into chat.jsonl on this
     image build (IAN report Pointer 5); the real per-request numbers live only
-    in the sidecar log. We isolate the agent's requests by the assistant
-    message timestamp window (excluding earlier testgen / later judge rows) and
-    assign rows to assistant messages in chronological order.
+    in the sidecar log.
+
+    On an OAuth-routed run each row's dollars are recomputed from that row's own
+    token counts at Bedrock list rates, matching how the run totals in
+    usage.json are derived, so a message's cost and the total it rolls up into
+    are the same currency. ``oauth_route`` is the run's routing flag; a Bedrock
+    run keeps the recorded cost and its weighted split untouched.
+
+    Row selection mirrors the totals path, ``extract_usage_from_litellm_log``
+    in src/utils/grading.py, so a delivered message's cost block and the run
+    total it rolls up into are attributed by the same key:
+
+      1. ``run_key`` exact match — rows the usage callback tagged with this
+         run's key. Immune to concurrent runs sharing one sidecar log, and the
+         only selector that works at all under the agent clock shim
+         (docker/agent_faketime_shim.js): chat.jsonl timestamps are then
+         narrative-clock values tens of days from the sidecar's real UTC
+         ``ts``, so a message-derived window matches nothing. Measured on the
+         2026-08 delivery: 45-188 days of skew, and 37212 of 37212 assistant
+         messages across 568 runs lost their usage block to that window.
+      2. Time-window fallback (legacy) — for logs whose rows carry no run_key.
+         Over-attributes under parallelism exactly as the totals path
+         documents (measured 1.4x-62.7x inflation), so it warns loudly.
+
+    Rows openclaw issued for itself are subtracted before the counts are
+    compared, on the ``purpose`` label the usage callback writes. That is what
+    closes the 98-rows-for-87-messages gap the koji run hit, and it is a label
+    rather than a guess: the surplus rows are context compactions and media
+    summaries, each sent with a prompt that is a compile-time constant of the
+    agent image, so the sidecar can name them from the request it is already
+    handed.
+
+    Subtracted, but not all of them: a label says who made the request, not
+    that no message came of it. ``_TRANSCRIPT_TURN_PURPOSES`` carries the
+    labels whose turn survives into the delivered transcript — today only the
+    pre-compaction memory flush — and those rows stay turn candidates, because
+    the message they answered is right there in ``assistants`` and removing
+    one side of a matched pair is how you MAKE a mismatch, not fix one.
+
+    Past that, attribution within the remaining rows is positional, which is
+    sound only when the counts match. A leftover mismatch cannot be repaired: a
+    stall or empty-turn retry rolls the session back
+    (runner.py::_restore_session_to) but leaves the aborted attempt's rows in
+    the log, and a subagent spawn tags its requests with the PARENT's run_key
+    (src/utils/subagent_director.py) while producing no assistant message —
+    both insert rows at positions nothing in the row schema records. Timestamps
+    cannot break the tie, for the clock-shim reason above. So a mismatch is
+    reported as an ERROR, stamped as ``failed``, and nothing is attributed: an
+    absent per-message cost is honestly absent, while a shifted one is a wrong
+    dollar figure in a delivered artifact. Run totals are unaffected either way.
     """
     if not usage_log_path or not Path(usage_log_path).is_file():
-        return 0
+        return {}
     msgs = [m for m in (traj.get("messages") or []) if isinstance(m, dict)]
-    def _inner(m):
-        return m.get("message") if isinstance(m.get("message"), dict) else m
-    assistants = [m for m in msgs if str(_inner(m).get("role", "")).lower() == "assistant"]
+    assistants = [m for m in msgs
+                  if str(_inner_message(m).get("role", "")).lower() == "assistant"]
     if not assistants:
-        return 0
-    # Agent window from message timestamps.
-    mts = [_parse_iso(m.get("timestamp", "")) for m in msgs]
-    mts = [t for t in mts if t is not None]
-    lo = min(mts) if mts else None
-    hi = max(mts) if mts else None
-    rows = []
+        return {}
+    parsed: list[dict] = []
     for line in Path(usage_log_path).read_text(encoding="utf-8", errors="replace").splitlines():
         line = line.strip()
         if not line:
@@ -391,30 +814,153 @@ def _backfill_per_message_cost(traj: dict, usage_log_path: str) -> int:
             r = json.loads(line)
         except json.JSONDecodeError:
             continue
-        rts = _parse_iso(r.get("ts", ""))
-        if rts is None:
-            continue
-        # Keep rows within the agent window (with a small margin for the final
-        # completion logged just after the last assistant message timestamp).
-        if lo is not None and hi is not None:
-            from datetime import timedelta
-            if rts < lo - timedelta(seconds=10) or rts > hi + timedelta(seconds=180):
-                continue
-        rows.append((rts, r))
-    rows.sort(key=lambda x: x[0])
-    rows = [(ts, r) for ts, r in rows if r.get("kind") not in ("failure", "preflight")]
-    n = 0
-    for msg, (_, r) in zip(assistants, rows):
-        inner = _inner(msg)
+        if isinstance(r, dict):
+            parsed.append(r)
+
+    # File order is completion order — the usage callback appends every row
+    # under a lock — so the tagged path needs no ``ts`` at all and a row with
+    # an unreadable timestamp is never silently dropped from its own run.
+    rows = [r for r in parsed if run_key and r.get("run_key") == run_key]
+    selector = "run_key"
+    if not rows:
+        selector = "time window"
+        logger.warning(
+            "per-message cost: no usage rows tagged with run_key %r in %s — "
+            "falling back to the message time window, which OVER-ATTRIBUTES "
+            "under parallel runs and selects nothing at all when the agent "
+            "clock shim is active", run_key, usage_log_path)
+        rows = _usage_rows_in_message_window(parsed, msgs)
+    candidates = [r for r in rows if r.get("kind") not in ("failure", "preflight")]
+    # The boundary is applied BEFORE the purpose labels, so a late row is
+    # harmless whether or not the classifier recognised it. That is the whole
+    # point: the row that nearly broke the sean_callahan gate carried tokens and
+    # nothing else, and no label could have been invented for it honestly.
+    during, post_agent = _split_post_agent_rows(candidates, agent_finished_ts)
+    # Labelled-and-message-less, not merely labelled: a memory_flush row is
+    # named AND has an assistant message, because nothing prunes the flush turn
+    # out of the transcript. See _TRANSCRIPT_TURN_PURPOSES.
+    internal = [r for r in during if _usage_row_is_internal_call(r)]
+    attributable = [r for r in during if not _usage_row_is_internal_call(r)]
+    # Last of the three splits, and last on purpose: each bucket refines what
+    # the one before it left, so no row can reach two of them. The boundary
+    # keeps a late all-zero row, because post_agent_calls is meant to be the
+    # whole account of what the container did after the run and a row moved out
+    # of it would put a hole in that account to say what the ledger already
+    # shows. The purpose split keeps a named all-zero row, because several of
+    # openclaw's own calls bill no tokens — duration-billed transcription bills
+    # audio seconds and nothing else — and naming the caller says strictly more
+    # than naming the arithmetic. What is left is the turn candidates, and this
+    # drops the ones that cannot be turns.
+    #
+    # Observed on the 2026-09-18 willie_prince run_3 release-gate rerun, where
+    # openclaw's heartbeat tick died inside its own gateway before dispatch
+    # (gateway.log: "Channel is required (no configured channels detected)")
+    # and the sidecar still booked a 15.002s agent row with four zero token
+    # columns. Nothing IN the row says any of that, so nothing here reads it
+    # that way: the split is on the columns alone.
+    zero_token = [r for r in attributable if _usage_row_bills_no_tokens(r)]
+    rows = [r for r in attributable if not _usage_row_bills_no_tokens(r)]
+
+    report: dict[str, Any] = {
+        "status": "failed",
+        "messages": len(assistants),
+        "rows_selected": len(candidates),
+        "rows_internal": len(internal),
+        "rows_post_agent": len(post_agent),
+        "rows_zero_token": len(zero_token),
+        "rows_unmatched": abs(len(rows) - len(assistants)),
+    }
+    heartbeat_turns = _count_heartbeat_turns_in_transcript(msgs)
+    if heartbeat_turns:
+        report["heartbeat_turns_in_transcript"] = heartbeat_turns
+        logger.warning(
+            "per-message cost: %d heartbeat turn(s) survive in the delivered "
+            "transcript. The gateway only prunes a heartbeat whose reply was "
+            "the bare HEARTBEAT_OK token, so these produced real output and "
+            "their user+assistant pairs read as genuine task turns nobody "
+            "asked for. Counted and stamped as heartbeat_turns_in_transcript; "
+            "nothing is excluded from the transcript or from judging.",
+            heartbeat_turns)
+    memory_flush_turns = _count_memory_flush_turns_in_transcript(msgs)
+    if memory_flush_turns:
+        report["memory_flush_turns_in_transcript"] = memory_flush_turns
+        logger.warning(
+            "per-message cost: %d pre-compaction memory-flush turn(s) in the "
+            "delivered transcript. OpenClaw spent them on the session, writing "
+            "durable memories to memory/<date>.md before compaction; nothing "
+            "prunes them, so they read as task turns nobody set. Their usage "
+            "rows ARE attributed, to the assistant messages they produced — "
+            "the label reports, it does not exclude. Counted and stamped as "
+            "memory_flush_turns_in_transcript; nothing is excluded from the "
+            "transcript or from judging.",
+            memory_flush_turns)
+    block = _internal_calls_block(internal)
+    if block:
+        report["internal_calls"] = block
+    post_block = _internal_calls_block(post_agent)
+    if post_block:
+        report["post_agent_calls"] = post_block
+    zero_block = _internal_calls_block(zero_token)
+    if zero_block:
+        report["zero_token_calls"] = zero_block
+
+    if post_agent:
+        logger.info(
+            "per-message cost: %d usage row(s) logged after the agent finished; "
+            "counted in the run total, excluded from turn matching",
+            len(post_agent))
+
+    if zero_token:
+        # Louder than post_agent deliberately. A late row is ordinary — the
+        # container is still up and still serving. A row that billed nothing in
+        # any column is not: something upstream booked a request that never
+        # moved any context, which normally means it failed before it was
+        # dispatched, and that is worth a line in the run's log whether or not
+        # it changed the verdict.
+        logger.warning(
+            "per-message cost: %d usage row(s) billed ZERO tokens in every "
+            "column (ts %s); a request that moved no context cannot have "
+            "produced an assistant message, so they are ledgered as "
+            "zero_token_calls and excluded from turn matching. Their money, if "
+            "any, stays in the run total. A zero-token agent row usually means "
+            "an upstream failure booked a row.",
+            len(zero_token),
+            ", ".join(str(r.get("ts", "?")) for r in zero_token))
+
+    if len(rows) != len(assistants):
+        logger.error(
+            "per-message cost NOT attributed: %s selected %d usage row(s) for "
+            "%d assistant message(s) (%d of them openclaw's own, %d post-agent, "
+            "%d zero-token). Positional attribution would bill one request's "
+            "tokens to another message, so the per-message blocks are left "
+            "empty; the run totals in usage.json are unaffected.",
+            selector, len(candidates), len(assistants), len(internal),
+            len(post_agent), len(zero_token))
+        return report
+
+    report["status"] = "attributed" if selector == "run_key" else "partial"
+    report["rows_unmatched"] = 0
+
+    for msg, r in zip(assistants, rows):
+        inner = _inner_message(msg)
         it = int(r.get("input_tokens", 0) or 0)
         ot = int(r.get("output_tokens", 0) or 0)
         cr = int(r.get("cache_read_tokens", 0) or 0)
         cw = int(r.get("cache_write_tokens", 0) or 0)
-        total_cost = float(r.get("cost_usd", 0.0) or 0.0)
-        toks = {"input": it, "output": ot, "cacheRead": cr, "cacheWrite": cw}
-        wsum = sum(_COST_WEIGHTS[k] * toks[k] for k in toks) or 1.0
-        cost = {k: round(total_cost * (_COST_WEIGHTS[k] * toks[k]) / wsum, 8) for k in toks}
-        cost["total"] = round(total_cost, 8)
+        cost = None
+        if oauth_route:
+            from src.utils.oauth_pricing import cost_breakdown
+            cost = cost_breakdown(
+                r.get("model") or model,
+                input_tokens=it, output_tokens=ot,
+                cache_read_tokens=cr, cache_write_tokens=cw,
+            )
+        if cost is None:
+            total_cost = float(r.get("cost_usd", 0.0) or 0.0)
+            toks = {"input": it, "output": ot, "cacheRead": cr, "cacheWrite": cw}
+            wsum = sum(_COST_WEIGHTS[k] * toks[k] for k in toks) or 1.0
+            cost = {k: round(total_cost * (_COST_WEIGHTS[k] * toks[k]) / wsum, 8) for k in toks}
+            cost["total"] = round(total_cost, 8)
         usage = inner.get("usage") if isinstance(inner.get("usage"), dict) else {}
         usage.update({
             "input": it, "output": ot, "cacheRead": cr, "cacheWrite": cw,
@@ -422,8 +968,24 @@ def _backfill_per_message_cost(traj: dict, usage_log_path: str) -> int:
             "cost": cost,
         })
         inner["usage"] = usage
-        n += 1
-    return n
+    return report
+
+
+def _agent_finished_ts(agent_usage: Mapping[str, Any] | None) -> float | None:
+    """The agent-finish wall clock the runner stamped onto the usage dict."""
+    raw = (agent_usage or {}).get("__agent_finished_ts__")
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _stamped_usage_attribution(result: Mapping[str, Any] | None) -> dict | None:
+    """The attribution report _build_trajectory left on ``result``, if any."""
+    stamp = (result or {}).get("usage_attribution")
+    return stamp if isinstance(stamp, dict) and stamp.get("status") else None
 
 
 def _aggregate_headroom(log_dir: str) -> dict | None:
@@ -484,6 +1046,8 @@ def save_usage(
     """Write usage.json with per-source breakdown (agent + testgen + judge + preflight)."""
     agent_usage = dict(usage)
     agent_usage.pop("__preflight__", None)
+    agent_usage.pop("__run_key__", None)
+    agent_usage.pop("__agent_finished_ts__", None)
     sources: dict[str, dict] = {"agent": agent_usage}
     if preflight_usage:
         sources["preflight"] = dict(preflight_usage)
@@ -495,11 +1059,13 @@ def save_usage(
         sources["judge"] = dict(judge_usage)
 
     # Runs before recompute_combined so the aggregate derives from the repriced
-    # figures. A prepaid subscription records ~$0, which would otherwise leave
-    # usage.json disagreeing with the cost the finance API is sent.
-    from src.utils.oauth_pricing import reprice_zero_cost_sources
+    # figures. What a prepaid subscription records is not one convention (~$0 or
+    # full list price, depending on the sidecar's per-token config), so on that
+    # route every figure is re-derived from tokens at Bedrock list rates and
+    # usage.json carries one cost column the finance API agrees with.
+    from src.utils.oauth_pricing import reprice_oauth_sources
 
-    repriced = reprice_zero_cost_sources(
+    repriced = reprice_oauth_sources(
         sources, model=model, oauth_route=oauth_route
     )
     if repriced:
@@ -508,6 +1074,11 @@ def save_usage(
     combined = recompute_combined(sources, task_id)
 
     out: dict[str, Any] = dict(combined)
+    # Explicit route provenance. Both routes now carry real-looking dollars, so
+    # "cost_usd == 0 means this ran on the subscription" is no longer a readable
+    # signal and the judge member's model string (bare id vs Bedrock ARN) is too
+    # indirect to be the only marker.
+    out["auth_provider"] = OAUTH if oauth_route else BEDROCK
     out["sources"] = sources
     for k, v in agent_usage.items():
         if k not in out and k not in _USAGE_NUMERIC_KEYS and k != "cost_usd":
@@ -516,6 +1087,25 @@ def save_usage(
     _hr = _aggregate_headroom(_HEADROOM_LOG_DIR)
     if _hr:
         out["headroom"] = _hr
+
+    # Whether the per-message blocks in output.json were filled in, and the
+    # ledger lines that make them add up. sources.agent counts every row this
+    # run's key selected, so Σ(per-message) + internal_calls + post_agent_calls
+    # + zero_token_calls == sources.agent exactly; without those terms a reader
+    # comparing the two can only conclude the artifact is inconsistent.
+    attribution = dict(_stamped_usage_attribution(result) or {})
+    if attribution:
+        internal = attribution.pop("internal_calls", None)
+        post_agent = attribution.pop("post_agent_calls", None)
+        zero_token = attribution.pop("zero_token_calls", None)
+        out["usage_attribution"] = attribution
+        if internal:
+            out["internal_calls"] = internal
+        if post_agent:
+            out["post_agent_calls"] = post_agent
+        if zero_token:
+            out["zero_token_calls"] = zero_token
+
     result["usage"] = out
     if out["request_count"] > 0:
         # Include preflight in the breakdown so the sidecar-startup ping is visible
@@ -571,6 +1161,51 @@ def collect_task_output(
         )
     except Exception as exc:
         logger.warning("[%s] Failed to collect task output: %s", task_id, exc)
+
+
+def _quiesce_agent_container(task_id: str) -> bool:
+    """Stop the agent container so the sidecar usage log stops growing.
+
+    Everything downstream of this call that reads usage.jsonl — the
+    ``sources.agent`` totals in ``collect_usage`` and the per-message
+    attribution in ``_build_trajectory`` — is a SNAPSHOT of a file the agent can
+    still append to, and the container outlives the agent process: it keeps
+    serving whatever openclaw fires off after its last turn. On the 2026-09-18
+    sean_callahan run the agent finished at 06:45:14, the snapshot was taken at
+    06:45:16 and a further row landed at 06:45:23, so the count the attribution
+    gate checks was correct by 7.25 seconds of luck. Stopping first removes the
+    race instead of widening the margin.
+
+    Called after every step that needs a LIVE container (``collect_task_output``
+    and the workspace_after snapshot both ``docker exec`` into it) and before
+    ``remove_container``, which still does the removal: the stopped container's
+    filesystem is left mounted for the ``docker cp`` calls that follow.
+
+    Fail-open. A container that cannot be stopped leaves the pre-existing
+    snapshot race in place for that run and nothing worse; refusing to produce
+    the artifacts would be strictly more damage.
+    """
+    try:
+        from src.utils.ui import lifecycle as _ui_lifecycle
+        _ui_lifecycle.emit_stage(
+            task_id, _ui_lifecycle.STAGE_STATUS,
+            "stopping agent container before reading usage",
+            status="quiescing",
+        )
+    except Exception:
+        pass
+    try:
+        stopped = stop_container(task_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[%s] Agent container quiesce failed: %s", task_id, exc)
+        return False
+    if stopped:
+        logger.info("[%s] Agent container quiesced; usage log is now final", task_id)
+    else:
+        logger.warning(
+            "[%s] Agent container did not stop; usage figures are a snapshot of "
+            "a file the container may still be appending to", task_id)
+    return stopped
 
 
 def _snapshot_persona_and_data_before(
@@ -848,6 +1483,124 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
         task["skills"] = "\n".join(merged)
 
 
+ALLOW_DEFECTIVE_TASK_ENV = "WCB_ALLOW_DEFECTIVE_TASK"
+
+
+def _allow_defective_task() -> bool:
+    """Escape hatch for the pre-trajectory task gate, for deliberate replays."""
+    return (os.environ.get(ALLOW_DEFECTIVE_TASK_ENV) or "").strip().lower() \
+        in {"1", "true", "yes", "on"}
+
+
+TASK_GATE_ENFORCE_ENV = "WCB_TASK_GATE_ENFORCE"
+
+
+def _task_gate_enforced() -> bool:
+    """HarnessV2 runs the task gate REPORT-ONLY by default: a defective task is
+    logged, stamped and written to defect.json, but still launches.
+    WCB_TASK_GATE_ENFORCE=1 makes the gate refuse the launch (neo-version
+    behavior)."""
+    return (os.environ.get(TASK_GATE_ENFORCE_ENV) or "").strip().lower() \
+        in {"1", "true", "yes", "on"}
+
+
+GATE_DEFECT_FILENAME = "defect.json"
+
+
+def _write_gate_defect(dest_dir: Path, defect: dict | None) -> Path | None:
+    """Drop a gate verdict next to the artifact it is about, and never raise.
+
+    Written only when the gate had something to say. A clean task leaves no
+    defect.json at all, so the file's mere presence in an ``output/`` listing is
+    the signal — one that survives the session log being rotated, the run record
+    being consumed and the operator who saw the ERROR line going home.
+
+    The write is best-effort by design. The gate exists to stop a defective task
+    from costing a run; a gate whose bookkeeping could itself void one would
+    have reintroduced the problem at the other end.
+    """
+    if not defect:
+        return None
+    try:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        path = dest_dir / GATE_DEFECT_FILENAME
+        path.write_text(
+            json.dumps(defect, indent=2, ensure_ascii=False, default=str) + "\n",
+            encoding="utf-8")
+        return path
+    except Exception as exc:  # noqa: BLE001 - bookkeeping must not void a run
+        logger.warning("task gate defect.json write failed at %s: %s", dest_dir, exc)
+        return None
+
+
+def _run_task_gate(task: dict) -> tuple[dict, bool, dict | None]:
+    """Decide whether this task may start a trajectory.
+
+    Returns ``(stamp, blocked, defect)``: the record the score carries, the
+    launch decision, and the full on-disk account the caller places once it
+    knows where this run's artifacts live (``None`` when the gate found nothing
+    at all, so a clean task writes no file).
+
+    Called before the mock stack, before the container and before the first
+    token, because a task whose injection cannot land or whose required service
+    does not load produces a graded artifact describing a world that was never
+    there — and the only way not to pay for one is not to start it. See
+    src/utils/inject_preflight for what is decided and why each verdict is
+    fatal or not.
+
+    The verdict is stamped into the run record either way, and any verdict with
+    findings is also written out as defect.json. A bypassed gate that left no
+    trace in the artifact would be worse than no gate: the run would be
+    indistinguishable at scoring time from one that passed.
+    """
+    task_dir = task.get("task_dir") or ""
+    if not task_dir or not Path(task_dir).is_dir():
+        return {"status": "skipped", "reason": "task ships no bundle directory"}, False, None
+    if not (Path(task_dir) / "mock_data").is_dir() and not task.get("inject_path"):
+        return {"status": "skipped", "reason": "task mounts no mock world"}, False, None
+    try:
+        from src.utils.inject_preflight import gate_task
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[%s] task gate unavailable (%s); launching ungated",
+                       task.get("task_id"), exc)
+        return {"status": "skipped", "reason": f"gate unavailable: {exc}"}, False, None
+    try:
+        report = gate_task(task_dir, required_apis=task.get("required_apis"),
+                           environment_dir=Path(task["env_dir"]) if task.get("env_dir") else None)
+    except Exception as exc:  # noqa: BLE001 - the gate must never itself void a run
+        logger.warning("[%s] task gate raised (%s: %s); launching ungated",
+                       task.get("task_id"), type(exc).__name__, exc)
+        return {"status": "skipped", "reason": f"gate raised: {exc}"}, False, None
+    for warning in report.warnings:
+        logger.warning("[%s] task gate warning: %s", task.get("task_id"), warning)
+    if report.ok:
+        logger.info("[%s] task gate passed: %d injected op(s) land and serve, "
+                    "%d warning(s), %dms", task.get("task_id"), report.ops,
+                    len(report.warnings), report.elapsed_ms)
+        # A pass that warned still leaves its warnings on disk; a pass with
+        # nothing to say leaves nothing, so defect.json never becomes noise a
+        # reader learns to scroll past.
+        defect = report.defect_record("passed") if report.warnings else None
+        return report.stamp("passed"), False, defect
+    for finding in report.fatal:
+        logger.error("[%s] TASK DEFECT: %s", task.get("task_id"), finding)
+    if _allow_defective_task():
+        logger.error(
+            "[%s] %s=1: launching a task with %d known defect(s) anyway. The "
+            "trajectory that follows measures an environment the task does not "
+            "describe; its score is not a measurement of the model.",
+            task.get("task_id"), ALLOW_DEFECTIVE_TASK_ENV, len(report.fatal))
+        return report.stamp("bypassed"), False, report.defect_record("bypassed")
+    if not _task_gate_enforced():
+        logger.error(
+            "[%s] task gate is REPORT-ONLY (%s unset): launching despite %d known "
+            "defect(s); see defect.json. Set %s=1 to refuse such tasks.",
+            task.get("task_id"), TASK_GATE_ENFORCE_ENV, len(report.fatal),
+            TASK_GATE_ENFORCE_ENV)
+        return report.stamp("reported"), False, report.defect_record("reported")
+    return report.stamp("failed"), True, report.defect_record("refused")
+
+
 def _model_type(model: str) -> str:
     """Map a model id to a kensei pod folder name (claude / gpt / sanitized)."""
     m = model.rsplit("/", 1)[-1].lower()
@@ -921,10 +1674,12 @@ def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict |
     crit_total = int(s.get("criteria_total", s.get("tests_total", 0)) or 0)
     crit_passed = int(s.get("criteria_passed", s.get("tests_passed", 0)) or 0)
     crit_failed = int(s.get("criteria_failed", s.get("tests_failed", 0)) or 0)
+    no_signal = s.get("error")
     rubric_reward = _finite_float(s.get("rubric_based_reward"))
-    if rubric_reward is None:
+    if rubric_reward is None and not no_signal:
         rubric_reward = _finite_float(s.get("overall_score"))
-    rubric_pct = _finite_float(s.get("rubric_weights_percentage"))
+    rubric_pct = (None if no_signal
+                  else _finite_float(s.get("rubric_weights_percentage")))
     if rubric_pct is None and rubric_reward is not None:
         rubric_pct = rubric_reward * 100.0
     # --- Channel A: real pytest counts ---
@@ -969,6 +1724,11 @@ def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict |
     # distinguish "grader wrote 0" from "no grader ran; stub emitted by finally".
     if s.get("__last_resort_stub__"):
         entry["__last_resort_stub__"] = True
+    # No-signal marker: the judge (or the last-resort stub) wrote an `error`,
+    # so there is no rubric measurement behind this run. _pass_summary_doc
+    # excludes it from averages instead of folding it in as a 0.0.
+    if no_signal:
+        entry["no_signal"] = str(no_signal)[:300]
     # Same for the injection-integrity flag: a run whose silent mutations
     # failed is not a valid measurement of the injection scenario.
     if s.get("injection_ok") is False:
@@ -1019,6 +1779,11 @@ def _run_exclusion_reason(r: dict) -> str | None:
         # run carries no signal and would otherwise be averaged in as a 0.0.
         if r.get("eval_skipped"):
             return "unmeasured"
+        # Judge no-signal (council/GPT cast no verdicts, grading raised, or the
+        # last-resort stub). Checked on both shapes: a per_run entry carries
+        # `no_signal`, a raw score.json carries `error`.
+        if r.get("no_signal") or r.get("error"):
+            return "no_signal"
     return None
 
 
@@ -1056,6 +1821,7 @@ def _pass_summary_doc(model_type: str, per_run: list) -> dict:
             ("incomplete", "runs_excluded_incomplete"),
             ("injection_failed", "runs_excluded_injection_failed"),
             ("unmeasured", "runs_excluded_unmeasured"),
+            ("no_signal", "runs_excluded_no_signal"),
         ):
             if reason_counts.get(_reason):
                 doc[_key] = reason_counts[_reason]
@@ -1083,7 +1849,8 @@ def _write_pass_summary(model_dir: Path, model_type: str, run_index: int,
                  encoding="utf-8")
 
 
-def _condense_transcript_for_judge(traj: dict, limit: int | None = None) -> str:
+def _condense_transcript_for_judge(traj: dict, limit: int | None = None,
+                                   turns_duplicated: Sequence[Any] | None = None) -> str:
     """Flatten the trajectory messages into a text the judge can read.
 
     By user policy (2026-06-02): the trajectory is NEVER truncated HERE. No
@@ -1093,15 +1860,59 @@ def _condense_transcript_for_judge(traj: dict, limit: int | None = None) -> str:
     [SUBMIT TOOL OUTPUT]) so a downstream boundary-aware evidence cut can keep
     the final turn whole. Grading._gather_evidence stitches this together with
     deliverables and applies a boundary-aware per-member evidence budget that
-    preserves the transcript marker + final turn (never a blind character cut)."""
+    preserves the transcript marker + final turn (never a blind character cut).
+
+    User turns carry an explicit ordinal ([user turn N]) because the judge
+    otherwise counts '[user]' lines to locate a turn, and a harness stall-retry
+    that duplicated the message shifted every later turn by one. A duplicated
+    re-send is collapsed into a single numbered turn. `turns_duplicated` (the
+    runner's "a retry fired on this turn" markers, 0-based) is only a HINT: it
+    widens the collapse to a re-send separated by the aborted attempt's own
+    output. Identical text is the requirement in every case, so a session whose
+    duplicate was already rolled back — or one from a run that predates the
+    marker — is handled the same way."""
+    dup_hint = {int(t) for t in (turns_duplicated or [])
+                if isinstance(t, int) and not isinstance(t, bool)}
     out: list[str] = []
+    user_turn = 0
+    prev_user_text: str | None = None
+    prev_user_line: int | None = None
+    prev_line_is_user = False
+
+    def _emit_user(text: str) -> None:
+        nonlocal user_turn, prev_user_text, prev_user_line, prev_line_is_user
+        clean = _TURN_TS_RE.sub("", text, count=1).strip()
+        if not clean:
+            return
+        if clean == prev_user_text and prev_user_line is not None and (
+                prev_line_is_user or (user_turn - 1) in dup_hint):
+            out[prev_user_line] = (
+                f"[user turn {user_turn} — resent by harness after a stall; "
+                f"duplicate collapsed] {clean}"
+            )
+            prev_line_is_user = True
+            return
+        user_turn += 1
+        prev_user_text = clean
+        prev_user_line = len(out)
+        prev_line_is_user = True
+        out.append(f"[user turn {user_turn}] {clean}")
+
+    def _emit(line: str) -> None:
+        nonlocal prev_line_is_user
+        prev_line_is_user = False
+        out.append(line)
+
     for m in traj.get("messages") or []:
         msg = m.get("message", m) if isinstance(m, dict) else {}
         role = msg.get("role", "")
         content = msg.get("content", "")
         if isinstance(content, str):
             if content.strip():
-                out.append(f"[{role}] {content.strip()}")
+                if role == "user":
+                    _emit_user(content)
+                else:
+                    _emit(f"[{role}] {content.strip()}")
             continue
         if not isinstance(content, list):
             continue
@@ -1110,14 +1921,17 @@ def _condense_transcript_for_judge(traj: dict, limit: int | None = None) -> str:
                 continue
             t = b.get("type")
             if t == "text" and b.get("text", "").strip():
-                out.append(f"[{role}] {b['text'].strip()}")
+                if role == "user":
+                    _emit_user(b["text"])
+                else:
+                    _emit(f"[{role}] {b['text'].strip()}")
             elif t == "toolCall":
                 args = json.dumps(b.get("arguments", {}))
-                out.append(f"[{role}:tool] {b.get('name')} {args}")
+                _emit(f"[{role}:tool] {b.get('name')} {args}")
             elif t == "toolResult" or role == "toolResult":
                 txt = b.get("text") or b.get("content") or ""
                 if isinstance(txt, str) and txt.strip():
-                    out.append(f"[toolResult] {txt.strip()}")
+                    _emit(f"[toolResult] {txt.strip()}")
     # Emit a terminal-turn landmark on the last flattened entry so the judge (and
     # grading._budget_transcript's boundary-aware tail anchor) can locate the
     # final turn even when a boundary-aware evidence cut drops middle lines. The
@@ -1234,7 +2048,7 @@ def _normalize_display_model(obj: Any) -> None:
             _normalize_display_model(item)
 
 
-def _reanchor_sim_clock(task_id: str, task: dict, turn_index: int) -> None:
+def _reanchor_sim_clock(task_id: str, task: dict, turn_index: int):
     """Move the agent's simulated clock to this turn's declared instant.
 
     prompts.json carries a timestamp per turn, but the container clock can only
@@ -1243,6 +2057,9 @@ def _reanchor_sim_clock(task_id: str, task: dict, turn_index: int) -> None:
     task narrating three days collapsed into three consecutive minutes. Best
     effort: a turn with no resolvable timestamp, or a failed write, keeps the
     previous anchor.
+
+    Returns the resolved ``SimClock`` (or None) so the caller can stamp this
+    turn's inject drops with the same instant the agent will read.
     """
     try:
         from src.utils.docker_utils import set_agent_sim_clock
@@ -1250,13 +2067,15 @@ def _reanchor_sim_clock(task_id: str, task: dict, turn_index: int) -> None:
 
         sim = compute_sim_clock_for_turn(task, turn_index)
         if sim is None:
-            return
+            return None
         if set_agent_sim_clock(task_id, sim.epoch_ms):
             logger.info("[%s] sim clock re-anchored for T%d: %s",
                         task_id, turn_index, sim.iso)
+        return sim
     except Exception as exc:  # pragma: no cover - never break a turn over this
         logger.warning("[%s] sim clock re-anchor skipped for T%d: %s",
                        task_id, turn_index, exc)
+        return None
 
 
 def _turn_completion_verdict(task: dict, execution, interactive: bool) -> dict:
@@ -1311,6 +2130,71 @@ def _turn_completion_verdict(task: dict, execution, interactive: bool) -> dict:
     return verdict
 
 
+def _user_turn_text(msg: Mapping[str, Any]) -> str:
+    """The user-authored text of a chat row — '' for rows that carry no user
+    message. OpenClaw records tool results as role='user' entries whose blocks
+    are all 'toolResult', so a bare role count is NOT a turn count."""
+    content = msg.get("content")
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        for b in content:
+            if isinstance(b, dict) and b.get("type") == "text":
+                return (b.get("text") or "").strip()
+    return ""
+
+
+def _session_user_turn_audit(entries: Sequence[Any] | None,
+                             result: Mapping[str, Any] | None,
+                             task_id: str = "") -> dict:
+    """Count the user turns the SESSION actually recorded and compare it with
+    the schedule the harness dispatched.
+
+    The stall/empty retry re-sends a turn the session had already stored, which
+    used to leave two identical user rows — invisible in score.json while it
+    shifted the judge's turn count and the per-turn feedback anchor. The runner
+    now rolls the orphan row back, but the guard is best-effort (a probe that
+    cannot reach the container declines to truncate), so the count is verified
+    against the session rather than assumed from the retry markers.
+
+    turn_dedup_ok gates on an OVER-count only: an under-count is a short run,
+    already reported by run_incomplete, not a duplication defect."""
+    seen = 0
+    for e in entries or []:
+        if not isinstance(e, dict):
+            continue
+        msg = e.get("message", e)
+        if isinstance(msg, dict) and msg.get("role") == "user" and _user_turn_text(msg):
+            seen += 1
+    r = result or {}
+    try:
+        planned = r.get("turns_planned")
+        expected = int(planned) if planned is not None else None
+    except (TypeError, ValueError):
+        expected = None
+    if expected is not None and r.get("recovery_turn_fired"):
+        expected += 1
+    audit: dict[str, Any] = {
+        "session_user_turns": seen,
+        "turn_dedup_ok": expected is None or seen <= expected,
+    }
+    if expected is None:
+        return audit
+    audit["session_user_turns_expected"] = expected
+    if seen > expected:
+        logger.error(
+            "[%s] TURN DUPLICATION: session recorded %d user turns for a "
+            "%d-turn schedule (turns_duplicated=%s) — the judge transcript "
+            "and per-turn feedback are offset by %d",
+            task_id, seen, expected, list(r.get("turns_duplicated") or []),
+            seen - expected)
+    elif seen < expected and not r.get("run_incomplete"):
+        logger.error(
+            "[%s] TURN LOSS: session recorded %d user turns for a %d-turn "
+            "schedule though the run reported complete", task_id, seen, expected)
+    return audit
+
+
 def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
     if not isinstance(scores, dict):
         return
@@ -1327,8 +2211,12 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
             test_reward = float(raw_test)
     rubric_reward: float | None = None
     raw_rubric = scores.get("overall_score")
+    # An `error` key marks the judge's no-signal sentinel (overall_score 0.0 or
+    # None with no verdicts behind it). It is not a rubric measurement, so it
+    # must not flow into rubric/combined reward as a genuine zero.
     if (
-        isinstance(raw_rubric, (int, float))
+        not scores.get("error")
+        and isinstance(raw_rubric, (int, float))
         and not isinstance(raw_rubric, bool)
         and math.isfinite(float(raw_rubric))
     ):
@@ -1351,6 +2239,16 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
     defects = (result or {}).get("injection_defects") or []
     scores["injection_ok"] = not defects
     scores["injection_defects"] = defects
+    # Launch-gate stamp (same on-disk-marker pattern as injection_ok, and for
+    # the same reason one level earlier): injection_ok says the mutations failed
+    # to land during the run, task_gate says they were never going to. A run
+    # launched past a known defect with WCB_ALLOW_DEFECTIVE_TASK must carry that
+    # fact into score.json, because score.json is what aggregation and delivery
+    # read — and a bypass visible only in a log the consumer never opens is a
+    # bypass that arrives at the customer looking like a clean pass.
+    gate = (result or {}).get("task_gate")
+    if isinstance(gate, dict) and gate:
+        scores["task_gate"] = dict(gate)
     # Turn-completion stamp (same on-disk-marker pattern as injection_ok): a
     # run that received fewer scripted turns than the task defines is not a
     # valid measurement of the full scenario and must be excludable downstream.
@@ -1367,6 +2265,23 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
             scores["turns_duplicated"] = list(r["turns_duplicated"])
         if r.get("turns_empty"):
             scores["turns_empty"] = list(r["turns_empty"])
+        # Session-side turn audit: turns_duplicated only says a retry FIRED;
+        # these two say whether the session ended up with the right number of
+        # user turns, which is what the judge and per-turn feedback read.
+        if r.get("session_user_turns") is not None:
+            scores["session_user_turns"] = r["session_user_turns"]
+            scores["turn_dedup_ok"] = bool(r.get("turn_dedup_ok", True))
+    # Per-message cost attribution stamp (same on-disk-marker pattern): a run
+    # whose messages ship cost 0 because the row count did not resolve must say
+    # so where a reader looks, not only in harness_debug.log. The ledger blocks
+    # are dropped here — score.json carries verdicts, usage.json carries money;
+    # the row COUNTS stay, since they are what explains the verdict.
+    stamp = _stamped_usage_attribution(result)
+    if stamp:
+        scores["usage_attribution"] = {
+            k: v for k, v in stamp.items()
+            if k not in ("internal_calls", "post_agent_calls", "zero_token_calls")
+        }
 
 
 def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
@@ -1386,6 +2301,8 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             entries.append(json.loads(line))
         except json.JSONDecodeError:
             continue
+
+    result.update(_session_user_turn_audit(entries, result, task.get("task_id", "")))
 
     st = StoreTask(
         id=task["task_id"], task_id=task["task_id"],
@@ -1474,10 +2391,22 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
     # Back-fill real per-message token + cost numbers from the sidecar usage log
     # (OpenClaw's chat.jsonl writes them as zero on this image build).
     try:
-        _n = _backfill_per_message_cost(traj, _USAGE_LOG_PATH)
-        if _n:
-            logger.info("[%s] per-message cost back-filled for %d assistant message(s)",
-                        task["task_id"], _n)
+        _report = _attribute_per_message_cost(
+            traj, _USAGE_LOG_PATH,
+            str((agent_usage or {}).get("__run_key__", "") or ""),
+            oauth_route=bool(getattr(config, "use_claude_oauth", False)),
+            model=model_type,
+            agent_finished_ts=_agent_finished_ts(agent_usage))
+        if _report:
+            # Read back out by save_usage and the score block below, so the
+            # outcome reaches usage.json and score.json instead of living only
+            # in this run's harness_debug.log.
+            result["usage_attribution"] = _report
+            logger.info(
+                "[%s] per-message cost %s for %d assistant message(s) from %d "
+                "usage row(s), %d of them openclaw's own",
+                task["task_id"], _report["status"], _report["messages"],
+                _report["rows_selected"], _report["rows_internal"])
     except Exception as exc:
         logger.warning("[%s] per-message cost back-fill failed: %s", task["task_id"], exc)
 
@@ -1568,7 +2497,8 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         results_dir = _pick_evidence_dir(output_dir)
         try:
             from src.utils.grading import grade_with_rubric
-            transcript_text = _condense_transcript_for_judge(traj)
+            transcript_text = _condense_transcript_for_judge(
+                traj, turns_duplicated=result.get("turns_duplicated"))
             scores = grade_with_rubric(
                 rubrics,
                 task.get("task_description") or task.get("initial_prompt") or "",
@@ -2003,6 +2933,25 @@ def run_single_task(
     if config is not None:
         _augment_task_with_mocks(task, config, mock_env_dict)
 
+    # Nothing has been spent yet: no container, no mock stack, no token. This is
+    # the last place a defective task can be refused for free.
+    task_gate, gate_blocked, gate_defect = _run_task_gate(task)
+    if gate_blocked:
+        # A refusal never claims a run_N/, so its defect.json goes one level up,
+        # at the task bundle root — output/<backend>/<task>/defect.json, beside
+        # the trajectories/ tree the run would have joined. That is the only
+        # path derivable here (the run index, and even the model folder, are
+        # settled a few hundred lines below, after the spend this return is
+        # avoiding), and it is the right one: a refusal is a verdict on the
+        # TASK, identical for every model and every rep, so writing it per-run
+        # would mean N copies of one fact and a task dir that looks clean.
+        _write_gate_defect(output_root / task_id_ori, gate_defect)
+        return {
+            "task_id": task_id_ori, "scores": {}, "task_gate": task_gate,
+            "error": (f"task gate refused {task_id_ori}: "
+                      + "; ".join(f["reason"] for f in task_gate["findings"][:3])),
+        }
+
     if (task.get("test_code") or "").strip():
         # Task ships its own test suite (input/<task>/test_outputs.py +
         # test_weights.json, loaded by task_parser._load_provided_tests) — the
@@ -2161,7 +3110,12 @@ def run_single_task(
     model_dir = task_bundle_dir / "trajectories" / model_type
     run_index, output_dir = _claim_run_dir(model_dir)
 
-    result = {"task_id": task_id, "scores": {}, "error": None}
+    # The run dir now exists, so a bypass or a warned pass can be written where
+    # score.json will land. Placed here, before the first thing that can throw,
+    # so the trace of a bypass does not depend on the run reaching its end.
+    _write_gate_defect(output_dir, gate_defect)
+
+    result = {"task_id": task_id, "scores": {}, "error": None, "task_gate": task_gate}
 
     # Per-run debug log: a focused DEBUG trace written next to this run's
     # score.json (output_dir/harness_debug.log). Everything logged during this
@@ -2220,11 +3174,14 @@ def run_single_task(
         # pre-T0 baseline, so the stage0 `loud` seed is NOT replayed; only the
         # `silent` mutations fire (kept out of the agent-visible audit feed).
         try:
-            from src.utils.inject_director import InjectScript, InjectApplier, is_defect
+            from src.utils.inject_director import (
+                InjectScript, InjectApplier, NarrativeClock, is_defect,
+            )
             from src.utils.docker_utils import copy_file_into_workspace
             from src.utils.inject_validator import (
                 run_authoring_validation, InjectAuthoringError,
             )
+            from src.utils.sim_clock import compute_sim_clock
             _is = InjectScript.load(task["inject_path"])
 
             # Static authoring pre-flight (no live container) -> injection_defects.
@@ -2255,13 +3212,15 @@ def run_single_task(
                                        or ""),
                         })
 
-            def _copy_into_workspace(host_src, dst, mkdir=False, _tid=task_id):
+            def _copy_into_workspace(host_src, dst, mkdir=False,
+                                     mtime_epoch_ms=None, _tid=task_id):
                 # Drop per-turn inject artifacts (emails, PDFs, silent file
                 # swaps) into the running agent container's workspace. The pre-T0
                 # seed fires before the container exists -> hook returns None and
                 # the op is logged "skipped_container_down" (baseline already
                 # mounted at /app). False means a real, attempted copy failed.
-                return copy_file_into_workspace(_tid, host_src, dst, mkdir=mkdir)
+                return copy_file_into_workspace(_tid, host_src, dst, mkdir=mkdir,
+                                                mtime_epoch_ms=mtime_epoch_ms)
 
             inject_applier = InjectApplier(
                 host_api_to_url=drift_info.get("host_api_to_url") or {},
@@ -2271,8 +3230,21 @@ def run_single_task(
                 copy_into_workspace=_copy_into_workspace,
                 task_id=task_id,
             )
-            _record_defects(inject_applier.seed(_is),
-                            stage_name="stage0(seed)", phase="seed")
+            # The T0 anchor is what the staged baseline tree is stamped with
+            # (docker_utils.inject_data_into_workspace), so it doubles as the
+            # last-resort instant for a stage that declares none AND as the
+            # yardstick for the recency-invisibility check.
+            _t0_sim = compute_sim_clock(task)
+            _t0_epoch_ms = _t0_sim.epoch_ms if _t0_sim is not None else None
+            if _t0_epoch_ms is None:
+                logger.warning(
+                    "[%s] no resolvable T0 instant in prompts.json — injected "
+                    "files cannot be stamped on the narrative timeline and may "
+                    "stay invisible to the agent's recency searches", task_id)
+            _record_defects(
+                inject_applier.seed(_is, clock=NarrativeClock(
+                    turn_epoch_ms=_t0_epoch_ms, t0_epoch_ms=_t0_epoch_ms)),
+                stage_name="stage0(seed)", phase="seed")
             # The pristine BEFORE snapshot (persona/ + data/ + mock_data/) is
             # taken below, after this branch, so it runs for every task — not
             # just injection ones. For inject tasks it still lands after seed()
@@ -2283,13 +3255,22 @@ def run_single_task(
             stage_turns = tuple([prompt] + raw_turns[1:]) if raw_turns else (prompt,)
 
             def _inject_before_turn(turn_index: int, _is=_is, _ap=inject_applier,
-                                    _task=task, _tid=task_id):
+                                    _task=task, _tid=task_id,
+                                    _t0_ms=_t0_epoch_ms):
                 # Agent is idle here; apply the stage whose boundary ends at this turn.
-                _reanchor_sim_clock(_tid, _task, turn_index)
+                sim = _reanchor_sim_clock(_tid, _task, turn_index)
                 st = _is.stage_for_boundary(turn_index)
                 if st is not None:
-                    _record_defects(_ap.apply_stage(st, turn_index),
-                                    stage_name=st.name, phase="stage")
+                    # Stamp this turn's drops on the narrative timeline so they
+                    # sort after the T0-stamped baseline. The applier prefers
+                    # the stage's own applied_at_local_time and falls back to
+                    # this turn's clock, then T0 — never to nothing, which is
+                    # what previously left drops at their authoring mtime.
+                    _record_defects(
+                        _ap.apply_stage(st, turn_index, clock=NarrativeClock(
+                            turn_epoch_ms=getattr(sim, "epoch_ms", None),
+                            t0_epoch_ms=_t0_ms)),
+                        stage_name=st.name, phase="stage")
 
             stage_before_turn = _inject_before_turn
             # Dangling-reference guard: a non-seed stage whose to_turn is
@@ -2569,11 +3550,6 @@ def run_single_task(
             scores=result.get("scores"),
             error=result.get("error"),
         )
-        usage = backend.collect_usage(
-            task_id=task_id,
-            output_dir=output_dir,
-            elapsed_time=elapsed_time,
-        )
 
         try:
             collect_task_output(
@@ -2700,6 +3676,21 @@ def run_single_task(
                     agent_state_json, encoding="utf-8")
             except Exception as exc:
                 logger.warning("[%s] agent_state build failed: %s", task_id, exc)
+
+        # Last call that needs a LIVE agent container is above (collect_task_output
+        # and the workspace_after snapshot both exec into it). Stop it here, so the
+        # two reads of the sidecar usage log below — collect_usage for the
+        # sources.agent totals, and the per-message attribution inside
+        # _build_trajectory — see a file nothing can still append to. Reading it
+        # while the container serves is what left the 2026-09-18 sean_callahan run
+        # passing its attribution gate by 7.25 seconds.
+        _quiesce_agent_container(task_id)
+
+        usage = backend.collect_usage(
+            task_id=task_id,
+            output_dir=output_dir,
+            elapsed_time=elapsed_time,
+        )
 
         startup_failed = isinstance(result.get("error"), str) and "Container startup failed" in result["error"]
         if startup_failed:
@@ -2926,6 +3917,11 @@ def run_single_task(
                     "run_incomplete": bool(result.get("run_incomplete")),
                     "turns_planned": result.get("turns_planned"),
                     "turns_completed": result.get("turns_completed"),
+                    # Carried here too, not only through _augment: this stub is
+                    # the artifact for the runs that failed hardest, which is
+                    # exactly when a bypassed gate is the likeliest explanation
+                    # and the least excusable thing to have dropped.
+                    "task_gate": result.get("task_gate"),
                 }
                 score_path.write_text(
                     json.dumps(last_resort, indent=2, ensure_ascii=False, default=str),
@@ -3025,6 +4021,54 @@ def _run_cleanups(cleanups: list) -> None:
     cleanups.clear()
 
 
+def _warn_if_master_key_auth_degrades_attribution(args) -> None:
+    """Say out loud, at batch start, when opting into master-key auth has cost
+    this batch its per-run cost attribution.
+
+    The main agent has exactly one way to tag its sidecar rows with a run key:
+    carry the key as the bearer. A master-key sidecar accepts only the master
+    key, so under WCB_SIDECAR_MASTER_KEY=1 every main-agent row lands untagged
+    and `collect_usage` falls back to selecting rows by time window. That
+    fallback cannot separate two runs whose windows overlap, and it is wrong
+    outright under faketime, where the row timestamps and the window are not on
+    the same clock. The failure is silent in the output — plausible-looking
+    totals, attributed to the wrong run — so the warning has to happen here,
+    before any spend.
+
+    Unconditional in master-key mode, because this process's own --parallel is
+    not a measure of how many runs share its log. script/run.sh:716 hardcodes
+    `--parallel 1` on every eval/run_batch.py it launches and gets its
+    concurrency by fanning out PROCESSES (run_k_for_model_bg / run_parallel_
+    tasks), all of them inheriting the one WCB_SHARED_SIDECAR_USAGE_LOG that
+    bootstrap_shared_sidecar exported — so the old `parallel <= 1` gate made
+    this warning unreachable from the canonical entry point no matter how wide
+    the fan-out. Two operators starting run.sh from two terminals, or a second
+    batch inheriting an exported WCB_SHARED_SIDECAR, are the same blind spot:
+    a co-tenant is invisible to the process it is polluting.
+    """
+    if sidecar_auth_mode() != AUTH_MODE_MASTER_KEY:
+        return
+    parallel = int(getattr(args, "parallel", 1) or 1)
+    logger.warning(
+        "=" * 78
+        + "\nSIDECAR AUTH: master-key mode is ON (WCB_SIDECAR_MASTER_KEY) with "
+          "--parallel %d.\nThe main agent cannot tag its sidecar rows in this "
+          "mode — its only tagging channel is the bearer, and a master-key "
+          "sidecar\naccepts no other bearer. Per-run cost for the main agent "
+          "therefore has no owner on its\nrows, and the extractor now reports "
+          "ZERO for this run rather than sweeping the time\nwindow, which "
+          "over-attributes whenever two runs overlap and is simply wrong "
+          "under\nfaketime. Subagent and audio calls stay tagged (they send "
+          "x-wcb-run-key).\nThis warning is UNCONDITIONAL: --parallel counts "
+          "only THIS process's tasks, while\nscript/run.sh fans out one "
+          "--parallel 1 process per run onto a single shared\nusage.jsonl, and "
+          "a second batch or a second terminal is invisible from here.\nUnset "
+          "WCB_SIDECAR_MASTER_KEY to restore run-key-scoped auth and exact "
+          "attribution.\n" + "=" * 78,
+        parallel,
+    )
+
+
 def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
                              mock_enabled_apis: "set[str] | None" = None):
     """For the openclaw backend, optionally bring up a per-batch shared LiteLLM
@@ -3051,6 +4095,8 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     use_litellm = args.litellm if args.litellm is not None else config.litellm_enabled()
     if not use_litellm:
         return False, "", "", "", {}, ""
+
+    _warn_if_master_key_auth_degrades_attribution(args)
 
     # Auth/connection setup phase begins here: docker network, LiteLLM sidecar
     # (+ OAuth bridge), upstream (Bedrock/OpenAI) reachability, and the mock-API
@@ -3137,6 +4183,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     _stream_enabled = (os.environ.get("WCB_STREAM", "").strip().lower()
                        in ("1", "true", "yes", "on"))
     shared_stream_log = os.environ.get("WCB_SHARED_SIDECAR_STREAM_LOG", "").strip()
+    _overflow_guard = overflow_guard_enabled(config.meta_api_key, config.meta_model)
     litellm_yaml = build_litellm_config_yaml(
         bedrock_sonnet_arn=config.bedrock_sonnet_arn if config.aws_bearer_token else "",
         bedrock_arn=config.bedrock_inference_arn if config.aws_bearer_token else "",
@@ -3158,6 +4205,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         meta_model=config.meta_model,
         enable_stream_callback=_stream_enabled,
         enable_sanitize_callback=bool(config.meta_model),
+        enable_overflow_guard_callback=_overflow_guard,
     )
     if not litellm_yaml:
         raise RuntimeError(
@@ -3605,6 +4653,12 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         # usage.json (IAN report Pointer 3).
         globals()["_HEADROOM_LOG_DIR"] = headroom_log_dir_str
 
+    overflow_guard_callback_src = ""
+    if _overflow_guard and not shared_mode:
+        overflow_guard_callback_src = str(
+            Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_overflow_guard_callback.py"
+        )
+
     if shared_mode:
         logger.info(
             "LiteLLM sidecar %s reused (shared-infra mode, network=%s); "
@@ -3643,6 +4697,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             stream_log_host_dir=stream_log_dir_str,
             sanitize_callback_host_path=sanitize_cb_src,
             sanitize_model=config.meta_model,
+            overflow_guard_callback_host_path=overflow_guard_callback_src,
         )
         cleanups.append(lambda: stop_litellm(sidecar))
         if not wait_for_litellm_healthy(sidecar):

@@ -221,6 +221,26 @@ class TestRegradeScoreOverwrite:
         # old stale keys ARE dropped
         assert "stale" not in on_disk
 
+    def test_regrade_no_signal_judge_writes_no_rubric_reward(
+            self, regrade_mod, tmp_path, monkeypatch):
+        # A council that cast no verdicts returns the no-signal sentinel
+        # (overall_score 0.0 + error). The regraded score.json must not turn it
+        # into a genuine 0.0 rubric/combined reward.
+        run_dir = _mk_run_dir(tmp_path)
+        (run_dir / "output.json").write_text(json.dumps({"messages": []}), encoding="utf-8")
+        rubric = tmp_path / "rubric.json"
+        rubric.write_text(json.dumps([{"criterion": "c", "weight": 5}]), encoding="utf-8")
+        monkeypatch.setattr(regrade_mod, "grade_with_rubric", lambda *a, **k: {
+            "overall_score": 0.0, "criteria_total": 1, "criteria_abstained": 1,
+            "error": "judge council cast no verdicts (0/3 members succeeded; ...)",
+        })
+
+        regrade_mod.regrade(run_dir, rubric_override=rubric)
+
+        on_disk = json.loads((run_dir / "score.json").read_text(encoding="utf-8"))
+        assert on_disk["rubric_based_reward"] is None
+        assert on_disk["combined_reward"] is None
+
     def test_regrade_reads_prompt_into_task_description(self, regrade_mod, tmp_path, monkeypatch):
         run_dir = _mk_run_dir(tmp_path)
         (run_dir / "output.json").write_text(json.dumps({"messages": []}), encoding="utf-8")
@@ -299,6 +319,78 @@ class TestRegradeUpdateUsageJson:
         assert out["cost_usd"] == pytest.approx(0.75)
         # unrelated top-level keys carried through verbatim.
         assert out["extra_preserved"] == "keepme"
+
+
+class TestRegradeJudgeCostOnTheOAuthRoute:
+    @staticmethod
+    def _usage_json(run_dir, **extra):
+        usage = {
+            "cost_usd": 0.5, "input_tokens": 10, "output_tokens": 5,
+            "cache_read_tokens": 0, "cache_write_tokens": 0,
+            "total_tokens": 15, "request_count": 1,
+            "sources": {"agent": {
+                "input_tokens": 10, "output_tokens": 5,
+                "cache_read_tokens": 0, "cache_write_tokens": 0,
+                "total_tokens": 15, "request_count": 1, "cost_usd": 0.5,
+            }},
+        }
+        usage.update(extra)
+        (run_dir / "usage.json").write_text(json.dumps(usage), encoding="utf-8")
+
+    def test_bridge_judge_lands_at_the_sonnet_rate_not_zero(
+        self, regrade_mod, tmp_path, monkeypatch
+    ):
+        # The regrade path used to record $0 for a prepaid bridge judge, which
+        # made the same grading work free on regrade and list-priced in batch.
+        from src.utils import grading
+        from src.utils.auth_provider import OAUTH, PROVIDER_ENV_VAR
+
+        monkeypatch.setenv(PROVIDER_ENV_VAR, OAUTH)
+        monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:8787")
+        cost, priced_ok = grading._judge_cost_usd(
+            "claude-sonnet-5", 20_000, 1_000, 0, 0, family="sonnet"
+        )
+        assert (priced_ok, cost) == (True, pytest.approx(0.075))
+
+        run_dir = _mk_run_dir(tmp_path)
+        self._usage_json(run_dir)
+        regrade_mod._update_usage_json(run_dir, {"usage": {
+            "input_tokens": 20_000, "output_tokens": 1_000,
+            "cache_read_tokens": 0, "cache_write_tokens": 0,
+            "total_tokens": 21_000, "request_count": 1, "cost_usd": cost,
+        }})
+
+        out = json.loads((run_dir / "usage.json").read_text(encoding="utf-8"))
+        assert out["sources"]["judge"]["cost_usd"] == pytest.approx(0.075)
+        assert out["cost_usd"] == pytest.approx(0.575)
+
+    def test_existing_provenance_is_preserved_over_this_process_env(
+        self, regrade_mod, tmp_path, monkeypatch
+    ):
+        # auth_provider records how the RUN was routed. Regrading a Bedrock run
+        # from an OAuth-configured shell must not rewrite that history.
+        from src.utils.auth_provider import OAUTH, PROVIDER_ENV_VAR
+
+        monkeypatch.setenv(PROVIDER_ENV_VAR, OAUTH)
+        run_dir = _mk_run_dir(tmp_path)
+        self._usage_json(run_dir, auth_provider="bedrock")
+        regrade_mod._update_usage_json(run_dir, {"usage": {"cost_usd": 0.25}})
+
+        out = json.loads((run_dir / "usage.json").read_text(encoding="utf-8"))
+        assert out["auth_provider"] == "bedrock"
+
+    def test_pre_provenance_artifact_is_stamped_from_the_configured_provider(
+        self, regrade_mod, tmp_path, monkeypatch
+    ):
+        from src.utils.auth_provider import OAUTH, PROVIDER_ENV_VAR
+
+        monkeypatch.setenv(PROVIDER_ENV_VAR, OAUTH)
+        run_dir = _mk_run_dir(tmp_path)
+        self._usage_json(run_dir)
+        regrade_mod._update_usage_json(run_dir, {"usage": {"cost_usd": 0.25}})
+
+        out = json.loads((run_dir / "usage.json").read_text(encoding="utf-8"))
+        assert out["auth_provider"] == "oauth"
 
 
 class TestRegradePrintSummary:

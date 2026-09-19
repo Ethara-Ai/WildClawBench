@@ -153,6 +153,52 @@ def test_shared_and_per_run_builders_both_pass_meta_1p_params() -> None:
     )
 
 
+def test_shared_and_per_run_builders_both_pass_whisper_key() -> None:
+    """Both builders MUST pass openai_whisper_api_key.
+
+    The audio block in build_litellm_config_yaml is gated on
+    `openai_api_key or openai_whisper_api_key`, so dropping this kwarg from
+    either entry point silently removes the whisper-1 route on any profile whose
+    ONLY transcription credential is KENSEI_OPENAI_WHISPER_API_KEY — the same
+    divergence class as the meta_* pin above.
+    """
+    required = {"openai_whisper_api_key"}
+    per_run = _meta_kwargs_of_build_litellm_call(RUN_BATCH)
+    shared = _meta_kwargs_of_build_litellm_call(BOOTSTRAP)
+    assert per_run is not None and shared is not None
+    assert required <= per_run, "run_batch.py per-run builder must pass openai_whisper_api_key"
+    assert required <= shared, (
+        "bootstrap_sidecar.py shared builder must pass openai_whisper_api_key "
+        "(mirror the per-run builder); without it the shared sidecar has no "
+        "/v1/audio/transcriptions route on whisper-key-only profiles."
+    )
+
+
+def test_start_litellm_receives_whisper_key_on_both_paths() -> None:
+    """The YAML references os.environ/OPENAI_API_KEY_WHISPER, so the container
+    env must actually carry it — build-time and run-time wiring must agree.
+
+    A builder that emits the env ref while start_litellm omits the variable
+    yields a route that resolves to an EMPTY key and 401s upstream, which is
+    harder to diagnose than the original 400.
+    """
+    for path, label in ((RUN_BATCH, "run_batch.py"), (BOOTSTRAP, "bootstrap_sidecar.py")):
+        kwargs = None
+        for node in ast.walk(_ast(path)):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "start_litellm"
+            ):
+                kwargs = {kw.arg for kw in node.keywords if kw.arg}
+                break
+        assert kwargs is not None, f"{label} start_litellm call not found"
+        assert "openai_whisper_api_key" in kwargs, (
+            f"{label} must pass openai_whisper_api_key to start_litellm so "
+            "OPENAI_API_KEY_WHISPER exists in the sidecar container env."
+        )
+
+
 # ---------- eval/run_batch.py: shared-mode short-circuit ----------
 
 

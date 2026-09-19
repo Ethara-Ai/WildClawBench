@@ -21,8 +21,58 @@ cd "$(dirname "$0")/.."
 # shellcheck source=script/lib/log.sh
 source "$(dirname "$0")/lib/log.sh"
 
-readonly AGENT_IMAGE="wildclawbench-ubuntu:v1.3"
-readonly AGENT_IMAGE_SHA="60eec8752cb597e180780ff08d7569c1892c169521f1f2b069c2efeb006a4078"
+# The agent runtime image is built in two stages.
+#
+# BASE_IMAGE is the prebuilt ~28GB tarball distributed via HuggingFace. It is
+# the only artifact `script/prepare.sh` / `script/ec2_bootstrap.sh` / `script/wcb`
+# fetch, and no Dockerfile in this repo produces it — so it stays the
+# acquisition target and must never be deleted or retagged.
+#
+# AGENT_IMAGE is what actually runs tasks: BASE_IMAGE plus openai-whisper and
+# preloaded 'small' weights, built locally by preflight_agent_image() from
+# docker/agent-whisper.Dockerfile. That layer is what makes the local fallback
+# rung of environment/skills/audio-extract/scripts/transcribe.sh work on runs
+# where the sidecar advertises no whisper route (OAuth/Bedrock-only batches —
+# see src/agents/openclaw/runner.py:601). Delivered bundles already bake the
+# same thing via src/utils/harbor/dockerfile.py; this brings our own runtime
+# image to parity. Rollback = point AGENT_IMAGE back at BASE_IMAGE; v1.4 is
+# purely additive and leaves v1.3 on disk untouched.
+readonly BASE_IMAGE="wildclawbench-ubuntu:v1.3"
+# HarnessV2 keeps the base image as the default (v1.4 is opt-in via
+# DOCKER_IMAGE=wildclawbench-ubuntu:v1.4). When AGENT_IMAGE equals BASE_IMAGE,
+# preflight/recovery only acquire the base and never build the whisper layer
+# onto the base tag.
+readonly AGENT_IMAGE_DEFAULT="$BASE_IMAGE"
+
+# Reads one KEY=value out of .env without sourcing it, so a malformed line
+# cannot execute and the file's credentials never enter this shell.
+env_file_value() {
+    [[ -f .env ]] || return 0
+    sed -n "s/^[[:space:]]*$1=//p" .env | tail -n 1 | tr -d '\r' \
+        | sed 's/^["'"'"']//; s/["'"'"']$//'
+}
+
+# Resolved ONCE here and exported, because the python side reads this same
+# DOCKER_IMAGE variable (src/utils/docker_utils.py) and its load_dotenv() will
+# not override a variable already in the environment. Preflight therefore
+# checks, builds and reports exactly the image run_batch will start, on every
+# channel, by construction rather than by both sides happening to agree.
+#
+# Resolving it twice is the defect this replaces. 2f52a8d flipped the default
+# on both sides to v1.4, but .env (and .env.example) still carried
+# `DOCKER_IMAGE=wildclawbench-ubuntu:v1.3`, which only the python side read: on
+# the 2026-09-18 batch, preflight echoed "Agent image wildclawbench-ubuntu:v1.4
+# [OK]" while run_batch logged v1.3 present and the container ran v1.3 —
+# without the whisper layer preflight had just reported as verified.
+AGENT_IMAGE="${DOCKER_IMAGE:-$(env_file_value DOCKER_IMAGE)}"
+AGENT_IMAGE="${AGENT_IMAGE:-$AGENT_IMAGE_DEFAULT}"
+readonly AGENT_IMAGE
+export DOCKER_IMAGE="$AGENT_IMAGE"
+readonly AGENT_WHISPER_DOCKERFILE="docker/agent-whisper.Dockerfile"
+# Content ID of BASE_IMAGE, used to recover from a lost/corrupted tag table
+# without re-loading the 28GB tar. Verified identical on both production hosts
+# via `docker image inspect wildclawbench-ubuntu:v1.3 --format '{{.Id}}'`.
+readonly BASE_IMAGE_SHA="88cd069e8ead5f4497093671a6d9e39e80259d75d4524f230b52ce439fcb2870"
 # Custom LiteLLM sidecar image with headroom-ai baked in (agent prompt compression).
 readonly HEADROOM_IMAGE="wildclawbench-litellm-headroom:v2"
 readonly AGENT_TAR_PATH="Images/wildclawbench-ubuntu_v1.3.tar"
@@ -223,23 +273,20 @@ ensure_pv_installed() {
     return 1
 }
 
-# Handles three failure modes:
+# Acquires BASE_IMAGE, handling three failure modes:
 #   1. Tag present and resolves: pass-through.
 #   2. Tag missing but content image (by SHA) present: re-tag from SHA.
 #   3. Neither tag nor SHA present: try to load from AGENT_TAR_PATH; fail with HF hint.
-preflight_agent_image() {
-    log::step 2 6 "Agent image ${AGENT_IMAGE}"
-
-    if docker image inspect "$AGENT_IMAGE" >/dev/null 2>&1; then
-        log::ok "Image present"
+ensure_base_image() {
+    if docker image inspect "$BASE_IMAGE" >/dev/null 2>&1; then
         return 0
     fi
 
-    log::warn "Tag not resolvable; checking for content image by SHA"
-    if docker image inspect "sha256:${AGENT_IMAGE_SHA}" >/dev/null 2>&1; then
-        log::warn "Content image present (sha256:${AGENT_IMAGE_SHA:0:16}…) but tag missing — re-tagging"
-        if docker tag "sha256:${AGENT_IMAGE_SHA}" "$AGENT_IMAGE"; then
-            log::ok "Re-tagged content image as ${AGENT_IMAGE}"
+    log::warn "Base tag ${BASE_IMAGE} not resolvable; checking for content image by SHA"
+    if docker image inspect "sha256:${BASE_IMAGE_SHA}" >/dev/null 2>&1; then
+        log::warn "Content image present (sha256:${BASE_IMAGE_SHA:0:16}…) but tag missing — re-tagging"
+        if docker tag "sha256:${BASE_IMAGE_SHA}" "$BASE_IMAGE"; then
+            log::ok "Re-tagged content image as ${BASE_IMAGE}"
             return 0
         else
             log::err "docker tag failed"
@@ -259,17 +306,65 @@ preflight_agent_image() {
             log::warn "pv unavailable; loading without progress display (silent for several minutes)"
             docker load -i "$AGENT_TAR_PATH"
         fi
-        if docker image inspect "$AGENT_IMAGE" >/dev/null 2>&1; then
-            log::ok "Image loaded successfully"
+        if docker image inspect "$BASE_IMAGE" >/dev/null 2>&1; then
+            log::ok "Base image loaded successfully"
             return 0
         fi
         log::err "docker load completed but tag still not resolvable; check tar integrity"
         return 1
     fi
 
-    log::err "Image not present and tar not found at ${AGENT_TAR_PATH}"
+    log::err "Base image not present and tar not found at ${AGENT_TAR_PATH}"
     log::hint "Fetch the tar manually then re-run this script:"
     log::hint "  hf download internlm/WildClawBench ${AGENT_TAR_PATH} --repo-type dataset --local-dir ."
+    return 1
+}
+
+# AGENT_IMAGE is BASE_IMAGE + the whisper bake, and only this function builds
+# it — the distributed tar carries the base alone. Mirrors preflight_mock_image
+# / preflight_headroom_image: fast-path when the tag exists, otherwise build
+# once and fail loud with a copy-pasteable command.
+#
+# --platform is pinned because BASE_IMAGE is an amd64-only artifact. On an
+# amd64 host this is a no-op; on anything else BuildKit would refuse the local
+# base (no matching platform) and try to PULL `wildclawbench-ubuntu:v1.3` from
+# Docker Hub, where it does not exist — failing with a misleading
+# "pull access denied" instead of building against the image already on disk.
+preflight_agent_image() {
+    log::step 2 6 "Agent image ${AGENT_IMAGE}"
+
+    # Say so when the tag did not come from the default, since the override
+    # decides what actually runs the tasks and is otherwise invisible until
+    # someone reads run_batch's log line and compares it with this one.
+    if [[ "$AGENT_IMAGE" != "$AGENT_IMAGE_DEFAULT" ]]; then
+        log::warn "DOCKER_IMAGE overrides the default ${AGENT_IMAGE_DEFAULT}"
+        log::warn "Preflight and run_batch will both use ${AGENT_IMAGE}; clear DOCKER_IMAGE from .env to get the default back"
+    fi
+
+    if docker image inspect "$AGENT_IMAGE" >/dev/null 2>&1; then
+        log::ok "Image present"
+        return 0
+    fi
+
+    log::warn "Agent image absent — acquiring base ${BASE_IMAGE} first"
+    ensure_base_image || return 1
+    if [[ "$AGENT_IMAGE" == "$BASE_IMAGE" ]]; then
+        log::ok "Base image present"
+        return 0
+    fi
+
+    log::warn "Building ${AGENT_IMAGE} from ${AGENT_WHISPER_DOCKERFILE} (~10–20 min first time; torch is the slow part)"
+    log::info "This bakes openai-whisper + 'small' weights so the audio-extract skill can transcribe without a sidecar whisper route"
+    if docker build --platform linux/amd64 -f "$AGENT_WHISPER_DOCKERFILE" -t "$AGENT_IMAGE" . ; then
+        log::ok "Agent image built"
+        return 0
+    fi
+
+    log::err "Agent image build failed. It needs internet (PyPI + the OpenAI weight CDN);"
+    log::err "a machine with no egress cannot produce it. Build it manually once you have connectivity:"
+    log::err "  docker build --platform linux/amd64 -f ${AGENT_WHISPER_DOCKERFILE} -t ${AGENT_IMAGE} ."
+    log::err "Or copy it from a host that has it:"
+    log::err "  docker save ${AGENT_IMAGE} | gzip | ssh <host> 'gunzip | docker load'"
     return 1
 }
 
@@ -493,7 +588,13 @@ bootstrap_shared_sidecar() {
     # python writes key=value to stdout; progress to stderr (tee'd to the
     # user terminal). On non-zero exit, we fail loud and abort the batch —
     # without the sidecar no reps can talk to Bedrock anyway.
-    if python3 eval/bootstrap_sidecar.py --name-suffix "$suffix" > "$tmpfile" 2> >(while read -r ln; do log::info "$ln"; done); then
+    # WCB_SKIP_UPSTREAM_VERIFY=1 skips the Bedrock-model reachability probe:
+    # a 1P-only run never touches Bedrock, but the probe hardcodes the
+    # claude-opus route and a dead/rotated bearer token aborts the whole
+    # batch even though the vendor route is healthy (kensei-alpha 2026-09-14).
+    bootstrap_flags=""
+    [ "${WCB_SKIP_UPSTREAM_VERIFY:-0}" = "1" ] && bootstrap_flags="--skip-upstream-verify"
+    if python3 eval/bootstrap_sidecar.py --name-suffix "$suffix" $bootstrap_flags > "$tmpfile" 2> >(while read -r ln; do log::info "$ln"; done); then
         rc=0
     else
         rc=$?
@@ -650,9 +751,16 @@ is_docker_recoverable_error() {
 attempt_docker_recovery() {
     log::warn "Docker-recoverable error detected — attempting recovery"
 
-    if docker image inspect "sha256:${AGENT_IMAGE_SHA}" >/dev/null 2>&1 && ! docker image inspect "$AGENT_IMAGE" >/dev/null 2>&1; then
-        log::warn "Tag table appears corrupted — re-tagging from SHA"
-        docker tag "sha256:${AGENT_IMAGE_SHA}" "$AGENT_IMAGE" || return 1
+    # AGENT_IMAGE is locally built, so a lost tag cannot be recovered by SHA the
+    # way the base can — restore the base (by SHA if its tag is what went
+    # missing) and re-derive the whisper layer on top. The build is a no-op
+    # replay of cached layers when only the tag was lost.
+    if ! docker image inspect "$AGENT_IMAGE" >/dev/null 2>&1; then
+        log::warn "Agent image tag missing — restoring base and rebuilding whisper layer"
+        ensure_base_image || return 1
+        if [[ "$AGENT_IMAGE" != "$BASE_IMAGE" ]]; then
+            docker build --platform linux/amd64 -f "$AGENT_WHISPER_DOCKERFILE" -t "$AGENT_IMAGE" . || return 1
+        fi
     fi
 
     cleanup_orphans

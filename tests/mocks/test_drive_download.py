@@ -51,7 +51,8 @@ def _get(client, api: str, file_id: str = "", path: str = ""):
 # Per-API fixtures — (md_id_or_path, pdf_id_or_path, unsupported_id_or_path)
 _FIXTURES = {
     "box-api": dict(md="500007", pdf="500001", unsupported="500002",  # zip
-                    missing_id="999999", missing_fixture="500005"),    # api-spec.yaml row exists but no fixture file
+                    missing_id="999999", missing_fixture="500005",     # api-spec.yaml
+                    missing_fixture_blob="api-spec.yaml"),
     "google-drive-api": dict(md="file-readme", pdf="file-arch",
                               unsupported="folder-eng",  # vnd.google-apps.folder
                               missing_id="nonexistent",
@@ -102,13 +103,21 @@ def test_missing_id_returns_404(api_dir, client):
 
 
 def test_missing_fixture_returns_404(api_dir, client):
-    """For box-api: row 500005 (api-spec.yaml) exists in CSV but no fixture
-    file is staged at file_blobs/api-spec.yaml — must 404 with
-    `code='fixture_missing'`, not 500."""
-    if _FIXTURES[api_dir.name]["missing_fixture"] is None:
+    """A row whose blob is absent from file_blobs/ must 404 with
+    `code='fixture_missing'`, not 500. Every seeded row now ships a blob, so
+    the blob is moved aside for the duration of the call."""
+    blob_name = _FIXTURES[api_dir.name].get("missing_fixture_blob")
+    if _FIXTURES[api_dir.name]["missing_fixture"] is None or blob_name is None:
         pytest.skip("API has no row-without-fixture testcase")
-    r = _call(client, api_dir.name, "missing_fixture")
+    blob = api_dir / "file_blobs" / blob_name
+    stashed = blob.with_suffix(blob.suffix + ".stashed")
+    blob.rename(stashed)
+    try:
+        r = _call(client, api_dir.name, "missing_fixture")
+    finally:
+        stashed.rename(blob)
     assert r.status_code == 404, r.text
+    assert r.json().get("code") == "fixture_missing", r.text
 
 
 def test_dropbox_folder_path_returns_415(api_dir, client):

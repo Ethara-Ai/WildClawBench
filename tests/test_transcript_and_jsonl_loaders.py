@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -203,6 +204,25 @@ def test_load_transcript_nonexistent_path_falls_through_to_empty(
     tmp_path: Path,
 ) -> None:
     assert tl.load_transcript(str(tmp_path / "missing.jsonl")) == []
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses directory permissions")
+def test_load_transcript_unreadable_candidate_returns_empty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Regression: the hard-coded fallback lives under /root, which is not
+    # traversable off-root, so probing it raised PermissionError out of
+    # load_transcript and the caller lost the transcript entirely.
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    chat = locked / "chat.jsonl"
+    chat.write_text('{"role": "user"}\n')
+    os.chmod(locked, 0o000)
+    try:
+        monkeypatch.setattr(tl, "OPENCLAW_FALLBACK_PATH", str(chat))
+        assert tl.load_transcript() == []
+    finally:
+        os.chmod(locked, 0o700)
 
 
 def test_load_transcript_dedupes_when_explicit_equals_fallback(
@@ -731,6 +751,49 @@ def test_turn_feedback_auto_hint_flags_propagate() -> None:
     out = bld._wrap_messages_with_turn_feedback(msgs, turns)
     assert out[1]["is_auto_hint"] is True
     assert out[1]["auto_hint_iteration"] == 2
+
+
+def test_turn_feedback_duplicate_resend_does_not_advance_turn() -> None:
+    # A harness stall-retry re-sends the SAME user text; advancing on it would
+    # anchor turn 2's feedback to the duplicate and shift every later turn.
+    turns = [{"prompt": "t1", "hints": "h1"}, {"prompt": "t2", "hints": "h2"}]
+    msgs = [
+        _msg("user", [{"type": "text", "text": "t1"}]),
+        _msg("user", [{"type": "text", "text": "t1"}]),
+        _msg("assistant", []),
+        _msg("user", [{"type": "text", "text": "t2"}]),
+        _msg("assistant", []),
+    ]
+    out = bld._wrap_messages_with_turn_feedback(msgs, turns)
+    assert out[2]["hints"] == "h1"
+    assert out[4]["hints"] == "h2"
+
+
+def test_turn_feedback_duplicate_resend_ignores_timestamp_prefix() -> None:
+    # The strip runs later in build_trajectory_from_jsonl, so the two copies
+    # still carry their own (differing) agent stamps here.
+    turns = [{"prompt": "t1", "hints": "h1"}, {"prompt": "t2", "hints": "h2"}]
+    msgs = [
+        _msg("user", [{"type": "text", "text": "[Mon 2026-06-15 14:50 UTC] t1"}]),
+        _msg("user", [{"type": "text", "text": "[Mon 2026-06-15 15:05 UTC] t1"}]),
+        _msg("assistant", []),
+        _msg("user", [{"type": "text", "text": "[Mon 2026-06-15 15:20 UTC] t2"}]),
+        _msg("assistant", []),
+    ]
+    out = bld._wrap_messages_with_turn_feedback(msgs, turns)
+    assert out[2]["hints"] == "h1"
+    assert out[4]["hints"] == "h2"
+
+
+def test_turn_feedback_distinct_consecutive_user_turns_still_advance() -> None:
+    turns = [{"prompt": "t1", "hints": "h1"}, {"prompt": "t2", "hints": "h2"}]
+    msgs = [
+        _msg("user", [{"type": "text", "text": "t1"}]),
+        _msg("user", [{"type": "text", "text": "t2"}]),
+        _msg("assistant", []),
+    ]
+    out = bld._wrap_messages_with_turn_feedback(msgs, turns)
+    assert out[2]["hints"] == "h2"
 
 
 # --- _unwrap_trajectory_messages ------------------------------------------

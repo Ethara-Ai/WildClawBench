@@ -467,32 +467,37 @@ class TestReconstructInputFromBundle:
         (benv / "foo-api" / "new.json").write_text('{"b":9}', encoding="utf-8")     # NEW
 
         out = tmp_path / "outmock"
-        recovered, warnings = reconstruct_mod.extract_overlays(benv, baseline, out)
-        assert warnings == []
+        got = reconstruct_mod.extract_overlays(benv, baseline, out, {"foo-api"})
+        assert got.warnings == []
         assert (out / "foo-api" / "seed.json").is_file()   # overlay (differs)
         assert (out / "foo-api" / "new.json").is_file()    # overlay (new)
         assert not (out / "foo-api" / "same.csv").is_file()  # identical -> skipped
-        reasons = " ".join(recovered["foo-api"])
+        reasons = " ".join(str(o) for o in got.overlays["foo-api"])
         assert "differs-from-default" in reasons
         assert "new-not-in-default" in reasons
 
-    def test_extract_overlays_warns_when_api_not_in_baseline(self, reconstruct_mod, tmp_path):
+    def test_extract_overlays_refuses_when_api_not_in_baseline(self, reconstruct_mod, tmp_path):
         baseline = tmp_path / "baseline"
         baseline.mkdir()  # empty baseline
         benv = tmp_path / "bundle" / "data" / "environment"
         (benv / "bar-api").mkdir(parents=True)
         (benv / "bar-api" / "seed.json").write_text('{"x":1}', encoding="utf-8")
         out = tmp_path / "outmock"
-        recovered, warnings = reconstruct_mod.extract_overlays(benv, baseline, out)
+        got = reconstruct_mod.extract_overlays(benv, baseline, out, {"bar-api"})
+        assert got.unverified_apis == ["bar-api"]
+        assert got.errors and not got.warnings
+
+        allowed = reconstruct_mod.extract_overlays(benv, baseline, out, {"bar-api"},
+                                                   allow_unverified=True)
         assert (out / "bar-api" / "seed.json").is_file()
-        assert any("UNVERIFIED" in w for w in warnings)
+        assert any("UNVERIFIED" in w for w in allowed.warnings)
 
     def test_extract_overlays_missing_env_dir(self, reconstruct_mod, tmp_path):
-        recovered, warnings = reconstruct_mod.extract_overlays(
-            tmp_path / "nope", tmp_path / "baseline", tmp_path / "out"
+        got = reconstruct_mod.extract_overlays(
+            tmp_path / "nope", tmp_path / "baseline", tmp_path / "out", {"bar-api"}
         )
-        assert recovered == {}
-        assert any("skipped mock_data" in w for w in warnings)
+        assert got.overlays == {}
+        assert any("no overlay to isolate" in w for w in got.warnings)
 
     def test_load_toml_missing_and_present(self, reconstruct_mod, tmp_path):
         assert reconstruct_mod._load_toml(tmp_path / "none.toml") == {}
@@ -500,17 +505,18 @@ class TestReconstructInputFromBundle:
         t.write_text('[environment]\nrequired_apis = ["foo-api"]\n', encoding="utf-8")
         assert reconstruct_mod._load_toml(t) == {"environment": {"required_apis": ["foo-api"]}}
 
-    def test_copy_flat_dir_flattens_and_skips_junk(self, reconstruct_mod, tmp_path):
+    def test_copy_tree_descends_and_skips_junk(self, reconstruct_mod, tmp_path):
+        from script.lib.recon.sources import copy_tree
+
         src = tmp_path / "src"
         src.mkdir()
         (src / "a.md").write_text("a", encoding="utf-8")
         (src / ".DS_Store").write_text("junk", encoding="utf-8")
-        (src / "sub").mkdir()  # subdir not descended
+        (src / "sub").mkdir()
         (src / "sub" / "b.md").write_text("b", encoding="utf-8")
         dst = tmp_path / "dst"
-        names = reconstruct_mod._copy_flat_dir(src, dst)
-        assert names == ["a.md"]
-        assert (dst / "a.md").is_file()
+        assert copy_tree(src, dst) == ["a.md", "sub/b.md"]
+        assert (dst / "sub" / "b.md").is_file()
         assert not (dst / ".DS_Store").exists()
 
     def test_reconstruct_full_tree(self, reconstruct_mod, tmp_path):
@@ -532,10 +538,16 @@ class TestReconstructInputFromBundle:
         assert summary["rubric"] is True
         assert summary["persona_files"] == 1
         assert summary["data_files"] == 1
-        assert (out / "prompt.txt").read_text(encoding="utf-8") == "do it"
+        # Never prompt.txt: task_parser reads that as ONE prompt, collapsing a
+        # multi-turn task to a single turn.
+        assert not (out / "prompt.txt").exists()
+        assert (out / "prompts.txt").read_text(encoding="utf-8").endswith(
+            "--- TURN T0 ---\ndo it\n")
+        assert summary["turns"] == 1
         assert (out / "persona" / "MEMORY.md").is_file()
         assert (out / "data" / "input.txt").is_file()
-        assert (out / "test_outputs.py").is_file()
+        # The generated-test channel is retired; writing it back revives it.
+        assert not (out / "test_outputs.py").exists()
         assert (out / "RECONSTRUCTION_NOTES.md").is_file()
 
     def test_reconstruct_prompt_fallback_to_instruction_md(self, reconstruct_mod, tmp_path):
@@ -545,7 +557,8 @@ class TestReconstructInputFromBundle:
         (b / "rubric.json").write_text("[]", encoding="utf-8")
         out = tmp_path / "out2"
         reconstruct_mod.reconstruct(b, out, tmp_path / "baseline", verbose=False)
-        assert (out / "prompt.txt").read_text(encoding="utf-8") == "fallback prompt"
+        assert (out / "prompts.txt").read_text(encoding="utf-8").endswith(
+            "--- TURN T0 ---\nfallback prompt\n")
 
     def test_reconstruct_prompt_fallback_prefers_solution_over_legacy(self, reconstruct_mod, tmp_path):
         b = tmp_path / "b3"
@@ -555,7 +568,9 @@ class TestReconstructInputFromBundle:
         (b / "rubric.json").write_text("[]", encoding="utf-8")
         out = tmp_path / "out3"
         reconstruct_mod.reconstruct(b, out, tmp_path / "baseline", verbose=False)
-        assert (out / "prompt.txt").read_text(encoding="utf-8") == "new layout"
+        assert (out / "prompts.txt").read_text(encoding="utf-8").endswith(
+            "--- TURN T0 ---\nnew layout\n")
+        assert not (out / "prompt.txt").exists()
 
     def test_reconstruct_prompt_fallback_to_legacy_data_root(self, reconstruct_mod, tmp_path):
         b = tmp_path / "b4"
@@ -564,7 +579,8 @@ class TestReconstructInputFromBundle:
         (b / "rubric.json").write_text("[]", encoding="utf-8")
         out = tmp_path / "out4"
         reconstruct_mod.reconstruct(b, out, tmp_path / "baseline", verbose=False)
-        assert (out / "prompt.txt").read_text(encoding="utf-8") == "legacy prompt"
+        assert (out / "prompts.txt").read_text(encoding="utf-8").endswith(
+            "--- TURN T0 ---\nlegacy prompt\n")
 
 
 # =========================================================================== #
@@ -743,18 +759,24 @@ class TestExtractHomeToData:
 # We pin that, then load them with the migrate module pre-seeded to reach the
 # handful of pure helpers they define.
 class TestVerifyScriptsImportContract:
-    def test_verify_applied_import_fails_without_migrate_preloaded(self):
+    def test_verify_applied_import_fails_without_migrate_preloaded(self, monkeypatch):
         # NOTE: pins current behavior — the script inserts REPO_ROOT/"scripts"
         # (wrong; dir is "script"), so a cold import can't resolve
         # migrate_to_drift_plane. See SCORING_AUDIT_REPORT.md.
         sys.modules.pop("migrate_to_drift_plane", None)
+        # Other suites put script/ on sys.path; drop it so this stays a cold import.
+        monkeypatch.setattr(sys, "path", [p for p in sys.path
+                                          if Path(p).resolve() != (_REPO_ROOT / "script").resolve()])
         with pytest.raises(ModuleNotFoundError):
             _load_script("_t_verify_applied_cold", "verify_applied.py")
 
-    def test_verify_migration_dryrun_import_fails_without_migrate_preloaded(self):
+    def test_verify_migration_dryrun_import_fails_without_migrate_preloaded(self, monkeypatch):
         # NOTE: pins current behavior — same wrong sys.path insert as verify_applied.
         # See SCORING_AUDIT_REPORT.md.
         sys.modules.pop("migrate_to_drift_plane", None)
+        # Other suites put script/ on sys.path; drop it so this stays a cold import.
+        monkeypatch.setattr(sys, "path", [p for p in sys.path
+                                          if Path(p).resolve() != (_REPO_ROOT / "script").resolve()])
         with pytest.raises(ModuleNotFoundError):
             _load_script("_t_verify_migration_dryrun_cold", "verify_migration_dryrun.py")
 

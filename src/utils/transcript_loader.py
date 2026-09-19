@@ -27,10 +27,11 @@ def _parse_json_lines(raw: str) -> list[Any]:
 
 
 def _read_transcript_file(path: Path) -> list[Any]:
-    if not path.exists():
-        return []
-
+    # exists() stats the path, so an unreadable parent raises PermissionError
+    # here: the probe must stay inside the guard, not above it.
     try:
+        if not path.exists():
+            return []
         raw = path.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return []

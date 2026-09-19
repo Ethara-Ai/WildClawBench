@@ -166,6 +166,30 @@ def infer_required_apis(prompt: str, environment_dir=None) -> list[str]:
     return sorted(matched)
 
 
+@lru_cache(maxsize=8)
+def _disk_services(env_str: str) -> tuple[str, ...]:
+    env = Path(env_str)
+    if not env.is_dir():
+        return ()
+    return tuple(sorted(
+        d.name for d in env.iterdir()
+        if d.is_dir() and (d / "service.toml").is_file()
+    ))
+
+
+def catalog_apis(environment_dir=None) -> list[str]:
+    """The standardized fleet: every service that actually exists on disk.
+
+    A service is any `<env>/<name>/service.toml`-bearing dir — the same rule the
+    mock image's baked port manifest uses, so this set is exactly what the stack
+    can serve. Unlike `available_apis` there is NO curated fallback and no
+    keyword filtering: an absent/empty environment dir yields `[]`, which callers
+    must read as "no catalog to validate against", never as "everything is
+    missing".
+    """
+    return list(_disk_services(str(_env_dir(environment_dir))))
+
+
 def compute_distractor_skills(required_apis: list[str], task_id: str,
                               count: int | None = None,
                               environment_dir=None) -> list[str]:

@@ -18,6 +18,7 @@ from _mutable_store import (
 
 _store = get_store("google-calendar-api")
 _API = "google-calendar-api"
+_DEFAULT_TIME_ZONE = "America/Los_Angeles"
 
 _store.register("calendars", primary_key="id",
                 initial_loader=lambda: _coerce_calendars(_load("calendars.json", "calendars")))
@@ -94,6 +95,8 @@ def _coerce_events(rows):
             **_strip_ctx(r),
             "all_day": strict_bool(r, "all_day"),
             "recurrence": [recurrence] if recurrence else [],
+            "start_time_zone": opt_str(r, "start_time_zone") or None,
+            "end_time_zone": opt_str(r, "end_time_zone") or None,
         })
     return out
 
@@ -121,12 +124,19 @@ def _new_event_id():
     return f"evt-{uuid.uuid4().hex[:10]}"
 
 
+def _time_block(value, all_day, time_zone):
+    if all_day:
+        block = {"date": value[:10]}
+        if time_zone:
+            block["timeZone"] = time_zone
+        return block
+    return {"dateTime": value, "timeZone": time_zone or _DEFAULT_TIME_ZONE}
+
+
 def _serialize_event(e):
     out = dict(e)
-    out["start"] = {"dateTime": e["start"], "timeZone": "America/Los_Angeles"} if not e["all_day"] \
-        else {"date": e["start"][:10]}
-    out["end"] = {"dateTime": e["end"], "timeZone": "America/Los_Angeles"} if not e["all_day"] \
-        else {"date": e["end"][:10]}
+    out["start"] = _time_block(e["start"], e["all_day"], out.pop("start_time_zone", None))
+    out["end"] = _time_block(e["end"], e["all_day"], out.pop("end_time_zone", None))
     out["attendees"] = _attendees_doc().get(e["id"], [])
     return out
 
@@ -213,6 +223,8 @@ def create_event(calendar_id, payload):
         "location": payload.get("location", ""),
         "start": start.get("dateTime") or start.get("date") or _now(),
         "end": end.get("dateTime") or end.get("date") or _now(),
+        "start_time_zone": start.get("timeZone"),
+        "end_time_zone": end.get("timeZone"),
         "all_day": all_day,
         "status": "confirmed",
         "creator": payload.get("creator", "amelia@orbit-labs.com"),
@@ -237,16 +249,19 @@ def update_event(calendar_id, event_id, payload):
     for e in _events_rows():
         if e["calendar_id"] == resolved and e["id"] == event_id:
             updates = {}
-            for field in ("summary", "description", "location", "status", "visibility"):
+            for field in ("summary", "description", "location", "status",
+                          "visibility", "recurrence"):
                 if field in payload:
                     updates[field] = payload[field]
             if "start" in payload:
                 s = payload["start"]
                 updates["start"] = s.get("dateTime") or s.get("date") or e["start"]
+                updates["start_time_zone"] = s.get("timeZone")
                 updates["all_day"] = "date" in s
             if "end" in payload:
                 en = payload["end"]
                 updates["end"] = en.get("dateTime") or en.get("date") or e["end"]
+                updates["end_time_zone"] = en.get("timeZone")
             if "attendees" in payload:
                 _attendees_set(event_id, [{
                     "email": a.get("email"),

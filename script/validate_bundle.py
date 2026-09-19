@@ -204,6 +204,40 @@ def check_task_toml(toml_path: Path) -> tuple[list[str], list[str]]:
             )
     return errors, warnings
 
+def check_mock_modules(bundle_dir: Path,
+                       source_env_dir: Path | None) -> tuple[list[str], list[str]]:
+    """Bundle-level check: the mock modules shipped are the current ones.
+
+    megan's delivery carried a stale `notion-api/notion_data.py` (the write-
+    discard bug, already fixed upstream and shipped correctly by four sibling
+    bundles) and nothing caught it until the same file was md5'd across seven
+    deliveries by hand. `src/utils/harbor/mock_manifest` records a digest per
+    module at generation time; this recomputes both sides.
+
+    Self-contained on purpose: this file is also extended remotely, so the whole
+    check lives in one function with one call site.
+    """
+    from src.utils.harbor.mock_manifest import MANIFEST_NAME, verify_manifest
+    errors, warnings = verify_manifest(bundle_dir, source_env_dir)
+    # HarnessV2: bundles built by script/repackage_to_bundle.py (the deliver.sh
+    # path) do not write the manifest, so its absence is reported, not failed.
+    # A manifest that IS present and disagrees stays an error.
+    missing = [e for e in errors if e.startswith(f"{MANIFEST_NAME} missing")]
+    return ([e for e in errors if e not in missing], missing + warnings)
+
+
+def _bundle_dirs(root: Path):
+    """Bundle roots under `root`: a dir holding `trajectories/` (or the root
+    itself when it IS one). The mock manifest is per-bundle, not per-run."""
+    if (root / "trajectories").is_dir() or (root / "rubric.json").is_file():
+        yield root
+        return
+    for candidate in sorted(root.iterdir()) if root.is_dir() else ():
+        if candidate.is_dir() and (
+                (candidate / "trajectories").is_dir()
+                or (candidate / "rubric.json").is_file()):
+            yield candidate
+
 
 def _run_dirs(root: Path):
     for out in sorted(root.rglob("output.json")):
@@ -225,7 +259,14 @@ def main(argv: list[str] | None = None) -> int:
                     help="Exit 1 if any errors were found")
     ap.add_argument("--quiet", action="store_true",
                     help="Only print runs with findings")
+    ap.add_argument("--mock-source", metavar="ENV_DIR", default=None,
+                    help="Harness environment/ dir to check shipped mock modules "
+                         "against (omit to only verify the bundle's own manifest)")
+    ap.add_argument("--no-mock-check", action="store_true",
+                    help="Skip the mock-module integrity manifest check")
     args = ap.parse_args(argv)
+
+    mock_source = Path(args.mock_source) if args.mock_source else None
 
     total = bad = warned = 0
     total_toml = bad_toml = 0
@@ -235,6 +276,18 @@ def main(argv: list[str] | None = None) -> int:
         if not rp.exists():
             print(f"!! skip (missing): {root}", file=sys.stderr)
             continue
+        if not args.no_mock_check:
+            for bundle_dir in _bundle_dirs(rp):
+                mock_errors, mock_warnings = check_mock_modules(bundle_dir, mock_source)
+                if mock_errors:
+                    any_errors = True
+                if mock_errors or mock_warnings or not args.quiet:
+                    status = "FAIL" if mock_errors else ("WARN" if mock_warnings else "ok")
+                    print(f"[{status:4s}] {bundle_dir} (mock modules)")
+                for e in mock_errors:
+                    print(f"    ERROR {e}")
+                for w in mock_warnings:
+                    print(f"    warn  {w}")
         for run_dir in _run_dirs(rp):
             total += 1
             errors, warnings = check_run(run_dir)

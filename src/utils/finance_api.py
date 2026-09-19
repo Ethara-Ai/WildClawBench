@@ -264,10 +264,12 @@ def _judge_cost_usd(
 ) -> float:
     """Recorded judge cost, or a Bedrock-rate estimate when it came back zero.
 
-    A council member graded over the Claude Max subscription is prepaid, so
-    ``grading.py::_judge_cost_usd`` deliberately records $0 for it. A Bedrock
-    member always carries a real non-zero cost, so a truthy ``recorded`` short
-    circuits here and that path is never repriced.
+    Every metered member — and, since the OAuth route started deriving its own
+    figures, every subscription member too — arrives with a real non-zero cost,
+    so a truthy ``recorded`` short circuits and the figure reaches finance
+    exactly as ``usage.json`` records it. Repricing an OAuth member here would
+    only recompute the identical number; the zero branch survives for artifacts
+    written before that change and for a member that genuinely spent nothing.
     """
     if recorded:
         return recorded
@@ -318,11 +320,12 @@ def _trajectory_cost_usd(
 ) -> float:
     """Recorded cost, or a Bedrock-rate estimate when the run used OAuth.
 
-    A Claude Max subscription is prepaid, so LiteLLM records ~$0 marginal cost
-    and the finance record would understate the trajectory by orders of
-    magnitude. On that route only, token counts are repriced at Bedrock list
-    rates. ``oauth_route`` is False for every Bedrock run, so this function
-    returns the recorded cost untouched there.
+    What LiteLLM books for a prepaid subscription is not a trajectory's worth,
+    so on the OAuth route the figure is derived from token counts at Bedrock
+    list rates. ``save_usage`` derives it from the same card, the same tokens
+    and the same model, so this recomputes an identical number rather than
+    compounding one — the two records agree by construction. ``oauth_route`` is
+    False for every Bedrock run, which returns the recorded cost untouched.
     """
     recorded = _as_number(agent.get("cost_usd"))
     if not oauth_route:

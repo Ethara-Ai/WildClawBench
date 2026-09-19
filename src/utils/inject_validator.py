@@ -7,7 +7,14 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from src.utils.inject_director import InjectApplier, InjectScript, InjectStage
+from src.utils.inject_director import (
+    INJECT_MTIME_KEY,
+    InjectApplier,
+    InjectScript,
+    InjectStage,
+    parse_narrative_instant,
+)
+from src.utils.skills_inference import catalog_apis
 
 LOG = logging.getLogger("wildclaw.inject")
 
@@ -31,6 +38,32 @@ class InjectAuthoringError(Exception):
 
 def _op_service(op: Dict[str, Any]) -> Optional[str]:
     return op.get("service") or op.get("api")
+
+
+def _validate_op_catalog(
+    stage: InjectStage, op: Dict[str, Any], service: str, catalog: Set[str],
+) -> List[Dict[str, Any]]:
+    """Fatal defect for an op addressed to a service the fleet does not ship.
+
+    Resolving against ``host_api_to_url`` is not the same check: the mock image
+    bakes a port manifest that outlives any given fleet composition, so a
+    service pruned from ``environment/`` can still publish a port and hand the
+    injector a URL. Every admin call against it then 404s mid-run, which reads
+    as a runtime flake rather than the authoring error it is.
+
+    The catalog is read off disk at validation time rather than pinned to a
+    list, so a service being restored to the fleet fixes its ops with no change
+    here. An empty catalog means there is nothing to validate against (stripped
+    checkout) and accuses nobody.
+    """
+    if not catalog or service in catalog:
+        return []
+    return [{
+        "stage": stage.name, "id": op.get("id"), "status": "service-not-in-catalog",
+        "reason": f"service {service!r} is not in the environment catalog — no "
+                  f"environment/{service}/service.toml exists, so the fleet cannot "
+                  "serve it and every admin call the op makes would miss",
+    }]
 
 
 def _resolve_slug(service: Optional[str], urls: Dict[str, Any]) -> Optional[str]:
@@ -218,11 +251,82 @@ def _resolve_fs_src(stage: InjectStage, src: str) -> Tuple[Optional[Path], List[
     return None, warnings
 
 
+_FS_CANONICAL_DST_PREFIXES = ("/workspace/", "/app/")
+
+
+def _staged_data_home(stage: InjectStage) -> Optional[Path]:
+    """``<task>/data/home`` when the stage's task stages one, else None.
+
+    ``data/``'s CONTENTS land in ``{workspace}/home``, so a ``data/home`` dir
+    means the agent sees inputs at ``/workspace/home/home/<rel>``. Ops authored
+    against the single-``home`` path miss that tree entirely.
+    """
+    if not stage.source:
+        return None
+    task_root = Path(stage.source).parent.parent.parent
+    data_home = task_root / "data" / "home"
+    return data_home if data_home.is_dir() else None
+
+
+def _validate_fs_dst(
+    stage: InjectStage, op: Dict[str, Any],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Check a filesystem op's ``dst`` against the workspace path contract."""
+    fatal: List[Dict[str, Any]] = []
+    warnings: List[Dict[str, Any]] = []
+    oid = op.get("id")
+    dst = str(op.get("dst") or "").strip()
+    if not dst:
+        return fatal, warnings
+    if not dst.startswith(_FS_CANONICAL_DST_PREFIXES):
+        fatal.append({
+            "stage": stage.name, "id": oid, "status": "fs-dst-not-workspace",
+            "reason": f"dst {dst!r} does not start with /workspace/ or /app/ — the "
+                      "runtime mapper either refuses it (absolute paths outside the "
+                      "workspace) or silently rewrites it; author the dst as "
+                      "/workspace/<rel>",
+        })
+        return fatal, warnings
+    if _staged_data_home(stage) is not None and not dst.startswith(
+            ("/workspace/home/home/", "/app/home/home/")):
+        warnings.append({
+            "stage": stage.name, "id": oid, "status": "fs-dst-tree-mismatch",
+            "reason": f"task stages data/home/, so its inputs live at "
+                      f"/workspace/home/home/<rel>; dst {dst!r} targets a different "
+                      "tree and will not join the staged input files",
+        })
+    return fatal, warnings
+
+
+def _validate_op_mtime(
+    stage: InjectStage, op: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """Fatal defects for an unusable per-op ``mtime`` override.
+
+    Statically decidable, and silently ignoring it would be worse than a
+    missing key: the author asked for a specific narrative instant and would
+    instead get the stage default, which is usually the opposite of the intent
+    (an override exists to make a file look OLD).
+    """
+    if INJECT_MTIME_KEY not in op:
+        return []
+    raw = op.get(INJECT_MTIME_KEY)
+    if parse_narrative_instant(raw) is not None:
+        return []
+    return [{
+        "stage": stage.name, "id": op.get("id"), "status": "fs-invalid-mtime",
+        "reason": f"{INJECT_MTIME_KEY} {raw!r} is neither an offset-aware "
+                  "ISO-8601 instant (e.g. '2026-12-20T03:10:00-05:00') nor an "
+                  "epoch in milliseconds — a naive local time is refused "
+                  "because its UTC offset would have to be guessed",
+    }]
+
+
 def _validate_filesystem_op(
     stage: InjectStage, op: Dict[str, Any], mock_data_root: Optional[Path],
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Statically validate one ``mutations.filesystem`` op. Returns (fatal, warnings)."""
-    fatal: List[Dict[str, Any]] = []
+    fatal: List[Dict[str, Any]] = _validate_op_mtime(stage, op)
     warnings: List[Dict[str, Any]] = []
     oid = op.get("id")
     action = op.get("action")
@@ -244,6 +348,9 @@ def _validate_filesystem_op(
         if op.get("src"):
             warnings.append({"stage": stage.name, "id": oid, "status": "fs-mkdir-with-src",
                              "reason": "mkdir op also sets src (ignored by the copy hook)"})
+        dst_fatal, dst_warn = _validate_fs_dst(stage, op)
+        fatal.extend(dst_fatal)
+        warnings.extend(dst_warn)
         return fatal, warnings
 
     src = op.get("src")
@@ -256,6 +363,9 @@ def _validate_filesystem_op(
     if not dst:
         fatal.append({"stage": stage.name, "id": oid, "status": "fs-missing-dst",
                       "reason": "filesystem copy op has no dst"})
+    dst_fatal, dst_warn = _validate_fs_dst(stage, op)
+    fatal.extend(dst_fatal)
+    warnings.extend(dst_warn)
     if src and dst and stage.source:
         resolved, fg = _resolve_fs_src(stage, src)
         warnings.extend({**w, "stage": stage.name, "id": oid} for w in fg)
@@ -271,6 +381,7 @@ def validate_inject_script(
     script: InjectScript,
     host_api_to_url: Dict[str, Any],
     mock_data_root: Optional[Path],
+    environment_dir: Optional[Path] = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Statically validate every op against a cumulative seed+inject snapshot.
 
@@ -278,8 +389,12 @@ def validate_inject_script(
     The snapshot starts from on-disk seed row ids and grows as earlier stages'
     upsert/doc_set targets are folded in (prior stages only, never same-stage),
     mirroring the runtime firing order (silent before loud within a stage).
+
+    ``environment_dir`` names the fleet the ops are judged against; it defaults
+    to the repo's own so every existing caller is unaffected.
     """
     urls = host_api_to_url or {}
+    catalog = set(catalog_apis(environment_dir))
     fatal: List[Dict[str, Any]] = []
     warnings: List[Dict[str, Any]] = []
 
@@ -334,6 +449,11 @@ def validate_inject_script(
                     "stage": stage.name, "id": oid, "status": "unresolved",
                     "reason": f"no admin URL for {raw_service!r} (use the canonical '<name>-api' slug)",
                 })
+                continue
+
+            off_catalog = _validate_op_catalog(stage, op, resolved, catalog)
+            if off_catalog:
+                fatal.extend(off_catalog)
                 continue
 
             kind = _op_kind(op)

@@ -80,6 +80,7 @@ from src.utils.litellm_sidecar import (  # noqa: E402
     build_litellm_config_yaml,
     create_network,
     ensure_litellm_headroom_image,
+    overflow_guard_enabled,
     pull_litellm_image,
     start_bridge,
     start_litellm,
@@ -157,6 +158,7 @@ def main() -> int:
         os.environ.get("WCB_STREAM", "").strip().lower()
         in ("1", "true", "yes", "on")
     )
+    _overflow_guard = overflow_guard_enabled(config.meta_api_key, config.meta_model)
 
     use_oauth = config.use_claude_oauth and bool(config.cc_account_pool)
     bridge_secret = config.cc_bridge_secret
@@ -209,6 +211,7 @@ def main() -> int:
         # Register the sidecar callback only on the non-OAuth (Bedrock) path.
         enable_stream_callback=_stream_enabled and not use_oauth,
         enable_sanitize_callback=bool(config.meta_model),
+        enable_overflow_guard_callback=_overflow_guard,
     )
     if not litellm_yaml:
         _log(
@@ -362,6 +365,12 @@ def main() -> int:
             _log(f"warning: chmod failed on headroom log dir ({exc})")
         headroom_log_dir_str = str(headroom_log_dir)
 
+    overflow_guard_callback_src = ""
+    if _overflow_guard:
+        overflow_guard_callback_src = str(
+            Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_overflow_guard_callback.py"
+        )
+
     # (Live-stream feed dir was resolved ABOVE the cc-bridge start.)
 
     _log(f"starting sidecar {sidecar} on network {network}…")
@@ -397,6 +406,7 @@ def main() -> int:
             stream_log_host_dir=stream_log_dir_str,
             sanitize_callback_host_path=sanitize_cb_src,
             sanitize_model=config.meta_model,
+            overflow_guard_callback_host_path=overflow_guard_callback_src,
         )
     except Exception as exc:
         _log(f"start_litellm failed: {exc}")

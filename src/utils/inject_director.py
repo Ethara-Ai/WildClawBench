@@ -56,18 +56,36 @@ openclaw runner's ``before_turn`` hook.
 from __future__ import annotations
 
 import csv
+import inspect
 import json
 import logging
 import os
 import re
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import requests
 
+from src.utils.serving_shape import (
+    ORPHAN_REASON,
+    UNVERIFIABLE,
+    UNVERIFIABLE_REASON,
+    describe_orphans,
+    envelope_vocabulary,
+    partition_expected,
+    row_bag as _serving_row_bag,
+    serving_vocabulary,
+    verify_against_serving,
+)
+
 LOG = logging.getLogger("wildclaw.inject")
+
+# Mirrors docker_utils.TMP_WORKSPACE without importing it: this module is
+# imported by static validation paths that must not pull in the docker stack.
+_TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 
 
 class InjectConfigError(Exception):
@@ -88,6 +106,70 @@ def _turn_to_index(token: Any) -> Optional[int]:
     return int(m.group(1)) if m else None
 
 
+def parse_narrative_instant(value: Any) -> Optional[int]:
+    """Epoch MILLISECONDS for an authored narrative instant, else None.
+
+    Accepts the two shapes tasks actually carry:
+
+    * an offset-aware ISO-8601 string (``"2026-12-20T03:10:00-05:00"``) — the
+      shape both ``mutations.json``'s ``applied_at_local_time`` and
+      ``prompts.json``'s ``turns[].timestamp`` already use;
+    * an integer/float epoch in milliseconds, for authors who would rather
+      write the number the harness ends up using.
+
+    A *naive* ISO string is refused rather than guessed at. The whole point of
+    the stamp is one specific narrative wall-clock moment, and silently reading
+    a US-Eastern instant as UTC would move the file five hours — enough to sort
+    a "this morning" drop before yesterday's baseline.
+    """
+    if isinstance(value, bool):  # bool is an int subclass; never a timestamp
+        return None
+    if isinstance(value, (int, float)):
+        return int(value)
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        dt = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        return None
+    return int(dt.timestamp() * 1000)
+
+
+@dataclass(frozen=True)
+class NarrativeClock:
+    """The fallback narrative instants available while applying one stage.
+
+    ``turn_epoch_ms`` is the sim-clock instant of the boundary turn — the same
+    instant the agent's faketime shim is re-anchored to before that turn runs
+    (see ``sim_clock.compute_sim_clock_for_turn``). ``t0_epoch_ms`` is the
+    task's T0 anchor, the instant ``docker_utils.inject_data_into_workspace``
+    stamps the whole staged baseline tree with.
+    """
+
+    turn_epoch_ms: Optional[int] = None
+    t0_epoch_ms: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class MtimeStamp:
+    """The narrative mtime a filesystem drop must carry, and where it came from.
+
+    ``source`` is one of ``"op"`` (an explicit per-op override), ``"stage"``
+    (the stage's ``applied_at_local_time``), ``"turn"`` (the boundary turn's
+    sim clock), ``"t0"`` (the baseline anchor, a degraded fallback) or
+    ``"unresolved"`` (there was nothing to stamp — a stage with no filesystem
+    ops at all). ``resolve_stage_mtime`` never returns ``"unresolved"``: a
+    stage that DOES carry filesystem ops but resolves no instant on any rung
+    raises ``InjectConfigError`` instead, so a copy is never attempted with an
+    invented real-time mtime.
+    """
+
+    epoch_ms: Optional[int]
+    source: str
+
+
 @dataclass
 class InjectStage:
     index: int
@@ -100,10 +182,93 @@ class InjectStage:
     loud: List[Dict[str, Any]] = field(default_factory=list)
     silent: List[Dict[str, Any]] = field(default_factory=list)
     source: str = ""
+    # Epoch ms parsed from the stage's ``applied_at_local_time`` — the narrative
+    # moment the mutation is supposed to have happened, which is what its
+    # filesystem drops are stamped with. None when the stage omits it (or writes
+    # it unparseably), which drops resolution to the boundary turn's sim clock.
+    applied_at_epoch_ms: Optional[int] = None
 
     @property
     def is_seed(self) -> bool:
         return self.from_turn is None
+
+
+def resolve_stage_mtime(stage: InjectStage,
+                        clock: Optional[NarrativeClock]) -> MtimeStamp:
+    """Narrative instant for ``stage``'s filesystem drops: stage > turn > T0.
+
+    The stage's own ``applied_at_local_time`` is preferred because it names the
+    moment the *injection* happens, which sits strictly between two turns; the
+    boundary turn's sim clock names the moment the agent next wakes up, which
+    is close but later. Either beats the last resort, T0, which merely ties the
+    drop with the baseline tree — so that branch is warned about rather than
+    taken quietly.
+
+    Never returning silently is the point: before this, an unresolved instant
+    became ``None``, the copy hook skipped ``touch -d`` entirely, and the drop
+    kept whatever host mtime the authored payload happened to carry — usually
+    older than the baseline, and therefore invisible to the recency searches
+    (``ls -t``, ``find -newer``, "the newest file in ~/Documents") that the
+    scenario expects the agent to run.
+
+    A stage that exhausts all four rungs raises ``InjectConfigError`` rather
+    than degrading to a real-time ``touch``: per the task-standard window
+    requirement (docs/TASK_STANDARD.md §1), every compliant task declares a
+    window, so T0 always resolves and this branch is unreachable for one. It
+    can only fire on a malformed task, and a malformed task silently running
+    with wall-clock mtimes is exactly the defect this whole ladder exists to
+    prevent — the injected file would land, sort by whatever moment the run
+    happened to execute at, and pass every recency search for the wrong
+    reason.
+    """
+    clock = clock or NarrativeClock()
+    if stage.applied_at_epoch_ms is not None:
+        return MtimeStamp(stage.applied_at_epoch_ms, "stage")
+    if clock.turn_epoch_ms is not None:
+        return MtimeStamp(int(clock.turn_epoch_ms), "turn")
+    if clock.t0_epoch_ms is not None:
+        LOG.warning(
+            "inject stage '%s': no applied_at_local_time and no sim clock for "
+            "its boundary turn — stamping filesystem drops at the T0 baseline "
+            "epoch %d, which makes them tie with the staged baseline instead "
+            "of sorting after it", stage.name, int(clock.t0_epoch_ms))
+        return MtimeStamp(int(clock.t0_epoch_ms), "t0")
+    raise InjectConfigError(
+        f"inject stage '{stage.name}': no narrative instant available at all "
+        "(no applied_at_local_time, no turn sim clock, no T0 baseline) — "
+        "refusing to stamp its filesystem drops with a real-time mtime. Fix "
+        "the stage's applied_at_local_time or the task's declared window "
+        "(docs/TASK_STANDARD.md §1)")
+
+
+def _recency_invisible_ops(outcomes: Iterable[Dict[str, Any]],
+                           baseline_max_epoch_ms: Optional[int]
+                           ) -> List[Dict[str, Any]]:
+    """The placed drops whose stamp does NOT sort after the staged baseline.
+
+    ``docker_utils.inject_data_into_workspace`` stamps the *entire* staged
+    baseline tree at the task's T0 instant, so T0 is that tree's max mtime by
+    construction and no container round-trip is needed to know it. A drop
+    stamped at or before T0 is the recency-invisibility signature: the agent's
+    own "what changed / what is newest" sweeps cannot distinguish it from the
+    files that were already there, which is exactly the failure this stamping
+    exists to prevent.
+
+    Ops carrying an explicit per-op ``mtime`` override are exempt — a buried,
+    deliberately forgotten document is *supposed* to look old.
+    """
+    if baseline_max_epoch_ms is None:
+        return []
+    flagged: List[Dict[str, Any]] = []
+    for rec in outcomes or []:
+        if rec.get("action") != "copy" or not rec.get("ok"):
+            continue
+        if rec.get("mtime_source") == "op":
+            continue
+        stamped = rec.get("mtime_epoch_ms")
+        if stamped is not None and int(stamped) <= int(baseline_max_epoch_ms):
+            flagged.append(rec)
+    return flagged
 
 
 def _coerce_mutation_buckets(raw_muts: Any) -> Tuple[list, list, list]:
@@ -179,6 +344,13 @@ class InjectScript:
             if not (fs or loud or silent):
                 LOG.warning("inject: %s mutations had no recognized ops "
                             "(shape=%s)", sd.name, type(raw.get("mutations")).__name__)
+            applied_at = raw.get("applied_at_local_time")
+            applied_at_ms = parse_narrative_instant(applied_at)
+            if applied_at and applied_at_ms is None:
+                LOG.warning("inject: %s applied_at_local_time %r is not an "
+                            "offset-aware ISO instant; filesystem drops fall "
+                            "back to the boundary turn's clock",
+                            sd.name, applied_at)
             stages.append(InjectStage(
                 index=idx,
                 name=str(raw.get("stage_name") or sd.name),
@@ -188,6 +360,7 @@ class InjectScript:
                 loud=loud,
                 silent=silent,
                 source=str(mf),
+                applied_at_epoch_ms=applied_at_ms,
             ))
         return cls(description=f"inject:{d.name}", stages=stages)
 
@@ -318,8 +491,6 @@ def parse_prompts_json(path: Path | str) -> Tuple[List[str], Dict[str, Any]]:
     if not isinstance(turns, list) or not turns:
         raise ValueError(f"{p}: 'turns' must be a non-empty list")
 
-    from datetime import datetime
-
     messages: List[str] = []
     turn_meta: List[Dict[str, Any]] = []
     prev_ts = None
@@ -396,11 +567,37 @@ _SERVICE_RESOLUTION = {
     "confluence-api": (("pages",), ("title", "Name", "name", "id")),
 }
 
+# Per-op narrative-mtime override on a ``mutations.filesystem`` op. Value is an
+# offset-aware ISO instant or an epoch in ms (see parse_narrative_instant), and
+# it WINS over the stage's resolved instant — the escape hatch for a payload
+# that must deliberately look old (a buried, long-forgotten document that the
+# scenario does not want surfacing at the top of a recency sweep).
+INJECT_MTIME_KEY = "mtime"
+
 # Op-envelope control keys that must never be treated as row field values when
-# the whole-body branch of _extract_fields falls through.
+# the whole-body branch of _extract_fields falls through. INJECT_MTIME_KEY is
+# listed alongside its siblings so an API op that carries one is not mutated
+# with a bogus `mtime` column; on a FILESYSTEM op it is read by
+# _op_mtime_override before this set is ever consulted, so it is parsed, not
+# stripped.
 _INJECT_ENVELOPE_KEYS = frozenset(
-    {"fires_at_turn", "raw_eml_path", "service", "api", "method", "path", "id", "admin"}
+    {"fires_at_turn", "raw_eml_path", "service", "api", "method", "path", "id",
+     "admin", INJECT_MTIME_KEY}
 )
+
+
+def _op_mtime_override(op: Dict[str, Any]) -> Optional[MtimeStamp]:
+    """The op's own ``mtime``, or None to inherit the stage's instant."""
+    if INJECT_MTIME_KEY not in op:
+        return None
+    epoch_ms = parse_narrative_instant(op.get(INJECT_MTIME_KEY))
+    if epoch_ms is None:
+        LOG.warning(
+            "inject fs op %s: %r override %r is neither an offset-aware ISO "
+            "instant nor an epoch in ms — inheriting the stage instant",
+            op.get("id"), INJECT_MTIME_KEY, op.get(INJECT_MTIME_KEY))
+        return None
+    return MtimeStamp(epoch_ms, "op")
 
 
 class InjectApplier:
@@ -433,6 +630,7 @@ class InjectApplier:
         self._timeline_path.parent.mkdir(parents=True, exist_ok=True)
         self._inject_root = Path(inject_root) if inject_root else None
         self._copy = copy_into_workspace
+        self._copy_mtime_ok: Optional[bool] = None
         self._replay_loud = replay_loud
         self._task_id = task_id
         self._session = requests.Session()
@@ -442,7 +640,8 @@ class InjectApplier:
 
     # -- public API ---------------------------------------------------------
 
-    def seed(self, script: InjectScript) -> List[Dict[str, Any]]:
+    def seed(self, script: InjectScript,
+             clock: Optional[NarrativeClock] = None) -> List[Dict[str, Any]]:
         outcomes: List[Dict[str, Any]] = []
         stage = script.seed_stage()
         if stage is None:
@@ -450,8 +649,13 @@ class InjectApplier:
         self._append({"type": "inject.seed.start", "ts": time.time(),
                       "stage": stage.name,
                       "fs": len(stage.filesystem), "loud": len(stage.loud)})
+        # Seed drops resolve through the same ladder as a mid-run stage, so both
+        # paths stamp identically; callers pass T0 as the turn instant because
+        # the seed stage IS the pre-T0 baseline.
+        stamp = (resolve_stage_mtime(stage, clock) if stage.filesystem
+                 else MtimeStamp(None, "unresolved"))
         for op in stage.filesystem:
-            outcomes.append(self._apply_filesystem(op, stage))
+            outcomes.append(self._apply_filesystem(op, stage, stamp))
         if self._replay_loud:
             for op in stage.loud:
                 outcomes.append(
@@ -460,7 +664,9 @@ class InjectApplier:
                       "stage": stage.name})
         return outcomes
 
-    def apply_stage(self, stage: InjectStage, turn_index: int) -> List[Dict[str, Any]]:
+    def apply_stage(self, stage: InjectStage, turn_index: int,
+                    clock: Optional[NarrativeClock] = None
+                    ) -> List[Dict[str, Any]]:
         outcomes: List[Dict[str, Any]] = []
         for op in stage.silent:
             outcomes.append(self._apply_api_mutation(op, stage, turn_index, silent=True))
@@ -476,9 +682,15 @@ class InjectApplier:
         # admin block resolves no existing target and is logged ``unresolved``.
         for op in stage.loud:
             outcomes.append(self._apply_api_mutation(op, stage, turn_index, silent=False))
-        # list-form stages may also carry filesystem drops mid-run
+        # list-form stages may also carry filesystem drops mid-run. Resolve the
+        # instant only when there is something to stamp, so an API-only stage
+        # does not warn about a clock it never needed.
+        stamp = (resolve_stage_mtime(stage, clock) if stage.filesystem
+                 else MtimeStamp(None, "unresolved"))
         for op in stage.filesystem:
-            outcomes.append(self._apply_filesystem(op, stage))
+            outcomes.append(self._apply_filesystem(op, stage, stamp))
+        invisible = _recency_invisible_ops(
+            outcomes, (clock or NarrativeClock()).t0_epoch_ms)
         # Honest accounting: count SUCCESSES, not attempts. The old log line
         # said "applied: N op(s)" for N attempted ops even when every one
         # resolved `unresolved` — that silence let broken task specs survive
@@ -494,8 +706,18 @@ class InjectApplier:
             "loud_ops": len(stage.loud),
             "applied_ops": n_ok,
             "failed_ops": len(failed),
+            "mtime_epoch_ms": stamp.epoch_ms,
+            "mtime_source": stamp.source,
+            "recency_invisible_ops": [r.get("id") for r in invisible],
             "outcomes": outcomes,
         })
+        if invisible:
+            LOG.warning(
+                "inject stage '%s': %d injected file(s) stamped at or before "
+                "the T0 baseline epoch %s — invisible to the agent's recency "
+                "searches (%s)", stage.name, len(invisible),
+                (clock or NarrativeClock()).t0_epoch_ms,
+                ", ".join(str(r.get("dst")) for r in invisible))
         if failed:
             first = failed[0]
             LOG.warning(
@@ -638,7 +860,79 @@ class InjectApplier:
     # silent no-op that let mid-run edits vanish (is_defect -> True both phases).
     _FS_ALLOWED_ACTIONS = ("copy", "mkdir")
 
-    def _apply_filesystem(self, op: Dict[str, Any], stage: InjectStage) -> Dict[str, Any]:
+    def _invoke_copy(self, host_src: Any, dst: Any, mkdir: bool = False,
+                     mtime_epoch_ms: Optional[int] = None) -> Any:
+        """Call the copy hook, passing ``mtime_epoch_ms`` only if it accepts it.
+
+        The published hook contract is ``fn(host_src, dst, mkdir=False)``;
+        stamping support is additive, and callers (including test stubs) still
+        written to the 3-arg shape must keep working rather than raise TypeError.
+        """
+        kwargs: Dict[str, Any] = {"mkdir": mkdir}
+        if mtime_epoch_ms is not None and self._copy_accepts_mtime():
+            kwargs["mtime_epoch_ms"] = mtime_epoch_ms
+        return self._copy(host_src, dst, **kwargs)
+
+    def _copy_accepts_mtime(self) -> bool:
+        if self._copy_mtime_ok is None:
+            try:
+                params = inspect.signature(self._copy).parameters
+            except (TypeError, ValueError):  # pragma: no cover - builtins/C hooks
+                self._copy_mtime_ok = False
+            else:
+                self._copy_mtime_ok = (
+                    "mtime_epoch_ms" in params
+                    or any(p.kind is inspect.Parameter.VAR_KEYWORD
+                           for p in params.values())
+                )
+        return self._copy_mtime_ok
+
+    def _note_mapped_dst(self, rec: Dict[str, Any], mapped: Optional[str]) -> None:
+        """Record where the payload actually landed, plus a staged-tree warning.
+
+        Ops authored against ``/workspace/home/<rel>`` silently miss a task whose
+        ``data/`` itself contains ``home/`` (staged at ``.../home/home/<rel>``),
+        so flag a mapped dst that falls outside the staged input tree.
+        """
+        if not mapped:
+            return
+        rec["mapped_dst"] = mapped
+        home_root = f"{_TMP_WORKSPACE}/home"
+        if self._staged_input_root() and not mapped.startswith(home_root + "/"):
+            rec["warning"] = "dst outside staged input tree"
+
+    @staticmethod
+    def _copy_result(res: Any) -> Tuple[Any, Optional[str], str]:
+        """Normalize a copy-hook return into ``(ok, mapped_dst, reason)``.
+
+        The production hook returns a ``CopyOutcome``; test stubs and legacy
+        callers return the bare tri-state ``True``/``False``/``None``. Both must
+        keep working, so unwrap defensively rather than by isinstance on a
+        docker-only import.
+        """
+        if res is None or isinstance(res, bool):
+            return res, None, ""
+        return (getattr(res, "ok", res),
+                getattr(res, "mapped_dst", None),
+                str(getattr(res, "reason", "") or ""))
+
+    def _staged_input_root(self) -> Optional[str]:
+        """``<TMP_WORKSPACE>/home/home`` when the task stages a ``data/home``
+        tree, else None.
+
+        ``data/``'s CONTENTS are copied into ``{TMP_WORKSPACE}/home``, so a task
+        whose ``data/`` itself contains ``home/`` presents its inputs one level
+        deeper than the single-``home`` dst most ops are authored against.
+        """
+        if self._inject_root is None:
+            return None
+        if not (self._inject_root.parent / "data" / "home").is_dir():
+            return None
+        return f"{_TMP_WORKSPACE}/home/home"
+
+    def _apply_filesystem(self, op: Dict[str, Any], stage: InjectStage,
+                          stamp: Optional[MtimeStamp] = None) -> Dict[str, Any]:
+        stamp = _op_mtime_override(op) or stamp or MtimeStamp(None, "unresolved")
         action = op.get("action")
         dst = op.get("dst")
         rec = {"id": op.get("id"), "action": action, "dst": dst}
@@ -658,13 +952,19 @@ class InjectApplier:
             self._append({"type": "inject.fs", **rec, "ts": time.time()})
             return rec
         if action == "mkdir":
-            ok = self._copy(None, dst, mkdir=True)
+            ok, mapped, reason = self._copy_result(
+                self._copy(None, dst, mkdir=True))
+            self._note_mapped_dst(rec, mapped)
             if ok is None:
                 # Hook reports "container not up" distinctly from "failed"; do
                 # not label an unattempted op as if it had been performed.
                 rec.update(ok=False, status="skipped_container_down")
+            elif not ok and reason == "dst_outside_workspace":
+                rec.update(ok=False, status="invalid_dst", reason=reason)
             else:
                 rec.update(ok=bool(ok), status="mkdir")
+                if not ok and reason:
+                    rec["reason"] = reason
             self._append({"type": "inject.fs", **rec, "ts": time.time()})
             return rec
         src = op.get("src")
@@ -695,12 +995,21 @@ class InjectApplier:
             self._append({"type": "inject.fs", **rec, "ts": time.time()})
             return rec
         rec["src"] = str(host_src)
+        if stamp.epoch_ms is not None:
+            rec["mtime_epoch_ms"] = stamp.epoch_ms
+            rec["mtime_source"] = stamp.source
         try:
-            ok = self._copy(host_src, dst)
+            ok, mapped, reason = self._copy_result(
+                self._invoke_copy(host_src, dst, mtime_epoch_ms=stamp.epoch_ms))
+            self._note_mapped_dst(rec, mapped)
             if ok is None:
                 rec.update(ok=False, status="skipped_container_down")
+            elif not ok and reason == "dst_outside_workspace":
+                rec.update(ok=False, status="invalid_dst", reason=reason)
             else:
                 rec.update(ok=bool(ok), status="copied")
+                if not ok and reason:
+                    rec["reason"] = reason
         except Exception as exc:  # pragma: no cover - defensive
             rec.update(ok=False, status="error", reason=str(exc))
         self._append({"type": "inject.fs", **rec, "ts": time.time()})
@@ -879,38 +1188,131 @@ class InjectApplier:
     def _row_bag(row: Dict[str, Any]) -> Dict[str, Any]:
         return row["fields"] if isinstance(row.get("fields"), dict) else row
 
+    @staticmethod
+    def _touched(row: Optional[Dict[str, Any]],
+                 expected: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Live values for the keys a patch touches, read in the namespace each
+        one was written to.
+
+        A patch that names ``fields`` alongside envelope stamps writes into two
+        namespaces (see ``_patch_row``); reading all of them off the column bag
+        reports the stamps as null both before and after the write, which makes
+        an op that landed perfectly look like it changed nothing.
+        """
+        if not isinstance(row, dict):
+            return None
+        bag = _serving_row_bag(row)
+        columns, envelope = partition_expected(
+            expected, isinstance(row.get("fields"), dict))
+        if not envelope:
+            return {k: bag.get(k) for k in expected}
+        touched = {k: row.get(k) for k in envelope}
+        touched["fields"] = {c: bag.get(c) for c in columns}
+        return touched
+
+    def _serving_vocabulary(self, api: str, table: str, pk: Any,
+                            known_keys: Optional[Iterable[str]]) -> set:
+        """Column names a service getter for ``table`` could legitimately name.
+
+        Built from the target row's PRE-write keys (``known_keys``, which every
+        caller that reads the row before patching already has) unioned with the
+        table's SIBLING rows — the patched row is excluded so a key the write
+        itself introduced cannot vouch for itself. Sibling rows are only fetched
+        when ``known_keys`` is absent (a fresh upsert), keeping the common path
+        at zero extra admin calls.
+        """
+        if known_keys:
+            return set(str(k) for k in known_keys)
+        pk_field = self._table_pk(api, table)
+        return serving_vocabulary(self._admin_get_rows(api, table),
+                                  exclude_pk=pk, pk_field=pk_field)
+
+    def _envelope_vocabulary(self, api: str, table: str, pk: Any) -> set:
+        """Envelope stamps a service getter for ``table`` could legitimately
+        name, taken from the patched row's SIBLINGS.
+
+        Callers hand ``known_keys`` for the column namespace only, and the
+        patched row already carries whatever stamp the write invented by
+        read-back time, so this one is worth the extra admin call — it is only
+        made for the rare op that patches columns and stamps together.
+        """
+        return envelope_vocabulary(self._admin_get_rows(api, table),
+                                   exclude_pk=pk, pk_field=self._table_pk(api, table))
+
     def _read_back_row(self, api: str, table: str, pk: Any,
-                       expected: Dict[str, Any]
-                       ) -> Tuple[Optional[Dict[str, Any]], bool]:
+                       expected: Dict[str, Any],
+                       known_keys: Optional[Iterable[str]] = None,
+                       ) -> Tuple[Optional[Dict[str, Any]], bool, List[str]]:
         """Post-write verification: re-read the row through the ADMIN plane and
-        report (live values for the touched fields, all-values-match?).
+        report (live values for the touched fields, all-values-match?, orphans).
 
         Admin reads never enter the agent-visible /audit feed
         (tracking_middleware short-circuits /admin/*), so this is side-effect
         free. NEVER use the public port here — public GETs are audit-logged
         and would corrupt the request counts the deterministic checkers grade.
 
+        Verification runs against the SERVING shape, not the raw bag. Comparing
+        only the keys we just wrote is circular: the store shallow-merges any
+        key it is handed, so a write under a key no getter names self-verifies
+        (the pilot-2 xero patch shipped dead exactly that way — ``set:
+        {"Status": ...}`` against a live ``status`` column). Every
+        ``<svc>_data.py`` getter reads its row by literal key, so a written key
+        outside the table's live column vocabulary cannot reach the agent and
+        fails verification here. See src/utils/serving_shape.
+
         Honest limitation: this re-reads the SAME target the write went to, so
         a fuzzy-resolver write to the wrong table still "verifies" — that
         class is caught statically by preflight's bare-REST-form warning.
+        Nested dict/list values stay reported-but-not-asserted.
         """
         row = self._admin_get(api, f"/admin/data/{table}/{pk}")
         if not isinstance(row, dict):
-            return None, False
-        bag = self._row_bag(row)
-        # Only scalar expectations are comparable; nested dict/list values
-        # (rich notion property objects, etc.) are reported but not asserted.
-        comparable = {k: v for k, v in expected.items()
-                      if not isinstance(v, (dict, list))}
-        after = {k: bag.get(k) for k in expected}
-        verified = all(self._loose_eq(bag.get(k), v) for k, v in comparable.items())
-        return after, verified
+            return None, False, []
+        bag = _serving_row_bag(row)
+        nested = isinstance(row.get("fields"), dict)
+        # A nested patch addresses two namespaces at once (see _patch_row), so
+        # each half is judged against its own vocabulary: the wrapper key and
+        # the envelope stamps beside it are not columns and read as orphans in
+        # the bag's namespace.
+        columns, envelope = partition_expected(expected, nested)
+        vocab = self._serving_vocabulary(api, table, pk, known_keys)
+        _, verified, orphans = verify_against_serving(columns, bag, vocab)
+        if envelope:
+            _, env_ok, env_orphans = verify_against_serving(
+                envelope, row, self._envelope_vocabulary(api, table, pk))
+            verified = verified and env_ok
+            orphans = sorted(orphans + env_orphans)
+        after = self._touched(row, expected)
+        if orphans:
+            LOG.warning("inject read-back: %s/%s/%s — %s",
+                        api, table, pk, describe_orphans(orphans, vocab))
+        return after, verified, orphans
 
     @staticmethod
-    def _mark_unverified(rec: Dict[str, Any]) -> None:
-        """A 2xx write whose values are absent on read-back did NOT land."""
-        rec.update(ok=False, status="failed", verified=False,
-                   reason="write not observed on read-back")
+    def _mark_unverified(rec: Dict[str, Any], orphans: Optional[List[str]] = None) -> None:
+        """Grade a 2xx write the read-back could not confirm.
+
+        Three outcomes, because two of them are provable and one is not:
+
+        * orphan keys — the write landed where no getter reads. Provable from
+          the live column vocabulary, and a hard failure.
+        * the row did not move — the values never stuck. Also provable, also a
+          hard failure.
+        * the row moved but does not read back byte-equal — the service retyped
+          or reserialized what it was handed. Nothing here is evidence either
+          way, so it is stamped ``unverifiable`` rather than counted against the
+          op; letting this class fail hard is what drowned the orphan findings
+          in noise (see serving_shape.UNVERIFIABLE_REASON).
+        """
+        if orphans:
+            rec.update(ok=False, status="failed", verified=False,
+                       orphan_fields=sorted(orphans),
+                       reason=f"{ORPHAN_REASON}: {', '.join(sorted(orphans))}")
+        elif rec.get("changed"):
+            rec.update(verified=UNVERIFIABLE, reason=UNVERIFIABLE_REASON)
+        else:
+            rec.update(ok=False, status="failed", verified=False,
+                       reason="write not observed on read-back")
 
     def _replay_admin_rest(self, api: str, op: Dict[str, Any],
                            silent: bool) -> Dict[str, Any]:
@@ -943,16 +1345,18 @@ class InjectApplier:
             ui_values = row
             if res.get("ok") and pk is not None:
                 expect = row["fields"] if isinstance(row.get("fields"), dict) else row
-                after, verified = self._read_back_row(api, table, str(pk), expect)
+                after, verified, orphans = self._read_back_row(
+                    api, table, str(pk), expect)
                 rec.update(after=after, verified=verified, changed=True)
                 if not verified:
-                    self._mark_unverified(rec)
+                    self._mark_unverified(rec, orphans)
         elif m_patch:
             table, pk = m_patch.group(1), m_patch.group(2)
             fields = body.get("fields") if isinstance(body.get("fields"), dict) else dict(body)
             row_before = self._admin_get(api, f"/admin/data/{table}/{pk}")
-            before = ({k: self._row_bag(row_before).get(k) for k in fields}
-                      if isinstance(row_before, dict) else None)
+            known = (set(_serving_row_bag(row_before))
+                     if isinstance(row_before, dict) else None)
+            before = self._touched(row_before, fields)
             res = self._admin_patch(api, table, pk, fields)
             rec.update(table=table, pk=pk, before=before, http=res.get("status"),
                        ok=bool(res.get("ok")),
@@ -961,10 +1365,11 @@ class InjectApplier:
                        else str(res.get("error") or res.get("body"))[:200])
             ui_values = fields
             if res.get("ok"):
-                after, verified = self._read_back_row(api, table, pk, fields)
+                after, verified, orphans = self._read_back_row(
+                    api, table, pk, fields, known_keys=known)
                 rec.update(after=after, verified=verified, changed=before != after)
                 if not verified:
-                    self._mark_unverified(rec)
+                    self._mark_unverified(rec, orphans)
         elif method == "POST":
             res = self._admin_post(api, path, body)
             ok = bool(res.get("ok"))
@@ -1017,12 +1422,22 @@ class InjectApplier:
         top-level keys, so an airtable-style nested ``fields`` object must be
         resent whole (existing + overrides). ``fallback_pk`` covers stores whose
         rows key on a domain column (order_id, store_id, ...) and expose no
-        ``id``/``pk`` — the explicit-admin caller already knows the true pk."""
+        ``id``/``pk`` — the explicit-admin caller already knows the true pk.
+
+        An op that names ``fields`` ITSELF is addressing the column bag, not a
+        column called "fields": contentful's entry ops send the whole rewritten
+        ``fields`` object plus the ``updated_at``/``published_version`` stamps
+        that move with it. Merging such a ``set`` wholesale into the bag buried
+        the columns one level down at ``fields.fields`` and demoted the stamps
+        into the bag beside them — a 200 that changed nothing the getter reads.
+        Its own keys merge into the bag; everything else it names is an envelope
+        stamp and stays top-level."""
         pk = self._row_pk(api, table, row) or fallback_pk
         if pk is None:
             return {"ok": False, "error": "no pk"}
         if isinstance(row.get("fields"), dict):
-            payload = {"fields": {**row["fields"], **set_}}
+            columns, envelope = partition_expected(set_, nested=True)
+            payload = {**envelope, "fields": {**row["fields"], **columns}}
         else:
             payload = dict(set_)
         return self._admin_patch(api, table, str(pk), payload)
@@ -1048,19 +1463,22 @@ class InjectApplier:
                                reason="row not found")
                 else:
                     bag = self._row_bag(row)
-                    before = {k: bag.get(k) for k in set_}
+                    before = self._touched(row, set_)
                     res = self._patch_row(api, table, row, set_, fallback_pk=pk)
                     rec.update(table=table, pk=pk, ok=bool(res.get("ok")),
                                http=res.get("status"), before=before,
                                status="applied" if res.get("ok") else "failed")
                     if res.get("ok"):
                         # Read back LIVE values — not an optimistic echo of the
-                        # request — so a 200 that didn't stick is a failure.
-                        after, verified = self._read_back_row(api, table, pk, set_)
+                        # request — so a 200 that didn't stick is a failure, and
+                        # judge them against the pre-write column vocabulary so a
+                        # wrong-cased `set` key cannot self-verify.
+                        after, verified, orphans = self._read_back_row(
+                            api, table, pk, set_, known_keys=set(bag))
                         rec.update(after=after, verified=verified,
                                    changed=before != after)
                         if not verified:
-                            self._mark_unverified(rec)
+                            self._mark_unverified(rec, orphans)
                     else:
                         rec.update(after=before, changed=False)
             elif kind in ("update_where", "bulk"):
@@ -1071,6 +1489,7 @@ class InjectApplier:
                 matched = ok = 0
                 before = after = None
                 first_pk = None
+                first_keys: Optional[set] = None
                 for row in rows:
                     if not isinstance(row, dict):
                         continue
@@ -1078,8 +1497,9 @@ class InjectApplier:
                     if not all(self._loose_eq(bag.get(k), v) for k, v in where.items()):
                         continue
                     if before is None:
-                        before = {k: bag.get(k) for k in set_}
+                        before = self._touched(row, set_)
                         first_pk = self._row_pk(api, table, row)
+                        first_keys = set(bag)
                     res = self._patch_row(api, table, row, set_)
                     matched += 1
                     ok += 1 if res.get("ok") else 0
@@ -1088,11 +1508,12 @@ class InjectApplier:
                            status="applied" if ok else "no-match")
                 if ok and first_pk is not None:
                     # Verify on the first matched row (representative sample).
-                    after, verified = self._read_back_row(api, table, first_pk, set_)
+                    after, verified, orphans = self._read_back_row(
+                        api, table, first_pk, set_, known_keys=first_keys)
                     rec.update(after=after, verified=verified,
                                changed=before != after)
                     if not verified:
-                        self._mark_unverified(rec)
+                        self._mark_unverified(rec, orphans)
                 else:
                     rec.update(after=dict(set_) if ok else before,
                                changed=ok > 0 and before != (dict(set_) if ok else before))
@@ -1113,11 +1534,16 @@ class InjectApplier:
                            status="applied" if res.get("ok") else "failed")
                 if res.get("ok") and pk is not None:
                     # Verify the new row is actually readable with its values.
+                    # A brand-new row has no pre-write keys, so the vocabulary
+                    # comes from its siblings in the same table.
                     row_expect = row["fields"] if isinstance(row.get("fields"), dict) else row
-                    after, verified = self._read_back_row(api, table, pk, row_expect)
+                    after, verified, orphans = self._read_back_row(
+                        api, table, pk, row_expect,
+                        known_keys=set(_serving_row_bag(existed))
+                        if isinstance(existed, dict) else None)
                     rec.update(after=after, verified=verified)
                     if not verified:
-                        self._mark_unverified(rec)
+                        self._mark_unverified(rec, orphans)
             elif kind in ("doc_set", "doc_merge", "doc.merge"):
                 doc = spec.get("document") or spec.get("doc")
                 res = self._admin_doc_set(api, doc, spec.get("path") or [], spec.get("value"))
@@ -1230,8 +1656,9 @@ class InjectApplier:
         table, pk, fields, unmapped = resolved
         rec.update(table=table, pk=pk, fields=list(fields.keys()))
         row_before = self._admin_get(api, f"/admin/data/{table}/{pk}")
-        before = ({k: self._row_bag(row_before).get(k) for k in fields}
-                  if isinstance(row_before, dict) else None)
+        known = (set(_serving_row_bag(row_before))
+                 if isinstance(row_before, dict) else None)
+        before = self._touched(row_before, fields)
         result = self._admin_patch(api, table, pk, fields)
         # `result` carries {"ok", "status": <int http code>, ...}. Historically
         # rec.update(result) clobbered `status` with the int so the string
@@ -1244,11 +1671,12 @@ class InjectApplier:
         rec["status"] = "applied" if rec["ok"] else "failed"
         rec["before"] = before
         if rec["ok"]:
-            after, verified = self._read_back_row(api, table, pk, fields)
+            after, verified, orphans = self._read_back_row(
+                api, table, pk, fields, known_keys=known)
             rec.update(after=after, verified=verified,
                        changed=before != after)
             if not verified:
-                self._mark_unverified(rec)
+                self._mark_unverified(rec, orphans)
         if rec["ok"] and unmapped:
             rec.update(ok=False, status="partial", verified=False,
                        unmapped_fields=sorted(unmapped),

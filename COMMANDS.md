@@ -565,7 +565,30 @@ python3 script/extract_home_to_data.py input/alden-croft_MB --verbose
 
 ### 3.8 `reconstruct_input_from_bundle.py`
 
-**Purpose:** Reverses the bundle writer — reconstructs an `input/<task>/` folder from a harbor `output_bundle`. Recovers `prompt.txt` (fallback `data/solution/instruction.md`, then the legacy `data/instruction.md` of bundles packaged before the move), `rubric.json`, `persona/`, flat `data/` (from `data/environment/artifacts/inputs/files/`), `test_outputs.py`, `test_weights.json`, and `mock_data/<api>/` (by byte-diffing each `.json`/`.csv` seed against a pristine baseline `environment/<api>/<f>` — identical files are baked defaults, differences/new files are the task overlay). Writes a `RECONSTRUCTION_NOTES.md` per task documenting recovery. Cannot recover `gt/`, original nested directory structure, or the pre-overlay default a given overlay replaced.
+**Purpose:** Reverses the bundle writer — reconstructs a runnable `input/<task>/` folder from a harbor `output_bundle`, then checks its own work.
+
+Recovers, in order: `prompts.txt` (from whichever of `prompts.txt`/`prompt.txt`/`PROMPT.md`/`data/instruction.md` the bundle publishes, with the header normalised onto the five-key standard and the window's day count recomputed from its own dates); `prompts.json` (turn texts from the prompt file, turn INSTANTS from the published trajectory, or from the `(Day N, HH:MM)` labels marked `fidelity: degraded`, or not at all); `rubric.json`; `TRUTH.md` (root or `data/solution/`, under either name in `task_standard.TRUTH_FILENAMES`); `persona/`; `data/**` (recursively, relative paths preserved — the `home/` segment is load-bearing, `storedAs` is `home/<path under data/>`); `inject/`; `task.yaml` + `task.json` (from `data/task.toml`); and `mock_data/<api>/` scoped to the task's declared APIs.
+
+**Never writes `prompt.txt`** — `task_parser` reads that as one whole prompt, collapsing a 20-turn task to a single turn. **Never writes back `test_outputs.py`/`test_weights.json`** — the generated-test channel is retired.
+
+Outputs `RECONSTRUCTION_NOTES.md` (every normalisation, gap and gate outcome) and `RECONSTRUCTION_MANIFEST.json` (mock-module digests in `build_manifest`'s shape, so `validate_bundle.py --mock-source` reads it unchanged, plus a `reconstruction` provenance block).
+
+Cannot recover `gt/` (grader-only), the pre-overlay default an overlay replaced, or a truth doc a bundle never shipped.
+
+**Gates.** Ten checks run after recovery; `G4` (mock-module drift) and `G5` (overlay containment) block a release by owner decision, `G10` only advises.
+
+| Gate | Checks |
+| --- | --- |
+| `G1` | `load_task` reads as many turns as the header declares |
+| `G2` | every turn resolves a sim clock, matching the run's instants (WARN when degraded) |
+| `G3` | `preflight_task.py` exits 0 (`--legacy` waives the retired test channel) |
+| `G4` | no mock module differs from the baseline |
+| `G5` | the overlay stays inside `required_apis ∪ distractor_apis` |
+| `G6` | every turn byte-identical to the bundle's prompt file |
+| `G7` | `rubric.json` sha256 matches the bundle's (`--rubric` logs a substitution) |
+| `G8` | every staged attachment recovered at its published path |
+| `G9` | `InjectScript.load` succeeds both sides with identical stage boundaries |
+| `G10` | the 7-file persona set is complete (WARN only) |
 
 **CLI library:** argparse.
 
@@ -577,7 +600,22 @@ python3 script/extract_home_to_data.py input/alden-croft_MB --verbose
 | --- | --- | --- | --- |
 | `--out` | Path | `reconstructed_input` | Output root; each task lands in `<out>/<task>/`. |
 | `--baseline-env` | Path | `<repo>/environment` | Pristine harness `environment/` for overlay diffing. |
-| `-v`, `--verbose` | flag | `False` | Verbose logging. |
+| `--baseline-ref` | str | — | Read the baseline out of a git ref instead (`git archive`, touches no branch/index/worktree). Needed for bundles that predate a fleet change. |
+| `--unverified-overlays` | flag | `False` | Keep seeds from APIs with no baseline. Off by default: unverifiable seeds all look new. |
+| `--trajectory-run` | str | — | Run to take instants from (`run_3` or `<model>/run_3`). Default: first run covering every turn. |
+| `--timezone` | str | — | IANA zone for bundles whose prompt header omits one. |
+| `--gates` | choice | `strict` | `strict` \| `warn` \| `off`. |
+| `--legacy` | flag | `False` | Pass `--legacy` to preflight and waive the retired test channel. |
+| `--rubric` | Path | — | Substitute the rubric; `G7` reports it. |
+| `-v`, `--verbose` | flag | `False` | Per-file recovery log and the gate table. |
+
+**Example** — replaying a bundle built before the 101→50 mock-fleet prune:
+```bash
+python3 script/reconstruct_input_from_bundle.py \
+  pilot-rework/willie_prince_6dfaf967 \
+  --out /tmp/recon --baseline-ref '9b4092bf^' --legacy -v
+```
+Exits non-zero when a gate fails in strict mode.
 
 ---
 
@@ -1031,7 +1069,7 @@ See [§ 2.7 above](#27-env-var-contract-read-by-the-harness-at-runtime) for the 
 | Re-run only the tests | `python3 script/rerun_tests.py --run <run_dir>` |
 | Aggregate per-model / per-task scores | `python3 script/aggregate_runs.py --backend openclaw` |
 | Convert run output to publishable bundle | `python3 script/repackage_to_bundle.py --dest-root output_bundle --all` |
-| Reverse a bundle back to `input/` layout | `python3 script/reconstruct_input_from_bundle.py <bundle_path> --out reconstructed_input` |
+| Reverse a bundle back to a runnable `input/` tree | `python3 script/reconstruct_input_from_bundle.py <bundle_path> --out reconstructed_input --baseline-ref <ref> --legacy` |
 | Ship deliverables to the delivery repo | `./deliver.sh` (or `./deliver.sh --run …` for the full pipeline) |
 | Backfill connector docs (thin connectors only) | `python3 script/backfill_connector_docs.py --only <api1,api2>` |
 | Migrate a data module to the drift-plane store | `python3 script/migrate_to_drift_plane.py --only <api>` (dry-run), then `--apply` |

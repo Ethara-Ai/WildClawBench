@@ -1,5 +1,6 @@
 """Data access module for the Gmail API mock service."""
 
+import base64
 import csv
 import json
 import re
@@ -47,7 +48,8 @@ def _store_insert(_table, _row):
 _store.register("labels", primary_key="id",
                 initial_loader=lambda: _coerce_labels(_load("labels.json", "labels")))
 _store.register("messages", primary_key="id",
-                initial_loader=lambda: _coerce_messages(_load("messages.json", "messages")))
+                initial_loader=lambda: _coerce_messages(_load("messages.json", "messages")),
+                row_coercer=lambda r: _coerce_message_row(r))
 _store.register("drafts", primary_key="id",
                 initial_loader=lambda: _coerce_drafts(_load("drafts.json", "drafts")))
 _store.register_document("profile", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "profile.json", encoding="utf-8")))
@@ -99,15 +101,37 @@ def _coerce_labels(rows):
     return out
 
 
+def _label_list(v):
+    if isinstance(v, (list, tuple)):
+        return [str(l) for l in v if str(l)]
+    return [l for l in opt_csv_list({"labels": v}, "labels", sep=",") if l]
+
+
+def _coerce_message_row(r):
+    out = _strip_ctx(r)
+    if isinstance(out.get("body"), str):
+        out["body"] = out["body"].replace("\\n", "\n")
+    if "internal_date" in out:
+        out["internal_date"] = strict_int(out, "internal_date")
+    if "size_estimate" in out:
+        out["size_estimate"] = strict_int(out, "size_estimate")
+    if "labels" in out:
+        out["labels"] = _label_list(out["labels"])
+    for flag in ("is_unread", "is_starred"):
+        if flag in out:
+            out[flag] = strict_bool(out, flag)
+    return out
+
+
 def _coerce_messages(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
+            **_coerce_message_row(r),
             "body": r["body"].replace("\\n", "\n"),
             "internal_date": strict_int(r, "internal_date"),
             "size_estimate": strict_int(r, "size_estimate"),
-            "labels": [l for l in opt_csv_list(r, "labels", sep=",") if l],
+            "labels": _label_list(r.get("labels")),
             "is_unread": strict_bool(r, "is_unread"),
             "is_starred": strict_bool(r, "is_starred"),
         })
@@ -126,6 +150,11 @@ def _new_id(prefix="msg"):
     return f"{prefix}-{uuid.uuid4().hex[:10]}"
 
 
+def _b64url(text):
+    raw = text.encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("="), len(raw)
+
+
 def _serialize_message(m, full=True):
     out = {
         "id": m["id"],
@@ -136,6 +165,7 @@ def _serialize_message(m, full=True):
         "sizeEstimate": m["size_estimate"],
     }
     if full:
+        data, size = _b64url(m["body"])
         out["payload"] = {
             "headers": [
                 {"name": "From", "value": m["from_addr"]},
@@ -144,7 +174,7 @@ def _serialize_message(m, full=True):
                 {"name": "Subject", "value": m["subject"]},
                 {"name": "Date", "value": m["date"]},
             ],
-            "body": {"data": m["body"], "size": len(m["body"])},
+            "body": {"data": data, "size": size},
             "mimeType": "text/plain",
         }
     return out
@@ -234,7 +264,7 @@ def list_messages(query="", max_results=25, label_ids=None):
         ft = free_text.lower()
         results = [m for m in results
                    if ft in m["subject"].lower() or ft in m["body"].lower() or ft in m["snippet"].lower()]
-    results.sort(key=lambda m: m["internal_date"], reverse=True)
+    results.sort(key=lambda m: int(m["internal_date"]), reverse=True)
     page = results[:max_results]
     return {"messages": [{"id": m["id"], "threadId": m["thread_id"]} for m in page],
             "resultSizeEstimate": len(results)}
@@ -318,7 +348,7 @@ def get_thread(thread_id):
     msgs = [m for m in _messages_rows() if m["thread_id"] == thread_id]
     if not msgs:
         return {"error": f"Thread {thread_id} not found"}
-    msgs.sort(key=lambda m: m["internal_date"])
+    msgs.sort(key=lambda m: int(m["internal_date"]))
     return {
         "id": thread_id,
         "historyId": _profile_doc()["historyId"],

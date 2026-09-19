@@ -113,6 +113,9 @@ class Config:
     brave_api_key: str = "placeholder"
 
     # ---- Container image ----
+    # Default is the distributed v1.3 image (HarnessV2). v1.4 = v1.3 +
+    # openai-whisper, opt-in via DOCKER_IMAGE; built by preflight_agent_image()
+    # in script/run.sh. Keep in lockstep with AGENT_IMAGE_DEFAULT there.
     docker_image: str = "wildclawbench-ubuntu:v1.3"
 
     # ---- LiteLLM proxy (shared sidecar container) ----

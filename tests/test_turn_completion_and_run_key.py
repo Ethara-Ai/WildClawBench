@@ -403,11 +403,28 @@ class TestAgentBearerWiring:
         a._run_keys["t1"] = "wcb::t1::deadbeef"
         return a
 
-    def test_production_default_master_key_keeps_master_key(self, monkeypatch):
+    def test_production_default_sends_the_run_key(self, monkeypatch):
         monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.delenv("WCB_SIDECAR_MASTER_KEY", raising=False)
+        a = self._agent("sk-talos-litellm")
+        assert a._agent_bearer("t1") == "wcb::t1::deadbeef"
+        assert a._run_key_bearer_live() is True
+
+    def test_master_key_opt_in_keeps_master_key(self, monkeypatch):
+        monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
         a = self._agent("sk-talos-litellm")
         assert a._agent_bearer("t1") == "sk-talos-litellm"
         assert a._run_key_bearer_live() is False
+
+    def test_master_key_opt_in_with_no_key_falls_back_to_run_key(self, monkeypatch):
+        # Nothing to enforce means the proxy is open, so throwing the run key
+        # away would cost attribution and buy nothing.
+        monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
+        a = self._agent("")
+        assert a._agent_bearer("t1") == "wcb::t1::deadbeef"
+        assert a._run_key_bearer_live() is True
 
     def test_empty_master_key_sends_run_key(self, monkeypatch):
         monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
@@ -415,8 +432,17 @@ class TestAgentBearerWiring:
         assert a._agent_bearer("t1") == "wcb::t1::deadbeef"
         assert a._run_key_bearer_live() is True
 
-    def test_keyless_switch_overrides_master_key(self, monkeypatch):
+    def test_keyless_switch_stays_a_no_op_for_existing_env_files(self, monkeypatch):
+        # gama ships this line; it has to keep meaning "run key rides the
+        # bearer", which is now simply the default.
         monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
+        a = self._agent("sk-talos-litellm")
+        assert a._agent_bearer("t1") == "wcb::t1::deadbeef"
+        assert a._run_key_bearer_live() is True
+
+    def test_keyless_switch_wins_over_master_key_opt_in(self, monkeypatch):
+        monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
         a = self._agent("sk-talos-litellm")
         assert a._agent_bearer("t1") == "wcb::t1::deadbeef"
         assert a._run_key_bearer_live() is True
@@ -449,6 +475,7 @@ class TestAgentBearerWiring:
         assert captured["run_key"] == "wcb::t1::deadbeef"
 
         monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
         b = self._agent("sk-talos-litellm")
         b.litellm_usage_log = str(tmp_path / "u.jsonl")
         b._task_windows["t1"] = (1.0, 2.0)
@@ -622,6 +649,123 @@ class TestTurnsDuplicated:
                                         "rubric_weights_percentage": 80.0,
                                         "turns_duplicated": [2, 7]}, None)
         assert e["turns_duplicated"] == [2, 7]
+
+
+def _rb():
+    sys.path.insert(0, str(REPO / "eval"))
+    import run_batch as rb
+    return rb
+
+
+def _user_row(text):
+    return {"message": {"role": "user", "content": [{"type": "text", "text": text}]}}
+
+
+class TestSessionUserTurnAudit:
+    """turns_duplicated only records that a retry FIRED. The session itself is
+    the authority on whether a duplicate user turn actually landed — the judge
+    transcript and per-turn feedback both read the session, not the markers."""
+
+    def test_clean_run_is_ok(self):
+        rb = _rb()
+        entries = [_user_row("t1"), {"message": {"role": "assistant", "content": []}},
+                   _user_row("t2")]
+        audit = rb._session_user_turn_audit(
+            entries, {"turns_planned": 2, "turns_completed": 2})
+        assert audit == {"session_user_turns": 2, "turn_dedup_ok": True,
+                         "session_user_turns_expected": 2}
+
+    def test_duplicate_user_row_flagged(self, caplog):
+        rb = _rb()
+        entries = [_user_row("t1"), _user_row("t1"), _user_row("t2")]
+        with caplog.at_level("ERROR"):
+            audit = rb._session_user_turn_audit(
+                entries, {"turns_planned": 2, "turns_duplicated": [0]}, "task-x")
+        assert audit["session_user_turns"] == 3
+        assert audit["turn_dedup_ok"] is False
+        assert "TURN DUPLICATION" in caplog.text
+
+    def test_recovery_turn_raises_expected_count(self):
+        rb = _rb()
+        entries = [_user_row("t1"), _user_row("t2"), _user_row("synthesize")]
+        audit = rb._session_user_turn_audit(
+            entries, {"turns_planned": 2, "recovery_turn_fired": True})
+        assert audit["session_user_turns_expected"] == 3
+        assert audit["turn_dedup_ok"] is True
+
+    def test_tool_result_rows_are_not_user_turns(self):
+        # OpenClaw stores tool results as role='user' entries; counting the
+        # role alone would report a 2-turn run as dozens of turns.
+        rb = _rb()
+        entries = [
+            _user_row("t1"),
+            {"message": {"role": "user",
+                         "content": [{"type": "toolResult", "text": "ls out"}]}},
+            _user_row("t2"),
+        ]
+        audit = rb._session_user_turn_audit(entries, {"turns_planned": 2})
+        assert audit["session_user_turns"] == 2
+        assert audit["turn_dedup_ok"] is True
+
+    def test_short_run_is_not_a_dedup_failure(self, caplog):
+        # An under-count is a short run (run_incomplete already reports it),
+        # not a duplication defect.
+        rb = _rb()
+        with caplog.at_level("ERROR"):
+            audit = rb._session_user_turn_audit(
+                [_user_row("t1")],
+                {"turns_planned": 9, "run_incomplete": True})
+        assert audit["turn_dedup_ok"] is True
+        assert "TURN LOSS" not in caplog.text
+
+    def test_unexplained_turn_loss_logs_error(self, caplog):
+        rb = _rb()
+        with caplog.at_level("ERROR"):
+            rb._session_user_turn_audit(
+                [_user_row("t1")], {"turns_planned": 9, "run_incomplete": False})
+        assert "TURN LOSS" in caplog.text
+
+    def test_no_denominator_never_flags(self):
+        rb = _rb()
+        audit = rb._session_user_turn_audit(
+            [_user_row("t1"), _user_row("t1")], {"turns_planned": None})
+        assert audit == {"session_user_turns": 2, "turn_dedup_ok": True}
+
+    def test_malformed_entries_ignored(self):
+        rb = _rb()
+        audit = rb._session_user_turn_audit(
+            ["garbage", None, {"message": "not-a-dict"}, _user_row("t1")],
+            {"turns_planned": 1})
+        assert audit["session_user_turns"] == 1
+
+    def test_augment_stamps_audit_into_score(self):
+        rb = _rb()
+        scores = {"overall_score": 0.9}
+        rb._augment_score_with_combined_rewards(
+            scores, {"run_incomplete": False, "turns_planned": 9,
+                     "turns_completed": 9, "turns_duplicated": [6],
+                     "session_user_turns": 10, "turn_dedup_ok": False})
+        assert scores["session_user_turns"] == 10
+        assert scores["turn_dedup_ok"] is False
+
+    def test_augment_stamps_ok_audit(self):
+        rb = _rb()
+        scores = {"overall_score": 0.9}
+        rb._augment_score_with_combined_rewards(
+            scores, {"run_incomplete": False, "turns_planned": 9,
+                     "turns_completed": 9, "session_user_turns": 9,
+                     "turn_dedup_ok": True})
+        assert scores["session_user_turns"] == 9
+        assert scores["turn_dedup_ok"] is True
+
+    def test_augment_omits_audit_when_absent(self):
+        rb = _rb()
+        scores = {"overall_score": 0.9}
+        rb._augment_score_with_combined_rewards(
+            scores, {"run_incomplete": False, "turns_planned": 9,
+                     "turns_completed": 9})
+        assert "session_user_turns" not in scores
+        assert "turn_dedup_ok" not in scores
 
 
 class TestJudgeHardening:
@@ -850,6 +994,18 @@ class TestStallGuard:
         assert "pkill -TERM -f 'openclaw agent'" in joined
         assert "pkill -KILL -f 'openclaw agent'" in joined
         assert "openclaw gateway" not in joined
+        assert "sessions/chat.jsonl.lock" in joined, (
+            "stale chat-session locks from killed agents must be removed or "
+            "every later attempt dies in a 'session file locked' failover loop"
+        )
+        assert "sessions/*.lock" not in joined, (
+            "lock removal must stay scoped to the chat session - a bare "
+            "*.lock also deletes locks of live gateway-hosted sub-agent "
+            "sessions the pkill deliberately does not touch"
+        )
+        kill_pos = joined.index("pkill -KILL")
+        rm_pos = joined.index("rm -f /root/.openclaw")
+        assert rm_pos > kill_pos, "lock removal must come AFTER the kills"
 
     def test_break_connections_honest_when_ss_missing(self, tmp_path,
                                                       monkeypatch, caplog):
@@ -871,15 +1027,26 @@ class TestStallGuard:
 
 
 class TestSidecarKeylessSwitch:
-    def test_yaml_omits_master_key_when_switch_on(self, monkeypatch):
+    def test_yaml_omits_master_key_by_default_and_under_the_switch(self, monkeypatch):
         from src.utils import litellm_sidecar as sc
+        monkeypatch.delenv("WCB_SIDECAR_MASTER_KEY", raising=False)
         monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
         yaml_on = sc.build_litellm_config_yaml(bedrock_sonnet_arn="")
         monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY")
-        yaml_off = sc.build_litellm_config_yaml(bedrock_sonnet_arn="")
+        yaml_default = sc.build_litellm_config_yaml(bedrock_sonnet_arn="")
         assert "master_key" not in yaml_on
-        assert "master_key: os.environ/LITELLM_MASTER_KEY" in yaml_off
+        assert "master_key" not in yaml_default
+        assert yaml_on == yaml_default
+        assert "custom_auth: litellm_run_key_auth.user_api_key_auth" in yaml_default
         assert "store_model_in_db" in yaml_on
+
+    def test_yaml_carries_master_key_only_on_explicit_opt_in(self, monkeypatch):
+        from src.utils import litellm_sidecar as sc
+        monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
+        yaml_legacy = sc.build_litellm_config_yaml(bedrock_sonnet_arn="")
+        assert "master_key: os.environ/LITELLM_MASTER_KEY" in yaml_legacy
+        assert "custom_auth" not in yaml_legacy
 
 
 class TestBackfillPortParity:
@@ -992,3 +1159,62 @@ class TestTurnCompletionVerdict:
         assert v["run_incomplete"] is True
         assert v["turns_planned"] == 9
         assert "turns_planned_dispatched" not in v
+
+
+class TestFailureRowsDontMaskEmptyTurns:
+    def _agent_with_log(self, tmp_path):
+        from src.agents.openclaw.runner import OpenClawAgent
+        agent = OpenClawAgent.__new__(OpenClawAgent)
+        agent.litellm_usage_log = str(tmp_path / "usage.jsonl")
+        return agent
+
+    def test_successes_only_counts_agent_rows_only(self, tmp_path):
+        agent = self._agent_with_log(tmp_path)
+        key = "wcb::task::abc123"
+        rows = [
+            {"run_key": key, "kind": "agent", "input_tokens": 100},
+            {"run_key": key, "kind": "preflight", "input_tokens": 1},
+            {"run_key": key, "kind": "failure", "error_class": "BadRequestError",
+             "error": "400 invalid parameters", "input_tokens": 0},
+            {"run_key": "wcb::other::zzz", "kind": "agent", "input_tokens": 50},
+        ]
+        with open(agent.litellm_usage_log, "w", encoding="utf-8") as fh:
+            for r in rows:
+                fh.write(json.dumps(r) + "\n")
+        assert agent._count_run_key_rows(key) == 3
+        assert agent._count_run_key_rows(key, successes_only=True) == 1, (
+            "preflight probe rows and failure rows must not count as "
+            "successful turn traffic"
+        )
+
+    def test_successes_only_survives_writer_formatting_drift(self, tmp_path):
+        agent = self._agent_with_log(tmp_path)
+        key = "wcb::task::abc123"
+        compact = json.dumps(
+            {"run_key": key, "kind": "failure", "error_class": "X"},
+            separators=(",", ":"))
+        with open(agent.litellm_usage_log, "w", encoding="utf-8") as fh:
+            fh.write(compact + "\n")
+        assert agent._count_run_key_rows(key, successes_only=True) == 0, (
+            "a compact-serialized failure row must still be excluded - the "
+            "check must not depend on json.dumps default separators"
+        )
+
+    def test_all_failure_turn_counts_as_empty_via_real_writer(self, tmp_path, monkeypatch):
+        from src.utils import litellm_usage_callback as cb
+        agent = self._agent_with_log(tmp_path)
+        key = "wcb::task::abc123"
+        monkeypatch.setattr(cb, "_PATH", agent.litellm_usage_log)
+        monkeypatch.setattr(cb, "_extract_run_key", lambda kwargs: key)
+        for _ in range(4):
+            cb._write_failure_row(
+                {"model": "rl-muse", "exception": RuntimeError("400 invalid")},
+                None, None)
+        assert agent._count_run_key_rows(key) == 4
+        assert agent._count_run_key_rows(key, successes_only=True) == 0, (
+            "rows produced by the real failure writer must be excluded"
+        )
+
+    def test_missing_log_returns_zero(self, tmp_path):
+        agent = self._agent_with_log(tmp_path)
+        assert agent._count_run_key_rows("k", successes_only=True) == 0

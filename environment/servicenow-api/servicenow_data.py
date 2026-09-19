@@ -210,12 +210,13 @@ def update_incident(sys_id, **fields):
         return {"error": f"Incident {sys_id} not found"}
     changes = {}
     for key in ("short_description", "description", "state", "priority", "impact",
-                "urgency", "category", "assigned_to"):
+                "urgency", "category", "assigned_to", "opened_by"):
         val = fields.get(key)
         if val is not None:
             changes[key] = str(val)
-    changes["updated_at"] = _now()
-    _store_patch("incidents", sys_id, changes)
+    if changes:
+        changes["updated_at"] = _now()
+        _store_patch("incidents", sys_id, changes)
     return {**rec, **changes}
 
 

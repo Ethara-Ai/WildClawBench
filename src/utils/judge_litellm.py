@@ -82,11 +82,16 @@ def _judge_oauth_bridge_model() -> str:
     normalize_body_for_anthropic_direct) passes the model tail through VERBATIM
     — it only rewrites thinking/output_config — so this literal IS the model on
     the wire at api.anthropic.com. LiteLLM strips the `anthropic/` prefix.
-    Default is Sonnet 5 (1M context, dateless canonical id). Overridable via
-    KENSEI_JUDGE_OAUTH_BRIDGE_MODEL."""
+    Default is Sonnet 4.6: Sonnet 5 rejects any pinned temperature (verdicts
+    are then non-deterministic between regrades) and has a live upstream
+    safety-refusal surface on rubric grading (willie_prince 2026-09-17: 53/53
+    criteria abstained with "judge returned no content (upstream refusal)").
+    Sonnet 4.6 accepts temperature=0 and has shown no such refusal — it is the
+    delivery-standard judge. Overridable via KENSEI_JUDGE_OAUTH_BRIDGE_MODEL
+    (e.g. back to anthropic/claude-sonnet-5 for its 1M context window)."""
     return (
         os.environ.get("KENSEI_JUDGE_OAUTH_BRIDGE_MODEL")
-        or "anthropic/claude-sonnet-5"
+        or "anthropic/claude-sonnet-4-6"
     ).strip()
 
 
@@ -701,7 +706,8 @@ def call_judge_via_litellm(
                 "stop_details"
             ) or {}
             _cat = _sd.get("category") or ""
-            if "refus" in str(_fr).lower() or _sd.get("type") == "refusal":
+            if ("refus" in str(_fr).lower() or _sd.get("type") == "refusal"
+                    or str(_fr).lower() == "content_filter"):
                 _reason = f" (upstream refusal{f', category={_cat}' if _cat else ''})"
         except Exception:  # noqa: BLE001 - diagnostics must not mask the error
             pass

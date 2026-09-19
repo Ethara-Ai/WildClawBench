@@ -90,6 +90,7 @@ import json
 import math
 import os
 from pathlib import Path
+import sys
 import threading
 import time
 import uuid
@@ -382,10 +383,58 @@ def opt_str(row: Row, column: str, default: str = "") -> str:
 def opt_csv_list(
     row: Row, column: str, sep: str = ",", default: Optional[List[str]] = None
 ) -> List[str]:
+    """Read a list-valued column that seeds may encode as CSV *or* as a list.
+
+    Seed files come in two shapes for the same logical column: CSV/TSV rows
+    carry ``"a;b"`` while JSON rows carry ``["a", "b"]``. Splitting a list on a
+    separator yields ``["['a', 'b']"]`` --- a one-element list holding the
+    repr --- which reads back as a single garbage member instead of failing, so
+    the corruption ships silently. Accept both shapes here, once, rather than
+    in each of the 17 services that call this.
+    """
     v = row.get(column, _MISSING)
+    if isinstance(v, (list, tuple)):
+        return [str(x) for x in v if str(x)]
     if v is _MISSING or v is None or str(v).strip() == "":
         return [] if default is None else list(default)
     return [part for part in str(v).split(sep)]
+
+
+_GARBLE_SEPARATORS = (";", ",")
+
+# Tuned so a healthy fleet load stays silent: an RFC 5545 recurrence value
+# ("RRULE:FREQ=WEEKLY;BYDAY=TU") is a legitimate one-element list carrying ';'.
+_GARBLE_DISQUALIFIERS = (" ", "\t", "=", ":")
+
+
+def garbled_list_sample(value: Any) -> Optional[str]:
+    """Return the offending element when ``value`` looks like a mis-split list.
+
+    A list-shaped seed pushed through a string splitter collapses to a
+    ONE-element list still holding the whole payload --- ``["['a', 'b']"]`` from
+    a JSON array, or ``["a;b"]`` from the wrong separator. Both read back as a
+    single garbage member rather than raising, which is how a route ends up
+    serving ``[]`` for a whole task with nothing in the logs.
+
+    Two signatures are reported: a member that opens a JSON container, and a
+    member that is a clean run of separated tokens. Returns None otherwise ---
+    this trades recall for precision on purpose.
+    """
+    if not isinstance(value, list) or len(value) != 1:
+        return None
+    only = value[0]
+    if not isinstance(only, str):
+        return None
+    stripped = only.strip()
+    if stripped[:1] in ("[", "{"):
+        return only
+    for sep in _GARBLE_SEPARATORS:
+        parts = stripped.split(sep)
+        if len(parts) < 2:
+            continue
+        if all(p and not any(c in p for c in _GARBLE_DISQUALIFIERS) for p in parts):
+            return only
+    return None
 
 
 class Table:
@@ -403,10 +452,15 @@ class Table:
     mutations rather than rebuilding from a dict.
     """
 
-    __slots__ = ("_name", "_pk", "_rows", "_order", "_lock", "_parent")
+    __slots__ = ("_name", "_pk", "_rows", "_order", "_lock", "_parent", "_row_coercer")
 
     def __init__(
-        self, name: str, primary_key: str, parent_lock: threading.RLock, parent: "Store"
+        self,
+        name: str,
+        primary_key: str,
+        parent_lock: threading.RLock,
+        parent: "Store",
+        row_coercer: Optional[Callable[[Row], Row]] = None,
     ):
         self._name = name
         self._pk = primary_key
@@ -414,6 +468,20 @@ class Table:
         self._order: List[Any] = []
         self._lock = parent_lock
         self._parent = parent
+        self._row_coercer = row_coercer
+
+    def _coerce(self, row: Row) -> Row:
+        """Normalise a row written after load time into seed shape.
+
+        The initial loader coerces seed rows (e.g. epoch strings -> int), but
+        admin-plane upserts and injected drift bypass it entirely, so a table
+        could end up holding rows the read paths cannot sort or compare. Any
+        table registered with a ``row_coercer`` runs writes through the same
+        normaliser the loader uses.
+        """
+        if self._row_coercer is None:
+            return row
+        return self._row_coercer(row)
 
     @property
     def name(self) -> str:
@@ -476,6 +544,7 @@ class Table:
             raise StoreError(
                 f"upsert into '{self._name}' missing primary key '{self._pk}'"
             )
+        row = self._coerce(copy.deepcopy(row))
         pk_value = row[self._pk]
         with self._lock:
             existed = pk_value in self._rows
@@ -502,6 +571,9 @@ class Table:
                         f"on table '{self._name}'"
                     )
                 row[k] = copy.deepcopy(v)
+            if self._row_coercer is not None:
+                self._rows[pk_value] = self._coerce(copy.deepcopy(row))
+                row = self._rows[pk_value]
             return copy.deepcopy(row)
 
     def delete(self, pk_value: Any) -> bool:
@@ -534,6 +606,8 @@ class Table:
                                 f"'{self._pk}' on table '{self._name}'"
                             )
                         row[k] = copy.deepcopy(v)
+                    if self._row_coercer is not None:
+                        self._rows[pk_value] = self._coerce(copy.deepcopy(row))
                     n += 1
         return n
 
@@ -652,15 +726,20 @@ class Store:
         table_name: str,
         primary_key: str,
         initial_loader: Callable[[], Iterable[Row]],
+        row_coercer: Optional[Callable[[Row], Row]] = None,
     ) -> Table:
         """Register a table. The loader runs the first time the table is
         accessed, not at registration time --- this keeps import order
         independent and avoids re-reading CSVs in test contexts.
+
+        ``row_coercer`` (optional) normalises rows written *after* load ---
+        admin upserts, injected drift --- into the same shape the initial
+        loader produces, so read paths never meet a half-typed row.
         """
         with self._lock:
             if table_name in self._tables:
                 return self._tables[table_name]
-            t = Table(table_name, primary_key, self._lock, self)
+            t = Table(table_name, primary_key, self._lock, self, row_coercer)
             self._tables[table_name] = t
             self._initial_loaders[table_name] = initial_loader
             self._initialized[table_name] = False
@@ -744,7 +823,13 @@ class Store:
         seen_pks: Dict[Any, int] = {}
         collapse_count = 0
         first_collision: Optional[Any] = None
+        garbled: Dict[str, str] = {}
         for i, r in enumerate(rows):
+            for column, value in r.items():
+                if column not in garbled:
+                    sample = garbled_list_sample(value)
+                    if sample is not None:
+                        garbled[column] = sample
             if t._pk not in r or r.get(t._pk) in (None, ""):
                 # Synthesize a per-load pk so a row missing/blank in the primary-key
                 # column is still served rather than aborting the whole load.
@@ -769,8 +854,6 @@ class Store:
             t._rows[stored_key] = stored_row
             t._order.append(stored_key)
         if collapse_count:
-            import sys as _sys
-
             print(
                 f"[mutable_store] WARN: table '{self._name}.{table_name}' "
                 f"declares primary_key='{t._pk}' but {collapse_count} of "
@@ -779,7 +862,19 @@ class Store:
                 f"'_pk' to preserve data. Fix by declaring a row-unique "
                 f"primary key (natural unique column, or synthetic '_pk' "
                 f'composite such as f"{{parent_id}}@{{child_id}}").',
-                file=_sys.stderr,
+                file=sys.stderr,
+                flush=True,
+            )
+        for column, sample in sorted(garbled.items()):
+            print(
+                f"[mutable_store] WARN: table '{self._name}.{table_name}' column "
+                f"'{column}' holds a ONE-element list whose only member still "
+                f"carries a separator or a JSON payload: {sample!r}. That is a "
+                f"list-shaped seed run through a string splitter --- reads will "
+                f"serve one garbage member instead of the real list. Coerce the "
+                f"column with opt_csv_list (accepts both shapes) rather than "
+                f"calling .split() on the raw value.",
+                file=sys.stderr,
                 flush=True,
             )
         self._initialized[table_name] = True

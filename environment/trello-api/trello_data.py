@@ -145,7 +145,7 @@ def _coerce_checklists(rows):
     out = []
     for r in rows:
         items = []
-        for n, raw in enumerate(r["items"].split(";")):
+        for n, raw in enumerate(opt_csv_list(r, "items", sep=";")):
             if not raw:
                 continue
             name, _, state = raw.partition(":")

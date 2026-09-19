@@ -123,7 +123,11 @@ def test_last_resort_stub_functional(tmp_path: Path) -> None:
     output_dir = tmp_path / "run_1"
     output_dir.mkdir()
     score_path = output_dir / "score.json"
-    result: dict = {"task_id": "t_x", "scores": {}, "error": "container startup failed"}
+    result: dict = {"task_id": "t_x", "scores": {}, "error": "container startup failed",
+                    "task_gate": {"status": "bypassed", "ops": 4, "warns": 0,
+                                  "elapsed_ms": 81, "findings": [
+                                      {"kind": "WOULD-ERROR", "subject": "svc s1/op",
+                                       "reason": "store refused the write"}]}}
 
     if not score_path.exists():
         last_resort = {
@@ -138,6 +142,7 @@ def test_last_resort_stub_functional(tmp_path: Path) -> None:
             "source": "run_single_task last-resort stub",
             "task_id": "t_x",
             "__last_resort_stub__": True,
+            "task_gate": result.get("task_gate"),
         }
         score_path.write_text(
             json.dumps(last_resort, indent=2, ensure_ascii=False, default=str),
@@ -150,6 +155,37 @@ def test_last_resort_stub_functional(tmp_path: Path) -> None:
     assert doc["overall_score"] is None
     assert doc["error"] == "container startup failed"
     assert doc["task_id"] == "t_x"
+    # The stub is the artifact for the runs that failed hardest, which is when
+    # a bypassed gate is the likeliest explanation for the failure.
+    assert doc["task_gate"]["status"] == "bypassed"
+    assert doc["task_gate"]["findings"][0]["kind"] == "WOULD-ERROR"
+
+
+def test_last_resort_stub_carries_the_task_gate_verdict() -> None:
+    """AST invariant: the inline stub dict names `task_gate`.
+
+    It does not travel through `_augment_score_with_combined_rewards` — the
+    stub is deliberately independent of every helper that could be the reason
+    it is firing — so the key has to be spelled out in the literal, and the
+    mirror above can only ever prove the mirror right.
+    """
+    tree = ast.parse(_run_batch_source())
+    fn = _find_function(tree, "run_single_task")
+
+    stub = next(
+        (d for d in ast.walk(fn)
+         if isinstance(d, ast.Dict)
+         and any(isinstance(k, ast.Constant) and k.value == "__last_resort_stub__"
+                 for k in d.keys)),
+        None,
+    )
+    assert stub is not None, "last-resort stub dict literal not found"
+    keys = {k.value for k in stub.keys if isinstance(k, ast.Constant)}
+    assert "task_gate" in keys, (
+        "the last-resort stub MUST carry task_gate: a run that was launched "
+        "past a known task defect and then died must not leave an artifact "
+        "indistinguishable from one that was gated clean."
+    )
 
 
 def test_last_resort_stub_does_not_clobber_existing(tmp_path: Path) -> None:

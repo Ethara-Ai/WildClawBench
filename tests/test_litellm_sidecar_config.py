@@ -134,7 +134,20 @@ class TestConfigEnvelope:
     def test_general_settings_present(self):
         doc = _parse(sidecar.build_litellm_config_yaml(bedrock_arn="arn:x"))
         gs = doc["general_settings"]
+        # Default inbound auth is run-key scoped: the proxy validates the
+        # attempt's own bearer through the custom_auth hook and carries no
+        # master key for anything to fall back to.
+        assert gs["custom_auth"] == "litellm_run_key_auth.user_api_key_auth"
+        assert "master_key" not in gs
+        assert gs["store_model_in_db"] is False
+
+    def test_general_settings_master_key_mode(self, monkeypatch):
+        monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
+        gs = _parse(sidecar.build_litellm_config_yaml(bedrock_arn="arn:x"))[
+            "general_settings"]
         assert gs["master_key"] == "os.environ/LITELLM_MASTER_KEY"
+        assert "custom_auth" not in gs
         assert gs["store_model_in_db"] is False
 
 
@@ -443,6 +456,37 @@ class TestOpenAIBranch:
         for fid in ("gpt-4o-mini-transcribe", "gpt-4o-transcribe"):
             assert _params(doc, fid)["model"] == "openai/whisper-1"
 
+    def test_whisper_key_alone_registers_audio_routes_without_chat_key(self):
+        """A whisper-only key MUST still yield a transcription route.
+
+        Regression pin: the audio block used to live inside `if openai_api_key:`,
+        so a Bedrock-only / OAuth / Codex-bridge profile carrying only
+        KENSEI_OPENAI_WHISPER_API_KEY emitted YAML with NO whisper-1 model. Every
+        agent POST to /v1/audio/transcriptions then 400'd "Invalid model name"
+        despite a perfectly usable whisper key being present in the env.
+        """
+        doc = _parse(
+            sidecar.build_litellm_config_yaml(
+                bedrock_arn="arn:x", openai_api_key="", openai_whisper_api_key="sk-whis"
+            )
+        )
+        for mid in ("whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe"):
+            assert _params(doc, mid)["model"] == "openai/whisper-1"
+            assert _params(doc, mid)["api_key"] == "os.environ/OPENAI_API_KEY_WHISPER"
+        # The chat-only route stays gated on the chat key.
+        assert _block(doc, "gpt-5.5") is None
+
+    def test_no_openai_key_of_either_kind_registers_no_audio_route(self):
+        """Bedrock-only with NO whisper key must NOT advertise a dead route.
+
+        Pairs with runner.py's `model_name: whisper-1` gate: no route in the YAML
+        means no WCB_AUDIO_TRANSCRIBE_URL, which routes the audio-extract skill
+        to its local-whisper fallback instead of a guaranteed 400.
+        """
+        doc = _parse(sidecar.build_litellm_config_yaml(bedrock_arn="arn:x"))
+        for mid in ("whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe"):
+            assert _block(doc, mid) is None
+
     def test_openai_image_alias_prefers_gpt55(self):
         # When OpenAI is configured the image-fallback ids alias to gpt-5.5
         # (OpenAI preferred over Bedrock).
@@ -544,6 +588,25 @@ class TestSonnetAndCallbacks:
         )
         assert doc["litellm_settings"]["callbacks"] == [
             "litellm_sanitize_callback.sanitize_callback_instance"
+        ]
+
+    def test_sanitize_and_overflow_guard_coexist_in_order(self):
+        # Both 1P pre-call hooks: sanitize repairs the messages array first;
+        # the overflow guard runs after headroom (which may shrink the prompt).
+        doc = _parse(
+            sidecar.build_litellm_config_yaml(
+                bedrock_arn="arn:x",
+                enable_sanitize_callback=True,
+                enable_usage_callback=True,
+                enable_headroom_callback=True,
+                enable_overflow_guard_callback=True,
+            )
+        )
+        assert doc["litellm_settings"]["callbacks"] == [
+            "litellm_sanitize_callback.sanitize_callback_instance",
+            "litellm_usage_callback.proxy_handler_instance",
+            "litellm_headroom_callback.headroom_callback_instance",
+            "litellm_overflow_guard_callback.overflow_guard_instance",
         ]
 
 
@@ -666,10 +729,14 @@ class TestVerifyUpstreamReachable:
     def test_success_returns_true_and_output(self, monkeypatch):
         def fake_run(cmd, *a, **k):
             assert cmd[0:3] == ["docker", "exec", "cX"]
-            # The probe body must carry the model name + master key + port.
+            # The probe body must carry the model name + port, and a bearer the
+            # sidecar's current auth mode will actually admit. Run-key mode
+            # rejects the master key by design, so the probe mints a key of the
+            # minted shape under a reserved task id instead.
             probe = cmd[-1]
             assert "claude-opus-4.7" in probe
-            assert "Bearer mk-secret" in probe
+            assert "Bearer wcb::__probe__::" in probe
+            assert "Bearer mk-secret" not in probe
             assert "4000" in probe
             return _FakeCompleted(returncode=0, stdout="OK status=200")
 

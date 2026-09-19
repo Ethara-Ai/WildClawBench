@@ -5,6 +5,7 @@ customers. Returns bare arrays/objects like the real API.
 """
 
 import csv
+import json
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
@@ -36,6 +37,10 @@ _store.register("customers", primary_key="id",
                 initial_loader=lambda: _coerce_customers(_load("customers.json", "customers")))
 _store.register("orders", primary_key="id",
                 initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
+_store.register_document(
+    "settings",
+    initial_loader=lambda: json.loads((DATA_DIR / "settings.json").read_text(encoding="utf-8")),
+)
 
 
 def _products_rows():
@@ -48,6 +53,10 @@ def _customers_rows():
 
 def _orders_rows():
     return _store.table("orders").rows()
+
+
+def _settings_doc():
+    return _store.document("settings").get()
 
 
 
@@ -101,6 +110,7 @@ def _coerce_products(rows):
             "categories": [c for c in opt_csv_list(r, "categories", sep=";") if c],
             "description": r["description"],
             "date_created": r["date_created"],
+            "tax_rate": opt_float(r, "tax_rate", default=None),
         })
     return out
 
@@ -141,6 +151,26 @@ def _coerce_orders(rows):
             "billing_last_name": r["billing_last_name"],
             "billing_email": r["billing_email"],
             "date_created": r["date_created"],
+            "line_items": _coerce_line_items(r.get("line_items")),
+        })
+    return out
+
+
+def _coerce_line_items(raw):
+    if not raw:
+        return []
+    if isinstance(raw, str):
+        raw = json.loads(raw)
+    out = []
+    for line in raw:
+        out.append({
+            "product_id": _to_int(line.get("product_id", 0)),
+            "name": str(line.get("name", "")),
+            "sku": str(line.get("sku", "")),
+            "quantity": _to_int(line.get("quantity", 1)),
+            "price": _to_float(line.get("price", 0.0)),
+            "subtotal": _to_float(line.get("subtotal", 0.0)),
+            "total": _to_float(line.get("total", 0.0)),
         })
     return out
 
@@ -208,6 +238,18 @@ def _serialize_order(o):
             "last_name": o["billing_last_name"],
             "email": o["billing_email"],
         },
+        "line_items": [
+            {
+                "product_id": li["product_id"],
+                "name": li["name"],
+                "sku": li["sku"],
+                "quantity": li["quantity"],
+                "price": li["price"],
+                "subtotal": f"{li['subtotal']:.2f}",
+                "total": f"{li['total']:.2f}",
+            }
+            for li in o.get("line_items", [])
+        ],
         "date_created": o["date_created"],
     }
 
@@ -260,28 +302,53 @@ def get_order(order_id):
     return _serialize_order(o)
 
 
+def _default_tax_rate():
+    return _to_float(_settings_doc().get("tax_rate", 0.0))
+
+
+def _line_tax_rate(prod):
+    if prod is not None and prod.get("tax_rate") is not None:
+        return _to_float(prod["tax_rate"])
+    return _default_tax_rate()
+
+
 def create_order(customer_id=0, status="pending", currency="USD",
                  payment_method="bacs", payment_method_title="Direct Bank Transfer",
-                 billing=None, line_items=None):
+                 billing=None, line_items=None, total=None, total_tax=None):
     billing = billing or {}
     line_items = line_items or []
     next_id = max((o["id"] for o in _orders_rows()), default=400) + 1
     subtotal = 0.0
+    tax = 0.0
+    stored_lines = []
     for line in line_items:
         prod = next((p for p in _products_rows()
-                     if p["id"] == int(line.get("product_id", 0))), None)
-        qty = int(line.get("quantity", 1))
-        price = prod["price"] if prod else 0.0
-        subtotal += price * qty
-    tax = round(subtotal * 0.1, 2)
+                     if p["id"] == _to_int(line.get("product_id", 0))), None)
+        qty = _to_int(line.get("quantity", 1))
+        price = prod["price"] if prod else _to_float(line.get("price", 0.0))
+        line_subtotal = round(price * qty, 2)
+        line_tax = round(line_subtotal * _line_tax_rate(prod), 2)
+        subtotal += line_subtotal
+        tax += line_tax
+        stored_lines.append({
+            "product_id": _to_int(line.get("product_id", 0)),
+            "name": line.get("name") or (prod["name"] if prod else ""),
+            "sku": line.get("sku") or (prod["sku"] if prod else ""),
+            "quantity": qty,
+            "price": price,
+            "subtotal": line_subtotal,
+            "total": round(line_subtotal + line_tax, 2),
+        })
+    subtotal = round(subtotal, 2)
+    tax = round(tax, 2) if total_tax is None else _to_float(total_tax)
     order = {
         "id": next_id,
         "number": str(next_id),
-        "customer_id": int(customer_id),
+        "customer_id": _to_int(customer_id),
         "status": status,
         "currency": currency,
-        "total": round(subtotal + tax, 2),
-        "subtotal": round(subtotal, 2),
+        "total": round(subtotal + tax, 2) if total is None else _to_float(total),
+        "subtotal": subtotal,
         "total_tax": tax,
         "payment_method": payment_method,
         "payment_method_title": payment_method_title,
@@ -289,6 +356,7 @@ def create_order(customer_id=0, status="pending", currency="USD",
         "billing_last_name": billing.get("last_name", ""),
         "billing_email": billing.get("email", ""),
         "date_created": "2026-05-28T00:00:00",
+        "line_items": stored_lines,
     }
     _store_insert("orders", order)
     return _serialize_order(order)

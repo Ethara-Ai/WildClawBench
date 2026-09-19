@@ -215,6 +215,26 @@ def get_board_items(board_id):
     return {"items": [_item_view(i) for i in items]}
 
 
+def _group_view(g):
+    return {
+        "id": g["group_id"],
+        "title": g["title"],
+        "color": g["color"],
+        "position": g["position"],
+        "board_id": g["board_id"],
+    }
+
+
+def list_groups(board_id=None):
+    groups = _groups_rows()
+    if board_id:
+        if not _find_board(board_id):
+            return {"error": f"Board {board_id} not found"}
+        groups = [g for g in groups if g["board_id"] == board_id]
+    groups = sorted(groups, key=lambda g: (g["board_id"], g["position"]))
+    return {"groups": [_group_view(g) for g in groups]}
+
+
 def list_items(board_id=None, group_id=None):
     items = _items_rows()
     if board_id:
@@ -257,12 +277,7 @@ def create_item(board_id, name, group_id=None, column_values=None):
     _store.table("items").upsert(item)
     if column_values:
         for column_id, val in column_values.items():
-            if isinstance(val, dict):
-                text = val.get("text", "")
-                value = val.get("value")
-            else:
-                text = str(val)
-                value = None
+            text, value = _split_column_value(val)
             _store.table("column_values").upsert({
                 "_pk": f"{item['item_id']}@{column_id}",
                 "item_id": item["item_id"],
@@ -273,7 +288,35 @@ def create_item(board_id, name, group_id=None, column_values=None):
     return _item_view(item)
 
 
-def update_item(item_id, column_id=None, text=None, value=None, group_id=None):
+def _split_column_value(val):
+    if isinstance(val, dict):
+        return val.get("text", ""), val.get("value")
+    return str(val), None
+
+
+def _set_column_value(item_id, column_id, text=None, value=None):
+    pk = f"{item_id}@{column_id}"
+    existing = _store.table("column_values").get(pk)
+    if existing:
+        patch = {}
+        if text is not None:
+            patch["text"] = text
+        if value is not None:
+            patch["value"] = value
+        if patch:
+            _store.table("column_values").patch(pk, patch)
+    else:
+        _store.table("column_values").upsert({
+            "_pk": pk,
+            "item_id": item_id,
+            "column_id": column_id,
+            "text": text or "",
+            "value": value,
+        })
+
+
+def update_item(item_id, column_id=None, text=None, value=None, group_id=None,
+                name=None, column_values=None):
     item = _find_item(item_id)
     if not item:
         return {"error": f"Item {item_id} not found"}
@@ -284,25 +327,18 @@ def update_item(item_id, column_id=None, text=None, value=None, group_id=None):
         _store.table("items").patch(item_id, {"group_id": group_id})
         item = _find_item(item_id) or item
 
+    if name is not None:
+        _store.table("items").patch(item_id, {"name": name})
+        item = _find_item(item_id) or item
+
     if column_id is not None:
-        pk = f"{item_id}@{column_id}"
-        existing = _store.table("column_values").get(pk)
-        if existing:
-            patch = {}
-            if text is not None:
-                patch["text"] = text
-            if value is not None:
-                patch["value"] = value
-            if patch:
-                _store.table("column_values").patch(pk, patch)
-        else:
-            _store.table("column_values").upsert({
-                "_pk": pk,
-                "item_id": item_id,
-                "column_id": column_id,
-                "text": text or "",
-                "value": value,
-            })
+        _set_column_value(item_id, column_id, text=text, value=value)
+
+    if column_values:
+        for cv_column_id, val in column_values.items():
+            cv_text, cv_value = _split_column_value(val)
+            _set_column_value(item_id, cv_column_id, text=cv_text, value=cv_value)
+
     return _item_view(item)
 
 
