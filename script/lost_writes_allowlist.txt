@@ -14,3 +14,38 @@
 
 # Quote / rate / availability calculators: derive a price, store nothing.
 google-calendar-api::POST /calendar/v3/freeBusy::NO_STORE_WRITE
+
+# Plaid has no GET plane. Every endpoint in the API is a POST, reads included,
+# because the query (access_token, account_ids, date windows) is too private for
+# a query string: "Plaid API endpoints are all POST requests"
+# (https://plaid.com/docs/api/). The five below are the retrieval half of that
+# convention, and each one is a projection of seed rows -- accounts_get/
+# get_balances return _accounts_rows(), get_transactions filters and pages them,
+# get_identity joins the identity document onto them, get_institution_by_id
+# reads the item document. Read by hand, handler by handler: there is no state a
+# caller expects to survive any of these calls. Note the asymmetry that makes
+# them worth listing rather than exempting by service -- POST bodies here are
+# still checked for laxity by the route-contract guard, and all six plaid models
+# carry extra="forbid", because Plaid itself rejects an unrecognised body field
+# (https://plaid.com/docs/errors/invalid-request/).
+plaid-api::POST /accounts/get::NO_STORE_WRITE
+plaid-api::POST /accounts/balance/get::NO_STORE_WRITE
+plaid-api::POST /identity/get::NO_STORE_WRITE
+plaid-api::POST /institutions/get_by_id::NO_STORE_WRITE
+plaid-api::POST /transactions/get::NO_STORE_WRITE
+
+# Kraken signs every private call, so every private call is a POST -- including
+# the pure reads. Get Account Balance is documented as "Retrieve all cash
+# balances, net of pending withdrawals"
+# (https://docs.kraken.com/api/docs/rest-api/get-account-balance); the handler
+# projects the seeded balances table and persists nothing. The nonce and
+# signature a real client sends are authentication, not content.
+kraken-api::POST /0/private/Balance::NO_STORE_WRITE
+
+# PostHog splits its ingestion plane in two and only one half writes. /capture
+# persists an event and DOES reach the store -- it is deliberately absent from
+# this file. /decide evaluates feature flags for a caller and returns the
+# verdict; it is the read half, which is why the SDKs poll it on every page load
+# (https://posthog.com/docs/api/decide). The handler reads _flags_rows() and
+# builds a {key: enabled} map. Nothing about the request is meant to outlive it.
+posthog-api::POST /decide::NO_STORE_WRITE
