@@ -1,3 +1,12 @@
+"""`_row_ids` harvesting and the ``*_key`` primary-key case.
+
+Re-pointed off figma, which left in the newreq convergence, onto confluence --
+the converged fleet's live example of the class and the sole entry left in
+``inject_director._SERVICE_RESOLUTION``, so the fixture and the resolver now
+name the same service. ``spaces`` is keyed by a bare ``key`` and ``pages``
+carries ``space_key``, which is the two-column shape figma's
+``component_key``/``file_key`` used to supply.
+"""
 from __future__ import annotations
 
 import sys
@@ -9,7 +18,12 @@ sys.path.insert(0, str(ROOT))
 from src.utils.inject_director import InjectScript, InjectStage
 from src.utils.inject_validator import _row_ids, validate_inject_script
 
-URLS = {"figma-api": "http://127.0.0.1:1"}
+URLS = {"confluence-api": "http://127.0.0.1:1"}
+
+PAGES_SEED = (
+    '[{"id": "100101", "type": "page", "space_key": "ENG", '
+    '"title": "Engineering Home"}]'
+)
 
 
 def _seed_stage():
@@ -37,16 +51,23 @@ def _script(*stages):
     return InjectScript(description="test", stages=list(stages))
 
 
-def test_row_ids_harvests_file_key():
-    row = {"file_key": "FKmenuv5final", "node_id": "42:1007", "name": "x"}
-    assert "FKmenuv5final" in _row_ids(row)
+def _confluence_seed(tmp_path):
+    svc_dir = tmp_path / "confluence-api"
+    svc_dir.mkdir()
+    (svc_dir / "pages.json").write_text(PAGES_SEED, encoding="utf-8")
+    return svc_dir
 
 
-def test_row_ids_harvests_component_key():
-    row = {"component_key": "comp-menuinsert-trim", "file_key": "FK1", "name": "x"}
+def test_row_ids_harvests_space_key():
+    row = {"space_key": "ENG", "id": "100101", "title": "x"}
+    assert "ENG" in _row_ids(row)
+
+
+def test_row_ids_harvests_every_key_column_on_the_row():
+    row = {"project_key": "ENG", "key": "ENG-142", "summary": "x"}
     ids = _row_ids(row)
-    assert "comp-menuinsert-trim" in ids
-    assert "FK1" in ids
+    assert "ENG" in ids
+    assert "ENG-142" in ids
 
 
 def test_row_ids_harvests_bare_key():
@@ -55,32 +76,20 @@ def test_row_ids_harvests_bare_key():
 
 
 def test_stage1_patch_on_key_pk_not_fatal(tmp_path):
-    svc_dir = tmp_path / "figma-api"
-    svc_dir.mkdir()
-    (svc_dir / "components.json").write_text(
-        '[{"component_key": "comp-menuinsert-trim", "file_key": "FKmenuv5final", '
-        '"name": "Menu insert"}]',
-        encoding="utf-8",
-    )
+    _confluence_seed(tmp_path)
     stage1 = _stage(1, 0, 1, silent=[_admin_patch(
-        "s1", "figma-api", "components", "comp-menuinsert-trim",
-        {"description": "updated"})])
+        "s1", "confluence-api", "pages", "ENG",
+        {"title": "updated"})])
     fatal, warnings = validate_inject_script(
         _script(_seed_stage(), stage1), host_api_to_url=URLS, mock_data_root=tmp_path)
     assert not any(d["status"] == "missing-target" for d in fatal)
 
 
 def test_stage1_patch_on_absent_key_pk_still_fatal(tmp_path):
-    svc_dir = tmp_path / "figma-api"
-    svc_dir.mkdir()
-    (svc_dir / "components.json").write_text(
-        '[{"component_key": "comp-menuinsert-trim", "file_key": "FKmenuv5final", '
-        '"name": "Menu insert"}]',
-        encoding="utf-8",
-    )
+    _confluence_seed(tmp_path)
     stage1 = _stage(1, 0, 1, silent=[_admin_patch(
-        "s1", "figma-api", "components", "comp-does-not-exist",
-        {"description": "updated"})])
+        "s1", "confluence-api", "pages", "SPACE-DOES-NOT-EXIST",
+        {"title": "updated"})])
     fatal, warnings = validate_inject_script(
         _script(_seed_stage(), stage1), host_api_to_url=URLS, mock_data_root=tmp_path)
     assert any(d["status"] == "missing-target" for d in fatal)

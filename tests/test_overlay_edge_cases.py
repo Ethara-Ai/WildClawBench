@@ -23,9 +23,12 @@ raises). This file pins the *edge cases* a real overlay author can hit:
 * Uppercase suffixes (``.JSON`` / ``.CSV``) are accepted via the suffix
   comparison being lowercased.
 * ``Path`` and ``str`` inputs behave identically.
-* Real-API integration: the figma comments overlay and the instagram users
-  overlay (the two callsites the production fix rewired) are exercised in a
-  sandboxed copy of the real ``environment/<api>/`` directory.
+* Real-API integration: the cloudflare dns-records overlay and the gitlab
+  issues overlay are exercised in a sandboxed copy of the real
+  ``environment/<api>/`` directory. (They re-point the figma-comments and
+  instagram-users fixtures the Q1 fix originally rewired; both services left
+  in the newreq convergence, and no service on the converged fleet ships a
+  ``.csv`` seed, so the overlay is authored into the sandbox either way.)
 
 Test hygiene mirrors ``test_reader_contract.py``: every test that mutates
 ``sys.modules`` or ``_mutable_store._STORES`` cleans up in a ``finally``
@@ -525,102 +528,107 @@ def isolated_api_import(monkeypatch):
         sys.modules.pop(module_name, None)
 
 
-def test_real_api_figma_csv_overlay_blanks_out_comments(tmp_path, isolated_api_import):
-    """Edge case end-to-end: an EMPTY (header-only) CSV overlay drops the
-    comments table to zero rows even though comments.json is populated.
-    This is the production analogue of test_empty_csv_overlay_wins_over...
-    above, but driven through the real figma_data._store loader.
-    """
-    sandbox = _sandbox_api(tmp_path, "figma-api")
-    # Author an empty overlay with the columns the real comments.json uses.
-    header_cols = [
-        "comment_id", "file_key", "user_id", "user_handle",
-        "message", "node_id", "resolved", "created_at",
-    ]
-    with open(sandbox / "comments.csv", "w", newline="", encoding="utf-8") as f:
-        csv.DictWriter(f, fieldnames=header_cols).writeheader()
+DNS_COLS = ["id", "zone_id", "type", "name", "content", "ttl", "proxied",
+            "priority", "created_on", "modified_on"]
 
-    figma_data = isolated_api_import(sandbox, "figma_data", "figma-api")
-    rows = figma_data._store.table("comments").rows()
+
+def test_real_api_cloudflare_csv_overlay_blanks_out_dns_records(tmp_path,
+                                                                isolated_api_import):
+    """Edge case end-to-end: an EMPTY (header-only) CSV overlay drops the
+    dns table to zero rows even though dns_records.json is populated.
+    This is the production analogue of test_empty_csv_overlay_wins_over...
+    above, but driven through the real cloudflare_data._store loader.
+    """
+    sandbox = _sandbox_api(tmp_path, "cloudflare-api")
+    with open(sandbox / "dns_records.csv", "w", newline="", encoding="utf-8") as f:
+        csv.DictWriter(f, fieldnames=DNS_COLS).writeheader()
+
+    cloudflare_data = isolated_api_import(sandbox, "cloudflare_data", "cloudflare-api")
+    rows = cloudflare_data._store.table("dns").rows()
     assert rows == []
 
 
-def test_real_api_figma_csv_overlay_does_not_leak_into_sibling_tables(
+def test_real_api_cloudflare_csv_overlay_does_not_leak_into_sibling_tables(
     tmp_path, isolated_api_import
 ):
-    """Selective-overlay invariant: overlaying ``comments.csv`` must not
-    perturb the sibling tables (``projects``, ``files``, ``components``)
+    """Selective-overlay invariant: overlaying ``dns_records.csv`` must not
+    perturb the sibling tables (``zones``, ``firewall``, ``page_rules``)
     that were NOT overlaid. This catches a class of bugs where a globbed
     overlay collector accidentally replaces every table at once.
-    """
-    sandbox = _sandbox_api(tmp_path, "figma-api")
-    # Baseline (no overlay) — capture counts.
-    figma_baseline = isolated_api_import(sandbox, "figma_data", "figma-api")
-    baseline_files = len(figma_baseline._store.table("files").rows())
-    baseline_components = len(figma_baseline._store.table("components").rows())
-    baseline_projects = len(figma_baseline._store.table("projects").rows())
 
-    # Now author a single-row comments overlay in the SAME sandbox dir and
+    The overlay filename tracks the SEED FILE, not the table: cloudflare
+    registers ``dns`` out of ``dns_records.json``, so the sibling probed for
+    the overlay is ``dns_records.csv``.
+    """
+    sandbox = _sandbox_api(tmp_path, "cloudflare-api")
+    # Baseline (no overlay) — capture counts.
+    cf_baseline = isolated_api_import(sandbox, "cloudflare_data", "cloudflare-api")
+    baseline_zones = len(cf_baseline._store.table("zones").rows())
+    baseline_firewall = len(cf_baseline._store.table("firewall").rows())
+    baseline_page_rules = len(cf_baseline._store.table("page_rules").rows())
+
+    # Now author a single-row dns overlay in the SAME sandbox dir and
     # re-import (the fixture handles cleanup).
     overlay_row = {
-        "comment_id": "EDGE_001", "file_key": "FK_EDGE", "user_id": "u-edge",
-        "user_handle": "Edge", "message": "selective overlay only",
-        "node_id": "0:0", "resolved": "false",
-        "created_at": "2026-06-17T00:00:00Z",
+        "id": "EDGE_001", "zone_id": "ZONE_EDGE", "type": "A",
+        "name": "edge.orbit-labs.com", "content": "203.0.113.9", "ttl": "300",
+        "proxied": "false", "priority": "0",
+        "created_on": "2026-06-17T00:00:00Z", "modified_on": "2026-06-17T00:00:00Z",
     }
-    with open(sandbox / "comments.csv", "w", newline="", encoding="utf-8") as f:
+    with open(sandbox / "dns_records.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(overlay_row.keys()))
         w.writeheader()
         w.writerow(overlay_row)
 
-    figma_overlaid = isolated_api_import(sandbox, "figma_data", "figma-api")
-    comments = figma_overlaid._store.table("comments").rows()
-    assert len(comments) == 1
-    assert comments[0]["comment_id"] == "EDGE_001"
+    cf_overlaid = isolated_api_import(sandbox, "cloudflare_data", "cloudflare-api")
+    dns = cf_overlaid._store.table("dns").rows()
+    assert len(dns) == 1
+    assert dns[0]["id"] == "EDGE_001"
     # Sibling tables untouched.
-    assert len(figma_overlaid._store.table("files").rows()) == baseline_files
-    assert len(figma_overlaid._store.table("components").rows()) == baseline_components
-    assert len(figma_overlaid._store.table("projects").rows()) == baseline_projects
+    assert len(cf_overlaid._store.table("zones").rows()) == baseline_zones
+    assert len(cf_overlaid._store.table("firewall").rows()) == baseline_firewall
+    assert len(cf_overlaid._store.table("page_rules").rows()) == baseline_page_rules
 
 
-def test_real_api_instagram_user_csv_overlay_replaces_baked_users(
+def test_real_api_gitlab_issue_csv_overlay_replaces_baked_issues(
     tmp_path, isolated_api_import
 ):
-    """The other production callsite the Q1 fix re-wired: instagram's
-    ``user.json`` is now routed through ``_load`` so a sibling
-    ``user.csv`` overlay wins. End-to-end edge case: a single-row CSV
-    fully replaces the multi-row baked JSON.
+    """A second, independent production callsite, so the contract is pinned
+    against a data module that resolves ``_load`` for itself rather than
+    against one service's spelling of it. End-to-end edge case: a single-row
+    CSV fully replaces the multi-row baked JSON.
     """
-    sandbox = _sandbox_api(tmp_path, "instagram-api")
-    overlay_user = {
-        "id": "ig_overlay_42",
-        "username": "overlay_user",
-        "name": "Overlay E2E",
-        "biography": "from CSV",
-        "website": "",
-        "followers_count": "0",
-        "follows_count": "0",
-        "media_count": "0",
-        "profile_picture_url": "",
-        "ig_id": "0",
-        "account_type": "BUSINESS",
-        "category": "Other",
+    sandbox = _sandbox_api(tmp_path, "gitlab-api")
+    overlay_issue = {
+        "id": "9001",
+        "iid": "91",
+        "project_id": "101",
+        "title": "Overlay E2E",
+        "description": "from CSV",
+        "state": "opened",
+        "author": "amelia-ortega",
+        "assignee": "",
+        "labels": "overlay;e2e",
+        "created_at": "2026-06-17T00:00:00Z",
+        "updated_at": "2026-06-17T00:00:00Z",
+        "closed_at": "",
     }
-    with open(sandbox / "user.csv", "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=list(overlay_user.keys()))
+    with open(sandbox / "issues.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(overlay_issue.keys()))
         w.writeheader()
-        w.writerow(overlay_user)
+        w.writerow(overlay_issue)
 
-    instagram_data = isolated_api_import(
-        sandbox, "instagram_data", "instagram-api",
-    )
-    users = instagram_data._store.table("users").rows()
-    assert len(users) == 1
-    assert users[0]["id"] == "ig_overlay_42"
-    assert users[0]["username"] == "overlay_user"
+    gitlab_data = isolated_api_import(sandbox, "gitlab_data", "gitlab-api")
+    issues = gitlab_data._store.table("issues").rows()
+    assert len(issues) == 1
+    assert issues[0]["id"] == 9001
+    assert issues[0]["title"] == "Overlay E2E"
+    # The coercer still runs on overlay rows: a ';'-joined CSV cell must
+    # arrive as the list the JSON baseline would have carried.
+    assert issues[0]["labels"] == ["overlay", "e2e"]
 
 
-def test_real_api_figma_ragged_csv_overlay_surfaces_coerce_error(
+def test_real_api_cloudflare_ragged_csv_overlay_surfaces_coerce_error(
     tmp_path, isolated_api_import
 ):
     """A malformed CSV overlay must surface as CoerceError at store-load
@@ -628,16 +636,17 @@ def test_real_api_figma_ragged_csv_overlay_surfaces_coerce_error(
     eventually hits the route. This is the operator-visibility property
     the Q1 fix is supposed to preserve at the real-API layer.
     """
-    sandbox = _sandbox_api(tmp_path, "figma-api")
-    # Hand-author a ragged comments.csv (extra unquoted comma in message).
-    (sandbox / "comments.csv").write_text(
-        "comment_id,file_key,user_id,user_handle,message,node_id,resolved,created_at\n"
-        "C1,FK,u1,Edge,oops, extra comma,0:0,false,2026-06-17T00:00:00Z\n",
+    sandbox = _sandbox_api(tmp_path, "cloudflare-api")
+    # Hand-author a ragged dns_records.csv (extra unquoted comma in name).
+    (sandbox / "dns_records.csv").write_text(
+        ",".join(DNS_COLS) + "\n"
+        "R1,ZONE,A,oops, extra comma,203.0.113.9,300,false,0,"
+        "2026-06-17T00:00:00Z,2026-06-17T00:00:00Z\n",
         encoding="utf-8",
     )
     # NOTE: The CoerceError raised here originates from the _mutable_store that
-    # figma_data resolves at (re)import time. When an earlier test in the same
-    # session evicts _mutable_store from sys.modules (e.g.
+    # cloudflare_data resolves at (re)import time. When an earlier test in the
+    # same session evicts _mutable_store from sys.modules (e.g.
     # test_drift_plane_smoke.py does exactly this in its fixture), the module
     # is re-imported under a fresh identity and its CoerceError becomes a
     # DISTINCT class object from the one bound at the top of THIS file -- so a
@@ -648,11 +657,11 @@ def test_real_api_figma_ragged_csv_overlay_surfaces_coerce_error(
     # contract: a ragged overlay CSV must abort store load with a CoerceError
     # naming api+table.
     with pytest.raises(Exception) as excinfo:
-        isolated_api_import(sandbox, "figma_data", "figma-api")
+        isolated_api_import(sandbox, "cloudflare_data", "cloudflare-api")
     assert type(excinfo.value).__name__ == "CoerceError", (
         f"expected CoerceError, got {type(excinfo.value).__name__}: {excinfo.value}"
     )
     msg = str(excinfo.value)
     assert "ragged row" in msg
-    assert "figma-api" in msg
-    assert "comments" in msg
+    assert "cloudflare-api" in msg
+    assert "dns" in msg

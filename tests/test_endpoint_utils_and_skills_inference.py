@@ -278,18 +278,18 @@ def test_compile_pattern_escapes_regex_metacharacters() -> None:
 
 
 def test_compile_matchers_strong_includes_slug_and_curated() -> None:
-    strong, generic = si._compile_matchers("etsy-api")
+    strong, generic = si._compile_matchers("bamboohr-api")
     assert strong is not None and generic is not None
-    assert strong.search("sync with etsy now")         # slug token
-    assert strong.search("a handmade batch")           # curated strong keyword
-    assert generic.search("update the shop")           # curated generic keyword
-    assert strong.search("update the shop") is None    # shop is generic-only
+    assert strong.search("sync with bamboohr now")     # slug token
+    assert strong.search("run the hris export")        # curated strong keyword
+    assert generic.search("update the employee list")  # curated generic keyword
+    assert strong.search("update the employee list") is None  # generic-only
 
 
 def test_compile_matchers_no_generic_map_returns_none_generic() -> None:
-    strong, generic = si._compile_matchers("notion-api")
+    strong, generic = si._compile_matchers("microsoft-teams-api")
     assert strong is not None
-    assert generic is None  # notion-api has no _GENERIC_KEYWORDS entry
+    assert generic is None  # microsoft-teams-api has no _GENERIC_KEYWORDS entry
 
 
 # ---------------------------------------------------------------------------
@@ -348,7 +348,7 @@ def test_all_keywordless_dirs_trigger_curated_fallback(tmp_path: Path) -> None:
 
 def test_available_apis_real_repo_environment_contains_flagships() -> None:
     apis = si.available_apis()  # default: repo environment/ (checked in, offline)
-    for flagship in ("amazon-seller-api", "google-classroom-api", "linear-api"):
+    for flagship in ("microsoft-teams-api", "bamboohr-api", "paypal-api"):
         assert flagship in apis
     assert len(apis) > len(si._CURATED_KEYWORDS)  # dynamic discovery, not fallback
 
@@ -437,47 +437,64 @@ def test_infer_multiple_matches_sorted(tmp_path: Path) -> None:
 
 
 def test_infer_single_generic_hit_is_not_enough(tmp_path: Path) -> None:
-    env = _make_env(tmp_path, ["linear-api"])
-    # 'ticket' is a generic keyword for linear-api; one hit must not match.
-    assert si.infer_required_apis("please review the ticket today", env) == []
+    env = _make_env(tmp_path, ["bamboohr-api"])
+    # 'employee' is a generic keyword for bamboohr-api; one hit must not match.
+    assert si.infer_required_apis("please review the employee today", env) == []
 
 
 def test_infer_two_generic_hits_qualify(tmp_path: Path) -> None:
-    env = _make_env(tmp_path, ["linear-api"])
-    prompt = "review the ticket and groom the backlog"
-    assert si.infer_required_apis(prompt, env) == ["linear-api"]
+    env = _make_env(tmp_path, ["bamboohr-api"])
+    prompt = "review the employee and plan the onboarding"
+    assert si.infer_required_apis(prompt, env) == ["bamboohr-api"]
 
 
 def test_infer_same_generic_word_twice_counts_as_two_hits(tmp_path: Path) -> None:
-    env = _make_env(tmp_path, ["linear-api"])
+    env = _make_env(tmp_path, ["bamboohr-api"])
     # findall counts occurrences, so repeating one generic word reaches the
     # >=2 threshold even though only one distinct domain word appears.
-    prompt = "attach ticket A and ticket B"
-    assert si.infer_required_apis(prompt, env) == ["linear-api"]
+    prompt = "attach employee A and employee B"
+    assert si.infer_required_apis(prompt, env) == ["bamboohr-api"]
 
 
 def test_infer_strong_hit_wins_even_with_generic_noise(tmp_path: Path) -> None:
-    env = _make_env(tmp_path, ["linear-api"])
-    assert si.infer_required_apis("log this ticket in linear", env) == ["linear-api"]
+    env = _make_env(tmp_path, ["bamboohr-api"])
+    assert si.infer_required_apis("log this employee in bamboohr", env) == [
+        "bamboohr-api"]
 
 
 def test_infer_curated_keyword_counts_as_strong(tmp_path: Path) -> None:
-    env = _make_env(tmp_path, ["etsy-api"])
-    # 'woodcraft' is a curated strong keyword for etsy-api and shares no token
+    env = _make_env(tmp_path, ["bamboohr-api"])
+    # 'hris' is a curated strong keyword for bamboohr-api and shares no token
     # with the slug, so a hit proves the curated table feeds the strong matcher.
-    assert si.infer_required_apis("bring the woodcraft samples", env) == ["etsy-api"]
+    # This is the discrimination property etsy's departed 'woodcraft' held: a
+    # curated term the slug could never have produced.
+    assert si.infer_required_apis("run the hris export", env) == ["bamboohr-api"]
 
 
-def test_infer_generic_pair_for_etsy(tmp_path: Path) -> None:
-    env = _make_env(tmp_path, ["etsy-api"])
-    assert si.infer_required_apis("update the shop listing", env) == ["etsy-api"]
-    assert si.infer_required_apis("update the shop", env) == []
+def test_every_curated_service_keeps_one_slug_independent_keyword() -> None:
+    """Generalises the property above across the whole curated table, so a
+    future re-point cannot quietly reduce a service's curated entry to
+    restatements of its own slug -- which would make the table dead weight."""
+    for api, keywords in si._CURATED_KEYWORDS.items():
+        slug_tokens, _ = si._slug_keywords(api)
+        independent = [
+            kw for kw in keywords
+            if not (set(kw.lower().split()) & slug_tokens)
+        ]
+        assert independent, f"{api}: every curated keyword restates the slug"
+
+
+def test_infer_generic_pair_for_bamboohr(tmp_path: Path) -> None:
+    env = _make_env(tmp_path, ["bamboohr-api"])
+    assert si.infer_required_apis("update the employee headcount", env) == [
+        "bamboohr-api"]
+    assert si.infer_required_apis("update the employee", env) == []
 
 
 def test_infer_multiword_slug_phrase_match(tmp_path: Path) -> None:
-    env = _make_env(tmp_path, ["google-classroom-api"])
-    out = si.infer_required_apis("post the syllabus to google classroom", env)
-    assert out == ["google-classroom-api"]
+    env = _make_env(tmp_path, ["microsoft-teams-api"])
+    out = si.infer_required_apis("post the standup notes to microsoft teams", env)
+    assert out == ["microsoft-teams-api"]
 
 
 def test_infer_no_match_returns_empty(tmp_path: Path) -> None:

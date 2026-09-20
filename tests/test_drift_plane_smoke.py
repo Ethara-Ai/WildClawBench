@@ -1,10 +1,19 @@
 """End-to-end smoke test for the drift plane.
 
-Spins up the stripe-api FastAPI app via TestClient with MOCK_ADMIN_ENABLED=1
+Spins up the monday-api FastAPI app via TestClient with MOCK_ADMIN_ENABLED=1
 and verifies that admin-plane mutations are reflected in subsequent reads
 through the public API. Run with:
 
     pytest tests/test_drift_plane_smoke.py -v
+
+monday-api replaces stripe-api, which left in the newreq convergence. It is the
+service src/utils/drift_director.py documents its own worked example against
+(`table: items`, `pk: item-1001`, `fields: {name: ...}`), so the smoke test and
+the director's docstring now exercise the same route.
+
+The items table is registered under `item_id`, not `id` -- the admin plane keys
+rows by the table's REGISTERED primary key, so the probe reads that column
+rather than assuming `id`.
 """
 
 import os
@@ -15,7 +24,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPO_ROOT / "environment" / "stripe-api"
+SERVICE_DIR = REPO_ROOT / "environment" / "monday-api"
 ENV_DIR = REPO_ROOT / "environment"
 
 
@@ -28,7 +37,7 @@ def admin_client(monkeypatch):
     monkeypatch.syspath_prepend(str(SERVICE_DIR))
 
     for mod in [
-        "stripe_data", "server", "_mutable_store", "admin_plane",
+        "monday_data", "server", "_mutable_store", "admin_plane",
         "tracking_middleware",
     ]:
         sys.modules.pop(mod, None)
@@ -39,7 +48,7 @@ def admin_client(monkeypatch):
     yield TestClient(server.app)
 
     for mod in [
-        "stripe_data", "server", "_mutable_store", "admin_plane",
+        "monday_data", "server", "_mutable_store", "admin_plane",
         "tracking_middleware",
     ]:
         sys.modules.pop(mod, None)
@@ -50,7 +59,7 @@ def test_admin_health_reachable(admin_client):
     assert r.status_code == 200
     body = r.json()
     assert body["ok"] is True
-    assert "customers" in body["tables"]
+    assert "items" in body["tables"]
 
 
 def test_admin_blocks_unallowlisted_ip(monkeypatch):
@@ -59,7 +68,7 @@ def test_admin_blocks_unallowlisted_ip(monkeypatch):
     monkeypatch.syspath_prepend(str(ENV_DIR))
     monkeypatch.syspath_prepend(str(SERVICE_DIR))
     for mod in [
-        "stripe_data", "server", "_mutable_store", "admin_plane",
+        "monday_data", "server", "_mutable_store", "admin_plane",
         "tracking_middleware",
     ]:
         sys.modules.pop(mod, None)
@@ -73,29 +82,29 @@ def test_admin_blocks_unallowlisted_ip(monkeypatch):
 
 
 def test_data_patch_visible_in_public_endpoint(admin_client):
-    r = admin_client.get("/admin/data/customers")
+    r = admin_client.get("/admin/data/items")
     assert r.status_code == 200
     rows = r.json()["rows"]
-    assert rows, "expected pre-loaded customers"
+    assert rows, "expected pre-loaded items"
     target = rows[0]
-    cust_id = target["id"]
+    item_id = target["item_id"]
 
     r = admin_client.patch(
-        f"/admin/data/customers/{cust_id}",
-        json={"fields": {"email": "drifted@example.com"}},
+        f"/admin/data/items/{item_id}",
+        json={"fields": {"name": "Blocked: vendor outage"}},
     )
     assert r.status_code == 200, r.text
 
-    r = admin_client.get(f"/v1/customers/{cust_id}")
+    r = admin_client.get(f"/v2/items/{item_id}")
     assert r.status_code == 200
-    assert r.json()["email"] == "drifted@example.com"
+    assert r.json()["name"] == "Blocked: vendor outage"
 
 
 def test_snapshot_restore_round_trip(admin_client):
-    r = admin_client.get("/admin/data/customers")
+    r = admin_client.get("/admin/data/items")
     original = r.json()["rows"][0]
-    cust_id = original["id"]
-    pristine_email = original["email"]
+    item_id = original["item_id"]
+    pristine_name = original["name"]
 
     r = admin_client.get("/admin/snapshot/__baseline__")
     if r.status_code == 404:
@@ -106,28 +115,28 @@ def test_snapshot_restore_round_trip(admin_client):
         snap_id = "__baseline__"
 
     admin_client.patch(
-        f"/admin/data/customers/{cust_id}",
-        json={"fields": {"email": "wiped@example.com"}},
+        f"/admin/data/items/{item_id}",
+        json={"fields": {"name": "Wiped"}},
     )
 
     r = admin_client.post("/admin/snapshot/restore",
                           json={"snapshot_id": snap_id})
     assert r.status_code == 200, r.text
 
-    r = admin_client.get(f"/v1/customers/{cust_id}")
+    r = admin_client.get(f"/v2/items/{item_id}")
     assert r.status_code == 200, r.text
-    assert r.json()["email"] == pristine_email
+    assert r.json()["name"] == pristine_name
 
 
 def test_drift_log_records_mutations(admin_client):
     admin_client.post("/admin/drift/log/clear")
 
-    r = admin_client.get("/admin/data/customers")
-    cust_id = r.json()["rows"][0]["id"]
+    r = admin_client.get("/admin/data/items")
+    item_id = r.json()["rows"][0]["item_id"]
 
     admin_client.patch(
-        f"/admin/data/customers/{cust_id}",
-        json={"fields": {"email": "logged@example.com"}},
+        f"/admin/data/items/{item_id}",
+        json={"fields": {"name": "Logged"}},
     )
 
     r = admin_client.get("/admin/drift/log")
@@ -139,7 +148,7 @@ def test_drift_log_records_mutations(admin_client):
 def test_audit_does_not_record_admin_calls(admin_client):
     admin_client.get("/audit/requests/clear")
 
-    admin_client.get("/admin/data/customers")
+    admin_client.get("/admin/data/items")
     admin_client.get("/admin/tables")
 
     r = admin_client.get("/audit/requests")

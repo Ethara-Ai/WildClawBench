@@ -45,9 +45,20 @@ pytestmark = pytest.mark.xfail(
     "not present in any connector script; source is off-limits.",
 )
 
-VARIANT_T_SAMPLE = "hubspot-api-connector/scripts/fetch_hubspot_data.py"
-VARIANT_R_SAMPLE = "instagram-api-connector/scripts/fetch_instagram_data.py"
-NAMING_EXCEPTION = "google-classroom-api-connector/scripts/fetch_classroom_data.py"
+# Three samples rather than all 50, because the helper is INLINED per script:
+# loading every one would be 50 module execs for one shared assertion, and the
+# file-scan guards in Section A already cover the fleet.
+#
+# Re-pointed for the newreq convergence. The old trio sampled two code shapes
+# plus the one connector whose script stem did not match its slug; instagram
+# and google-classroom both left, and the converged fleet has NO naming
+# exception left and only one structural outlier. So the three now sample what
+# actually varies: a surviving connector, an arriving one (the 25 newcomers
+# were previously unsampled here), and twilio, the single script that does not
+# share the other 49's shape.
+SURVIVING_SAMPLE = "hubspot-api-connector/scripts/fetch_hubspot_data.py"
+ARRIVING_SAMPLE = "paypal-api-connector/scripts/fetch_paypal_data.py"
+SHAPE_OUTLIER = "twilio-api-connector/scripts/fetch_twilio_data.py"
 
 
 def _load_script(rel: str):
@@ -63,18 +74,18 @@ def _load_script(rel: str):
 
 
 @pytest.fixture(scope="module")
-def variant_t():
-    return _load_script(VARIANT_T_SAMPLE)
+def surviving_sample():
+    return _load_script(SURVIVING_SAMPLE)
 
 
 @pytest.fixture(scope="module")
-def variant_r():
-    return _load_script(VARIANT_R_SAMPLE)
+def arriving_sample():
+    return _load_script(ARRIVING_SAMPLE)
 
 
 @pytest.fixture(scope="module")
-def naming_exception():
-    return _load_script(NAMING_EXCEPTION)
+def shape_outlier():
+    return _load_script(SHAPE_OUTLIER)
 
 
 # Section A. The 50 patched files all import + parse cleanly and expose the
@@ -104,7 +115,7 @@ def test_no_unguarded_urlopen_remains_in_connector_scripts():
 
 @pytest.mark.parametrize(
     "fixture_name",
-    ["variant_t", "variant_r", "naming_exception"],
+    ["surviving_sample", "arriving_sample", "shape_outlier"],
 )
 @pytest.mark.parametrize(
     "url",
@@ -127,7 +138,7 @@ def test_safe_urlopen_rejects_non_http_schemes(fixture_name, url, request):
 
 @pytest.mark.parametrize(
     "fixture_name",
-    ["variant_t", "variant_r", "naming_exception"],
+    ["surviving_sample", "arriving_sample", "shape_outlier"],
 )
 @pytest.mark.parametrize(
     "url",
@@ -149,7 +160,7 @@ def test_safe_urlopen_rejects_link_local(fixture_name, url, request):
 
 @pytest.mark.parametrize(
     "fixture_name",
-    ["variant_t", "variant_r", "naming_exception"],
+    ["surviving_sample", "arriving_sample", "shape_outlier"],
 )
 @pytest.mark.parametrize(
     "url",
@@ -171,7 +182,7 @@ def test_safe_urlopen_allows_localhost_and_rfc1918(fixture_name, url, request):
 
 @pytest.mark.parametrize(
     "fixture_name",
-    ["variant_t", "variant_r", "naming_exception"],
+    ["surviving_sample", "arriving_sample", "shape_outlier"],
 )
 def test_safe_urlopen_rejects_missing_host(fixture_name, request):
     mod = request.getfixturevalue(fixture_name)
@@ -186,7 +197,7 @@ def test_safe_urlopen_rejects_missing_host(fixture_name, request):
 
 @pytest.mark.parametrize(
     "fixture_name",
-    ["variant_t", "variant_r", "naming_exception"],
+    ["surviving_sample", "arriving_sample", "shape_outlier"],
 )
 def test_redirect_handler_revalidates_location(fixture_name, request):
     mod = request.getfixturevalue(fixture_name)
@@ -224,7 +235,7 @@ def test_redirect_handler_revalidates_location(fixture_name, request):
 
 @pytest.mark.parametrize(
     "fixture_name",
-    ["variant_t", "variant_r", "naming_exception"],
+    ["surviving_sample", "arriving_sample", "shape_outlier"],
 )
 @pytest.mark.parametrize(
     "url",

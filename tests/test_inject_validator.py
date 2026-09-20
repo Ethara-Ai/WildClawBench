@@ -16,7 +16,14 @@ from src.utils.inject_validator import (
 )
 from src.utils.skills_inference import catalog_apis
 
-URLS = {"google-classroom-api": "http://127.0.0.1:1", "mailchimp-api": "http://127.0.0.1:2"}
+# Re-pointed off google-classroom / mailchimp, which left in the newreq
+# convergence. kubernetes keeps the property the amara scenario was written
+# for: a nested-dict field (`spec.replicas`) moving across stages, which is the
+# shape `dueDate: {year, month, day}` supplied. The validator never inspects
+# the REST path, only the slug, the pk and the body's field count, so the paths
+# below are cosmetic fidelity rather than load-bearing.
+URLS = {"kubernetes-api": "http://127.0.0.1:1", "sentry-api": "http://127.0.0.1:2"}
+DEPLOYMENT = "api-gateway"
 
 
 def _seed_stage(silent=None, loud=None):
@@ -36,7 +43,7 @@ def _stage(index, from_turn, to_turn, silent=None, loud=None, name=None):
 def _rest_patch(oid, service, pk, body):
     return {
         "id": oid, "service": service, "method": "PATCH",
-        "path": f"/v1/courses/801110001/courseWork/{pk}", "body": body,
+        "path": f"/apis/apps/v1/namespaces/prod/deployments/{pk}", "body": body,
     }
 
 
@@ -45,15 +52,15 @@ def _script(*stages):
 
 
 def test_slug_normalization_success_no_fatal(tmp_path):
-    svc_dir = tmp_path / "google-classroom-api"
+    svc_dir = tmp_path / "kubernetes-api"
     svc_dir.mkdir()
-    (svc_dir / "coursework.json").write_text(
-        '[{"id": "901110051", "dueDate": {"year": 2027, "month": 1, "day": 20}}]',
+    (svc_dir / "deployments.json").write_text(
+        '[{"id": "api-gateway", "spec": {"replicas": 3}}]',
         encoding="utf-8",
     )
     stage1 = _stage(1, 0, 1, silent=[_rest_patch(
-        "s1", "google-classroom-api", "901110051",
-        {"dueDate": {"year": 2027, "month": 1, "day": 27}})])
+        "s1", "kubernetes-api", DEPLOYMENT,
+        {"spec": {"replicas": 7}})])
     warnings = run_authoring_validation(
         _script(_seed_stage(), stage1), host_api_to_url=URLS, mock_data_root=tmp_path)
     assert warnings == []
@@ -61,10 +68,10 @@ def test_slug_normalization_success_no_fatal(tmp_path):
 
 def test_bare_slug_without_api_suffix_is_fatal():
     # The injector does NOT auto-normalize a bare slug; authors must write the
-    # canonical '<name>-api' slug. A bare 'google-classroom' is unresolvable.
+    # canonical '<name>-api' slug. A bare 'kubernetes' is unresolvable.
     stage1 = _stage(1, 0, 1, silent=[_rest_patch(
-        "s1", "google-classroom", "901110051",
-        {"dueDate": {"year": 2027, "month": 1, "day": 27}})])
+        "s1", "kubernetes", DEPLOYMENT,
+        {"spec": {"replicas": 7}})])
     with pytest.raises(InjectAuthoringError) as ei:
         run_authoring_validation(_script(stage1), host_api_to_url=URLS, mock_data_root=None)
     assert any(d["status"] == "unresolved" for d in ei.value.defects)
@@ -72,8 +79,8 @@ def test_bare_slug_without_api_suffix_is_fatal():
 
 def test_unresolvable_slug_is_fatal():
     stage1 = _stage(1, 0, 1, silent=[_rest_patch(
-        "s1", "does-not-exist", "901110051",
-        {"dueDate": {"year": 2027, "month": 1, "day": 27}})])
+        "s1", "does-not-exist", DEPLOYMENT,
+        {"spec": {"replicas": 7}})])
     with pytest.raises(InjectAuthoringError) as ei:
         run_authoring_validation(_script(stage1), host_api_to_url=URLS, mock_data_root=None)
     assert any(d["status"] == "unresolved" for d in ei.value.defects)
@@ -81,7 +88,7 @@ def test_unresolvable_slug_is_fatal():
 
 def test_zero_field_op_is_fatal():
     stage1 = _stage(1, 0, 1, silent=[_rest_patch(
-        "s1", "google-classroom-api", "901110051", {})])
+        "s1", "kubernetes-api", DEPLOYMENT, {})])
     with pytest.raises(InjectAuthoringError) as ei:
         run_authoring_validation(_script(stage1), host_api_to_url=URLS, mock_data_root=None)
     assert any(d["status"] == "empty" for d in ei.value.defects)
@@ -90,8 +97,8 @@ def test_zero_field_op_is_fatal():
 def test_stage1_missing_target_is_fatal():
     seed = _seed_stage()
     stage1 = _stage(1, 0, 1, silent=[_rest_patch(
-        "s1", "google-classroom-api", "999999999",
-        {"dueDate": {"year": 2027, "month": 1, "day": 27}})])
+        "s1", "kubernetes-api", "deployment-does-not-exist",
+        {"spec": {"replicas": 7}})])
     fatal, warnings = validate_inject_script(
         _script(seed, stage1), host_api_to_url=URLS, mock_data_root=None)
     assert any(d["status"] == "missing-target" for d in fatal)
@@ -100,13 +107,13 @@ def test_stage1_missing_target_is_fatal():
 def test_stage2_patch_of_stage1_upsert_not_fatal():
     seed = _seed_stage()
     upsert_op = {
-        "id": "u1", "service": "google-classroom-api",
-        "admin": {"op": "upsert", "table": "coursework", "row": {"id": "555000111"}},
+        "id": "u1", "service": "kubernetes-api",
+        "admin": {"op": "upsert", "table": "deployments", "row": {"id": "api-canary"}},
     }
     stage1 = _stage(1, 0, 1, loud=[upsert_op])
     stage2 = _stage(2, 2, 3, silent=[_rest_patch(
-        "s2", "google-classroom-api", "555000111",
-        {"dueDate": {"year": 2027, "month": 2, "day": 1}})])
+        "s2", "kubernetes-api", "api-canary",
+        {"spec": {"replicas": 9}})])
     fatal, warnings = validate_inject_script(
         _script(seed, stage1, stage2), host_api_to_url=URLS, mock_data_root=None)
     assert fatal == []
@@ -116,11 +123,11 @@ def test_stage2_patch_of_stage1_upsert_not_fatal():
 def test_stage2_missing_target_is_warning_not_fatal():
     seed = _seed_stage()
     stage1 = _stage(1, 0, 1, silent=[_rest_patch(
-        "s1", "google-classroom-api", "seedrow",
-        {"dueDate": {"year": 2027, "month": 1, "day": 27}})])
+        "s1", "kubernetes-api", "seedrow",
+        {"spec": {"replicas": 7}})])
     stage2 = _stage(2, 2, 3, silent=[_rest_patch(
-        "s2", "google-classroom-api", "never-seen",
-        {"dueDate": {"year": 2027, "month": 2, "day": 1}})])
+        "s2", "kubernetes-api", "never-seen",
+        {"spec": {"replicas": 9}})])
     fatal, warnings = validate_inject_script(
         _script(seed, stage1, stage2),
         host_api_to_url=URLS,
@@ -131,47 +138,52 @@ def test_stage2_missing_target_is_warning_not_fatal():
 
 
 # --------------------------------------------------------------------------- #
-# End-to-end amara/google-classroom scenario: the real 4-stage dueDate move,
-# through the C4 validator (static pre-flight) AND the C1+C2+C3 runtime applier
-# against a live store shaped like _coerce_coursework's output (nested dueDate).
+# End-to-end 4-stage nested-field move, through the C4 validator (static
+# pre-flight) AND the C1+C2+C3 runtime applier against a live store.
+#
+# This is the amara/google-classroom dueDate scenario re-pointed onto
+# kubernetes: hold, move, hold, with the moved field nested one level down
+# (`spec.replicas` where amara had `dueDate.day`). The property under test is
+# that the applier reaches INTO the nested body rather than overwriting the
+# parent key, which is what the incident turned on.
 # --------------------------------------------------------------------------- #
 from src.utils.inject_director import InjectApplier, is_defect  # noqa: E402
 
 
-def _amara_stages():
-    # Canonical 'google-classroom-api' slug + bare top-level nested dueDate body,
-    # matching the schema-corrected inject/stage{0..3}/mutations.json files.
+def _scale_stages():
+    # Canonical '<name>-api' slug + bare top-level nested body, matching the
+    # shape of an authored inject/stage{0..3}/mutations.json file.
     seed = _seed_stage(silent=[_rest_patch(
-        "s0_due_seed", "google-classroom-api", "901110051",
-        {"dueDate": {"year": 2027, "month": 1, "day": 20}})])
+        "s0_scale_seed", "kubernetes-api", DEPLOYMENT,
+        {"spec": {"replicas": 3}})])
     stage1 = _stage(1, 2, 3, name="day2_hold", silent=[_rest_patch(
-        "s1_due_hold", "google-classroom-api", "901110051",
-        {"dueDate": {"year": 2027, "month": 1, "day": 20}})])
-    stage2 = _stage(2, 4, 5, name="day3_registrar_move", silent=[_rest_patch(
-        "s2_due_move", "google-classroom-api", "901110051",
-        {"dueDate": {"year": 2027, "month": 1, "day": 27}})])
+        "s1_scale_hold", "kubernetes-api", DEPLOYMENT,
+        {"spec": {"replicas": 3}})])
+    stage2 = _stage(2, 4, 5, name="day3_scale_out", silent=[_rest_patch(
+        "s2_scale_move", "kubernetes-api", DEPLOYMENT,
+        {"spec": {"replicas": 7}})])
     stage3 = _stage(3, 6, 7, name="day4_hold_live", silent=[_rest_patch(
-        "s3_due_live", "google-classroom-api", "901110051",
-        {"dueDate": {"year": 2027, "month": 1, "day": 27}})])
+        "s3_scale_live", "kubernetes-api", DEPLOYMENT,
+        {"spec": {"replicas": 7}})])
     return seed, stage1, stage2, stage3
 
 
-def test_amara_scenario_passes_preflight(tmp_path):
-    svc_dir = tmp_path / "google-classroom-api"
+def test_scale_scenario_passes_preflight(tmp_path):
+    svc_dir = tmp_path / "kubernetes-api"
     svc_dir.mkdir()
-    (svc_dir / "coursework.json").write_text(
-        '[{"id": "901110051", "dueDate": {"year": 2027, "month": 1, "day": 20}}]',
+    (svc_dir / "deployments.json").write_text(
+        '[{"id": "api-gateway", "spec": {"replicas": 3}}]',
         encoding="utf-8",
     )
     warnings = run_authoring_validation(
-        _script(*_amara_stages()), host_api_to_url=URLS, mock_data_root=tmp_path)
+        _script(*_scale_stages()), host_api_to_url=URLS, mock_data_root=tmp_path)
     assert warnings == []
 
 
-def _live_classroom_applier(tmp_path, tables, urls):
+def _live_deployment_applier(tmp_path, tables, urls):
     ap = InjectApplier(
         host_api_to_url=urls, admin_token=None,
-        timeline_path=tmp_path / "inject_timeline.jsonl", task_id="amara")
+        timeline_path=tmp_path / "inject_timeline.jsonl", task_id="scale-move")
 
     def fake_admin_get(api, suffix):
         if suffix == "/admin/tables":
@@ -199,31 +211,30 @@ def _live_classroom_applier(tmp_path, tables, urls):
     return ap
 
 
-def test_amara_scenario_applies_nested_duedate_end_to_end(tmp_path):
-    # Live store mirrors _coerce_coursework: flat seed dueDate_* lifted to nested.
-    tables = {"coursework": [{
-        "id": "901110051",
-        "title": "Reading the Chart: Asylum Grant Rates",
-        "dueDate": {"year": 2027, "month": 1, "day": 20},
+def test_scale_scenario_applies_nested_replicas_end_to_end(tmp_path):
+    # Live store mirrors the served deployment shape: replicas nested under spec.
+    tables = {"deployments": [{
+        "id": DEPLOYMENT,
+        "namespace": "prod",
+        "spec": {"replicas": 3},
     }]}
-    ap = _live_classroom_applier(
-        tmp_path, tables, urls={"google-classroom-api": "http://x"})
-    _seed, stage1, stage2, stage3 = _amara_stages()
+    ap = _live_deployment_applier(
+        tmp_path, tables, urls={"kubernetes-api": "http://x"})
+    _seed, stage1, stage2, stage3 = _scale_stages()
 
-    # Fire each non-seed stage's silent op; the registrar move (stage2) shifts
-    # the deadline to Jan 27 and the hold (stage3) keeps it there.
-    for stage, expected_day in ((stage1, 20), (stage2, 27), (stage3, 27)):
+    # Fire each non-seed stage's silent op; the scale-out (stage2) takes the
+    # deployment to 7 replicas and the hold (stage3) keeps it there.
+    for stage, expected_replicas in ((stage1, 3), (stage2, 7), (stage3, 7)):
         op = stage.silent[0]
         rec = ap._apply_api_mutation(op, stage, stage.to_turn, silent=True)
         assert "resolved_service" not in rec
-        assert rec["service"] == "google-classroom-api"
+        assert rec["service"] == "kubernetes-api"
         assert rec["ok"] is True and rec["status"] == "applied"
         assert "unmapped_fields" not in rec
         assert is_defect(rec) is False
-        assert tables["coursework"][0]["dueDate"]["day"] == expected_day
+        assert tables["deployments"][0]["spec"]["replicas"] == expected_replicas
 
-    assert tables["coursework"][0]["dueDate"] == {
-        "year": 2027, "month": 1, "day": 27}
+    assert tables["deployments"][0]["spec"] == {"replicas": 7}
 
 
 # --------------------------------------------------------------------------- #
@@ -421,7 +432,7 @@ def test_a_service_the_fleet_does_not_ship_is_fatal():
 def test_a_service_on_disk_clears_the_gate():
     fatal, _ = validate_inject_script(
         _script(_seed_stage(), _stage(1, 0, 1, silent=[_rest_patch(
-            "s1", "google-classroom-api", "901110051", {"dueDate": {"year": 2027}})])),
+            "s1", "kubernetes-api", DEPLOYMENT, {"spec": {"replicas": 2}})])),
         host_api_to_url=URLS, mock_data_root=None)
     assert not any(d["status"] == "service-not-in-catalog" for d in fatal)
 
@@ -451,6 +462,6 @@ def test_a_slug_in_neither_the_stack_nor_the_catalog_still_reads_as_unresolved()
     # a bare slug still gets the "use the canonical '<name>-api' slug" hint.
     with pytest.raises(InjectAuthoringError) as ei:
         run_authoring_validation(_script(_seed_stage(), _stage(1, 0, 1, silent=[
-            _rest_patch("s1", "google-classroom", "901110051", {"dueDate": {}})])),
+            _rest_patch("s1", "kubernetes", DEPLOYMENT, {"spec": {}})])),
             host_api_to_url=URLS, mock_data_root=None)
     assert [d["status"] for d in ei.value.defects] == ["unresolved"]

@@ -75,34 +75,45 @@ def _load(api_dir, module_name):
 
 
 def test_create_then_read_persists():
-    """A created entity must be readable back (the original C1 bug)."""
-    sd = _load("stripe-api", "stripe_data")
-    cust = sd.create_customer(name="Probe", email="probe@example.com")
-    assert "error" not in sd.get_customer(cust["id"]), "created customer did not persist"
+    """A created entity must be readable back (the original C1 bug).
 
-    # payment_intents is registered with primary_key != 'id' -> exercises the shim
-    pi = sd.create_payment_intent(amount=500, customer=cust["id"])
-    assert "error" not in sd.get_payment_intent(pi["id"]), "created payment_intent did not persist"
+    monday replaces stripe, which left in the newreq convergence, and carries
+    the same shim case in one table: ``items`` is registered with
+    primary_key="item_id", so ``_store_insert`` has to synthesize the
+    registered key from the row's ``id`` for the create to be addressable.
+    """
+    md = _load("monday-api", "monday_data")
+    item = md.create_item(board_id="board-101", name="Probe", group_id="grp-todo")
+    assert md._store.table("items").primary_key != "id"
+    assert "error" not in md.get_item(item["id"]), "created item did not persist"
 
 
 def test_update_and_delete_persist():
     """Update and delete must survive a fresh accessor read."""
-    gd = _load("google-drive-api", "google_drive_data")
-    created = gd.create_file(name="persist_probe.md", mime_type="text/markdown")
-    file_id = created["id"]
+    md = _load("monday-api", "monday_data")
+    created = md.create_item(board_id="board-101", name="persist_probe",
+                             group_id="grp-todo",
+                             column_values={"status": {"text": "Working on it"}})
+    item_id = created["id"]
 
-    gd.update_file(file_id, name="persist_probe_renamed.md")
-    assert gd.get_file(file_id)["name"] == "persist_probe_renamed.md", "update did not persist"
+    md.update_item(item_id, name="persist_probe_renamed")
+    assert md.get_item(item_id)["name"] == "persist_probe_renamed", "update did not persist"
 
-    gd.delete_file(file_id)
-    assert all(f["id"] != file_id for f in gd._files_rows()), "delete did not persist"
-    assert all(p["file_id"] != file_id for p in gd._permissions_rows()), \
-        "delete_where cascade did not persist: the file's permission row outlived it"
+    md.delete_item(item_id)
+    assert all(i["item_id"] != item_id for i in md._items_rows()), "delete did not persist"
+    assert all(cv["item_id"] != item_id for cv in md._column_values_rows()), \
+        "delete_where cascade did not persist: the item's column value outlived it"
 
 
 def test_injection_still_visible():
-    """Out-of-band store mutation (drift/injection) is visible on the next read."""
-    sd = _load("stripe-api", "stripe_data")
-    cust = sd.create_customer(name="DriftMe", email="a@b.com")
-    sd._store.table("customers").patch(cust["id"], {"email": "drifted@evil.com"})
-    assert sd.get_customer(cust["id"])["email"] == "drifted@evil.com"
+    """Out-of-band store mutation (drift/injection) is visible on the next read.
+
+    Asserted against github rather than monday so the create/read path and the
+    injection path are not the same module: an accessor that had stopped
+    reading the store would otherwise be able to fail both tests the same way
+    and look like one bug.
+    """
+    gh = _load("github-api", "github_data")
+    issue = gh.create_issue("orbit-labs", "auth-api", title="DriftMe", body="seed")
+    gh._store.table("issues").patch(issue["id"], {"title": "drifted"})
+    assert gh.get_issue("orbit-labs", "auth-api", issue["number"])["title"] == "drifted"
