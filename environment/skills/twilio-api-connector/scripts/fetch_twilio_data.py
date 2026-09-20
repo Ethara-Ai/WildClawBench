@@ -2,8 +2,13 @@
 """CLI helper for the Twilio API (Mock) mock API.
 
 Generated read/write helper: one flag per endpoint. Base URL comes from
-$TWILIO_API_URL (override with --url). POST/PUT/PATCH bodies are read from --data
-(JSON string) or --data-file; DELETE/GET take only path params.
+$TWILIO_API_URL (override with --url).
+
+This mock reads write fields (e.g. To/From/Body) from QUERY PARAMS, not a JSON
+body -- a JSON body is silently ignored and required fields will 422. Supply
+write fields with repeatable `--param key=value` flags (e.g. `--param To=+15551234567`).
+`--data`/`--data-file` are also accepted for back-compat: a flat JSON object is
+expanded into the same query params. GET takes only path params.
 """
 
 import argparse
@@ -35,6 +40,13 @@ def _request(base, path, method, body=None):
         return raw
 
 
+def _request_query(base, path, method, params):
+    query = urllib.parse.urlencode(params or {})
+    sep = "&" if "?" in path else "?"
+    full = path + (sep + query if query else "")
+    return _request(base, full, method)
+
+
 def api_get(base, path):
     return _request(base, path, "GET")
 
@@ -43,17 +55,21 @@ def api_delete(base, path):
     return _request(base, path, "DELETE")
 
 
-def api_send(base, path, method, body):
-    return _request(base, path, method, body if body is not None else {})
+def api_send(base, path, method, params):
+    return _request_query(base, path, method, params)
 
 
-def _body(args):
+def _params(args):
+    params = {}
     if getattr(args, "data_file", None):
         with open(args.data_file, "r", encoding="utf-8") as fh:
-            return json.load(fh)
+            params.update(json.load(fh))
     if getattr(args, "data", None):
-        return json.loads(args.data)
-    return {}
+        params.update(json.loads(args.data))
+    for pair in getattr(args, "param", None) or []:
+        key, _, value = pair.partition("=")
+        params[key] = value
+    return params
 
 
 def show(data):
@@ -70,8 +86,10 @@ def main():
     p.add_argument("--post-2010-04-01-accounts-calls-json-account-sid", metavar="ACCOUNT_SID", nargs=1, help="POST /2010-04-01/Accounts/{account_sid}/Calls.json")
     p.add_argument("--get-2010-04-01-accounts-incomingphonenumbers-json-account-sid", metavar="ACCOUNT_SID", nargs=1, help="GET /2010-04-01/Accounts/{account_sid}/IncomingPhoneNumbers.json")
     p.add_argument("--get-phonenumbers-phone-number", metavar="PHONE_NUMBER", nargs=1, help="GET /v1/PhoneNumbers/{phone_number}")
-    p.add_argument("--data", metavar="JSON", help="Request body as a JSON string (POST/PUT/PATCH)")
-    p.add_argument("--data-file", metavar="PATH", help="Request body from a JSON file (POST/PUT/PATCH)")
+    p.add_argument("--param", action="append", metavar="KEY=VALUE",
+                   help="Write field as a query param (repeatable), e.g. --param To=+15551234567")
+    p.add_argument("--data", metavar="JSON", help="Write fields as a flat JSON object (expanded into query params)")
+    p.add_argument("--data-file", metavar="PATH", help="Write fields from a flat JSON file (expanded into query params)")
     p.add_argument("--url", default=os.environ.get("TWILIO_API_URL", "http://localhost:8026"),
                    help="API base URL (default: $TWILIO_API_URL or http://localhost:8026)")
     args = p.parse_args()
@@ -93,11 +111,11 @@ def _dispatch(args, base):
     if args.get_2010_04_01_accounts_messages_account_sid_sid:
         return show(api_get(base, _fill('/2010-04-01/Accounts/{account_sid}/Messages/{sid}.json', args.get_2010_04_01_accounts_messages_account_sid_sid)))
     if args.post_2010_04_01_accounts_messages_json_account_sid:
-        return show(api_send(base, _fill('/2010-04-01/Accounts/{account_sid}/Messages.json', args.post_2010_04_01_accounts_messages_json_account_sid), 'POST', _body(args)))
+        return show(api_send(base, _fill('/2010-04-01/Accounts/{account_sid}/Messages.json', args.post_2010_04_01_accounts_messages_json_account_sid), 'POST', _params(args)))
     if args.get_2010_04_01_accounts_calls_json_account_sid:
         return show(api_get(base, _fill('/2010-04-01/Accounts/{account_sid}/Calls.json', args.get_2010_04_01_accounts_calls_json_account_sid)))
     if args.post_2010_04_01_accounts_calls_json_account_sid:
-        return show(api_send(base, _fill('/2010-04-01/Accounts/{account_sid}/Calls.json', args.post_2010_04_01_accounts_calls_json_account_sid), 'POST', _body(args)))
+        return show(api_send(base, _fill('/2010-04-01/Accounts/{account_sid}/Calls.json', args.post_2010_04_01_accounts_calls_json_account_sid), 'POST', _params(args)))
     if args.get_2010_04_01_accounts_incomingphonenumbers_json_account_sid:
         return show(api_get(base, _fill('/2010-04-01/Accounts/{account_sid}/IncomingPhoneNumbers.json', args.get_2010_04_01_accounts_incomingphonenumbers_json_account_sid)))
     if args.get_phonenumbers_phone_number:
