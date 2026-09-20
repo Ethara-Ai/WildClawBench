@@ -62,6 +62,7 @@ from eval.run_batch import (  # noqa: E402
     save_usage,
 )
 from src.utils import skills_inference  # noqa: E402
+from src.utils.pass_summary import PassSummaryCorruptError  # noqa: E402
 from src.utils.litellm_usage_callback import (  # noqa: E402
     _is_heartbeat_prompt,
     _is_memory_flush_prompt,
@@ -454,12 +455,44 @@ class TestPassSummaryDoc:
         # only run 1 has a test_reward -> mean over the single non-None value
         assert doc["average_test_reward"] == 0.8
 
-    def test_empty_per_run_zeroes(self):
+    def test_empty_per_run_is_marked_not_a_fabricated_zero(self):
+        # Regression (markerless zero): `_mean_or_none(...) or 0.0` used to turn
+        # "nothing to average" into `average_reward: 0.0`, and the
+        # all_runs_excluded marker was stamped only inside `if excluded:` — which
+        # is 0 for an empty per_run. The doc therefore claimed a genuine zero
+        # score with no marker at all for delivery to notice.
         doc = _pass_summary_doc("claude", [])
         assert doc["runs"] == 0
-        assert doc["average_reward"] == 0.0
+        assert doc["average_reward"] is None
+        assert doc["all_runs_excluded"] is True
+        assert doc["runs_used"] == 0
         assert doc["average_combined_reward"] is None
         assert doc["average_rubric_weights_percentage"] is None
+
+    def test_all_runs_excluded_carries_marker_and_no_bare_zero(self):
+        per_run = [
+            {"run_index": 1, "reward": 0.0, "combined_reward": 0.0,
+             "rubric_reward": 0.0, "test_reward": None,
+             "rubric_weights_percentage": 0.0, "grading_status": "failed"},
+        ]
+        doc = _pass_summary_doc("claude", per_run)
+        assert doc["average_reward"] is None
+        assert doc["all_runs_excluded"] is True
+        assert doc["runs_ungraded"] == 1
+        assert doc["runs_used"] == 0
+        assert len(doc["per_run"]) == 1
+
+    def test_used_reps_still_average_normally(self):
+        # The marker must not leak into the healthy path.
+        per_run = [
+            {"run_index": 1, "reward": 0.4, "combined_reward": 0.4,
+             "rubric_reward": 0.4, "test_reward": None,
+             "rubric_weights_percentage": 40.0},
+        ]
+        doc = _pass_summary_doc("claude", per_run)
+        assert doc["average_reward"] == pytest.approx(0.4)
+        assert "all_runs_excluded" not in doc
+        assert "runs_used" not in doc
 
 
 # ---------------------------------------------------------------------------
@@ -1234,14 +1267,27 @@ class TestWritePassSummary:
         assert doc["runs"] == 1
         assert doc["per_run"][0]["rubric_reward"] == 0.9
 
-    def test_corrupt_existing_summary_recovers(self, tmp_path):
+    def test_corrupt_existing_summary_is_quarantined_and_raises(self, tmp_path):
+        # Was `except json.JSONDecodeError: existing = {}` — a truncated file
+        # (the exact artifact a kill mid-write leaves) silently dropped every
+        # previously recorded rep and republished the doc with only this one in
+        # it. Now the unreadable bytes are preserved aside and the write fails
+        # loudly; _build_trajectory's try/except is what logs it.
         model_dir = tmp_path / "claude"
         model_dir.mkdir()
-        (model_dir / "pass_summary.json").write_text("{ this is not valid json")
-        # malformed existing file -> treated as empty, does not raise
-        _write_pass_summary(model_dir, "claude", 0, {"overall_score": 0.3}, None)
-        doc = json.loads((model_dir / "pass_summary.json").read_text())
-        assert doc["runs"] == 1
+        corrupt = model_dir / "pass_summary.json"
+        corrupt.write_text('{"model": "claude", "runs": 7, "per_run": [{"run_i')
+
+        with pytest.raises(PassSummaryCorruptError) as exc:
+            _write_pass_summary(model_dir, "claude", 0, {"overall_score": 0.3}, None)
+
+        aside = sorted(model_dir.glob("pass_summary.json.corrupt.*"))
+        assert len(aside) == 1
+        assert aside[0].read_text() == '{"model": "claude", "runs": 7, "per_run": [{"run_i'
+        assert exc.value.quarantined == aside[0]
+        # The prior history is NOT left in place as a half-valid file, and no
+        # fabricated replacement was written over it.
+        assert not corrupt.exists()
 
 
 # ---------------------------------------------------------------------------

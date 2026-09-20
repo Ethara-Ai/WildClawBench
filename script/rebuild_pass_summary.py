@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 """Rebuild pass_summary.json from run_N/ artifacts under a trajectories/<model>/ dir.
 
-This is a byte-for-byte faithful reimplementation of the harness's
-`_pass_summary_doc()` + `_pass_summary_entry()` pipeline in `eval/run_batch.py`.
 Point it at a trajectories/<model>/ folder that already contains 1..N run_N/
-sub-dirs, and it emits pass_summary_new.json with the exact same shape the
+sub-dirs and it emits pass_summary_new.json with the exact same shape the
 harness would have written if all N reps had run in a single batch.
-
-Same keys, same order, same rounding, same `_finite_float` semantics, same
-None-tolerant means. No extra keys. No merged_from audit trail. No pass@K.
 
 USAGE
 
@@ -32,223 +27,67 @@ a rich-schema field is renamed or a decimal reward hasn't been converted to
 a percent. Recomputing from the per-run artifacts sidesteps every
 schema-crossover problem: the artifacts are the source of truth the harness
 itself reads.
+
+RELATIONSHIP TO backfill_pass_summary.py
+
+This was once a hand-written re-port of the harness pipeline and had drifted
+from it — most visibly in the scalar-reward precedence, where it read
+reward.txt BEFORE ctrf's summary.overall_score while the production repair
+writer read them the other way round. That divergence was vestigial rather
+than deliberate: both artifacts are written from the same in-memory
+``te['reward']`` (run_batch.py writes ``reward.txt`` at 6dp and hands the same
+value to ``harbor.ctrf.build_ctrf``, which rounds it to 4dp), so the two can
+only ever disagree in precision, never in meaning; and nothing outside the test
+suite imported this module, whereas backfill is wired into ``script/run.sh``,
+``deliver.sh`` and ``script/regrade.py``. Both now call the one implementation
+in ``src/utils/pass_summary.py``, so this CLI and backfill produce identical
+bytes for identical inputs. What is left here is only the CLI surface: the
+``-o`` / ``--in-place`` / ``--indent`` options backfill does not offer.
 """
 from __future__ import annotations
 
 import argparse
 import json
-import math
-import os
-import re
 import sys
 from pathlib import Path
-from typing import Any
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-def _finite_float(v: Any) -> float | None:
-    if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v)):
-        return float(v)
-    return None
+# This module's public API, under its historical names.
+from src.utils.pass_summary import (  # noqa: E402,F401
+    RUN_DIR_RE as _RUN_DIR_RE,
+    atomic_write_text,
+    ctrf_test_result as _read_ctrf_summary,
+    discover_run_dirs,
+    finite_float as _finite_float,
+    include_incomplete_runs as _include_incomplete_runs,
+    include_invalid_runs as _include_invalid_runs,
+    load_json_or_none as _load_json,
+    mean_or_none as _mean_or_none,
+    pass_summary_doc as _pass_summary_doc,
+    pass_summary_entry as _pass_summary_entry,
+    rebuild_model_dir,
+    run_exclusion_reason as _run_exclusion_reason,
+)
 
-
-def _mean_or_none(vals: list[Any]) -> float | None:
-    nums = [v for v in vals if v is not None]
-    return (sum(nums) / len(nums)) if nums else None
-
-
-def _load_json(path: Path) -> dict | None:
-    if not path.is_file():
-        return None
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-
-
-def _read_ctrf_summary(run_dir: Path) -> dict:
-    """Return the pytest counts + reward that _pass_summary_entry expects.
-
-    The harness passes a `test_result` dict with keys
-    tests_total/tests_passed/tests_failed/tests_errored/tests_skipped and
-    reward (a decimal 0-1 from test_executor). We reconstruct that dict from
-    the on-disk ctrf.json + reward.txt so the recompute is byte-equivalent.
-    """
-    ctrf = _load_json(run_dir / "task_output" / "logs" / "verifier" / "ctrf.json") or {}
-    summary = (ctrf.get("results") or {}).get("summary") or ctrf.get("summary") or {}
-    reward_path = run_dir / "task_output" / "logs" / "verifier" / "reward.txt"
-    reward: float | None = None
-    if reward_path.is_file():
-        try:
-            reward = float(reward_path.read_text(encoding="utf-8").strip())
-        except (OSError, ValueError):
-            reward = None
-    if reward is None:
-        reward = _finite_float(summary.get("overall_score"))
-    return {
-        "tests_total": int(summary.get("tests", 0) or 0),
-        "tests_passed": int(summary.get("passed", 0) or 0),
-        "tests_failed": int(summary.get("failed", 0) or 0),
-        "tests_errored": int(summary.get("other", 0) or 0),
-        "tests_skipped": int(summary.get("skipped", 0) or 0),
-        "reward": reward,
-    }
-
-
-def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict | None) -> dict:
-    """Verbatim port of eval/run_batch.py::_pass_summary_entry."""
-    s = scores or {}
-    tr = test_result or {}
-    crit_total = int(s.get("criteria_total", s.get("tests_total", 0)) or 0)
-    crit_passed = int(s.get("criteria_passed", s.get("tests_passed", 0)) or 0)
-    crit_failed = int(s.get("criteria_failed", s.get("tests_failed", 0)) or 0)
-    rubric_reward = _finite_float(s.get("rubric_based_reward"))
-    if rubric_reward is None:
-        rubric_reward = _finite_float(s.get("overall_score"))
-    rubric_pct = _finite_float(s.get("rubric_weights_percentage"))
-    if rubric_pct is None and rubric_reward is not None:
-        rubric_pct = rubric_reward * 100.0
-    t_total = int(tr.get("tests_total", 0) or 0)
-    t_passed = int(tr.get("tests_passed", 0) or 0)
-    t_failed = int(tr.get("tests_failed", 0) or 0)
-    t_err = int(tr.get("tests_errored", 0) or 0)
-    t_skip = int(tr.get("tests_skipped", 0) or 0)
-    test_reward = _finite_float(s.get("test_based_reward"))
-    if test_reward is None and t_total > 0:
-        test_reward = _finite_float(tr.get("reward"))
-    combined = _finite_float(s.get("combined_reward"))
-    if combined is None:
-        if test_reward is not None and rubric_reward is not None:
-            combined = (test_reward + rubric_reward) / 2.0
-        elif test_reward is not None:
-            combined = test_reward
-        else:
-            combined = rubric_reward
-    authoritative = combined if combined is not None else (rubric_reward or 0.0)
-    entry = {
-        "run_index": run_index,
-        "criteria_total": crit_total,
-        "criteria_passed": crit_passed,
-        "criteria_failed": crit_failed,
-        "rubric_reward": rubric_reward,
-        "rubric_weights_percentage": round(rubric_pct, 2) if rubric_pct is not None else None,
-        "tests_total": t_total,
-        "tests_passed": t_passed,
-        "tests_failed": t_failed,
-        "tests_errored": t_err,
-        "tests_skipped": t_skip,
-        "test_reward": test_reward,
-        "combined_reward": combined,
-        "reward": authoritative,
-    }
-    if s.get("__last_resort_stub__"):
-        entry["__last_resort_stub__"] = True
-    if s.get("injection_ok") is False:
-        entry["injection_ok"] = False
-    if s.get("run_incomplete"):
-        entry["run_incomplete"] = True
-        entry["turns_planned"] = s.get("turns_planned")
-        entry["turns_completed"] = s.get("turns_completed")
-    if s.get("eval_skipped"):
-        entry["eval_skipped"] = s.get("eval_skipped")
-    if s.get("turns_duplicated"):
-        entry["turns_duplicated"] = list(s["turns_duplicated"])
-    return entry
-
-
-def _include_incomplete_runs() -> bool:
-    return os.environ.get("WCB_INCLUDE_INCOMPLETE_RUNS", "").strip().lower() in (
-        "1", "true", "yes", "on")
-
-
-def _include_invalid_runs() -> bool:
-    return os.environ.get("WCB_INCLUDE_INVALID_RUNS", "").strip().lower() in (
-        "1", "true", "yes", "on")
-
-
-def _run_exclusion_reason(r: dict) -> str | None:
-    # Mirror of run_batch.py:_run_exclusion_reason (fail-closed; `is False` keeps legacy).
-    if r.get("run_incomplete") and not _include_incomplete_runs():
-        return "incomplete"
-    if not _include_invalid_runs():
-        if r.get("injection_ok") is False:
-            return "injection_failed"
-        if r.get("eval_skipped"):
-            return "unmeasured"
-    return None
-
-
-def _pass_summary_doc(model_type: str, per_run: list) -> dict:
-    """Verbatim port of eval/run_batch.py::_pass_summary_doc."""
-    per_run = sorted(per_run, key=lambda r: r["run_index"])
-    reasons = {r["run_index"]: _run_exclusion_reason(r) for r in per_run}
-    used = [r for r in per_run if reasons[r["run_index"]] is None]
-    reason_counts: dict[str, int] = {}
-    for _v in reasons.values():
-        if _v:
-            reason_counts[_v] = reason_counts.get(_v, 0) + 1
-    excluded = len(per_run) - len(used)
-    avg_reward = _mean_or_none([r.get("reward") for r in used]) or 0.0
-    avg_combined = _mean_or_none([r.get("combined_reward") for r in used])
-    avg_rubric = _mean_or_none([r.get("rubric_reward") for r in used])
-    avg_test = _mean_or_none([r.get("test_reward") for r in used])
-    avg_pct = _mean_or_none([r.get("rubric_weights_percentage") for r in used])
-    doc = {
-        "model": model_type,
-        "runs": len(per_run),
-        "average_reward": avg_reward,
-        "average_combined_reward": avg_combined,
-        "average_rubric_reward": avg_rubric,
-        "average_test_reward": avg_test,
-        "average_rubric_weights_percentage": round(avg_pct, 2) if avg_pct is not None else None,
-        "per_run": per_run,
-    }
-    if excluded:
-        doc["runs_used"] = len(used)
-        for _reason, _key in (
-            ("incomplete", "runs_excluded_incomplete"),
-            ("injection_failed", "runs_excluded_injection_failed"),
-            ("unmeasured", "runs_excluded_unmeasured"),
-        ):
-            if reason_counts.get(_reason):
-                doc[_key] = reason_counts[_reason]
-        if not used:
-            doc["all_runs_excluded"] = True
-    return doc
-
-
-_RUN_DIR_RE = re.compile(r"^run_(\d+)$")
-
-
-def discover_run_dirs(model_dir: Path) -> list[tuple[int, Path]]:
-    """Return sorted [(run_index, run_dir), ...] under model_dir."""
-    out: list[tuple[int, Path]] = []
-    if not model_dir.is_dir():
-        return out
-    for child in model_dir.iterdir():
-        if not child.is_dir():
-            continue
-        m = _RUN_DIR_RE.match(child.name)
-        if not m:
-            continue
-        out.append((int(m.group(1)), child))
-    out.sort(key=lambda x: x[0])
-    return out
+__all__ = [
+    "_RUN_DIR_RE", "atomic_write_text", "_finite_float",
+    "_include_incomplete_runs", "_include_invalid_runs", "_load_json",
+    "_mean_or_none", "_pass_summary_doc", "_pass_summary_entry",
+    "_read_ctrf_summary", "_run_exclusion_reason", "discover_run_dirs", "main",
+    "rebuild", "rebuild_model_dir",
+]
 
 
 def rebuild(model_dir: Path, model_type: str | None = None) -> dict:
     """Compute pass_summary contents from run_N/ artifacts under model_dir."""
-    runs = discover_run_dirs(model_dir)
-    if not runs:
+    doc = rebuild_model_dir(model_dir, model_type)
+    if doc is None:
         sys.stderr.write(f"error: no run_N/ dirs under {model_dir}\n")
         sys.exit(2)
-    if model_type is None:
-        model_type = model_dir.name
-    per_run: list[dict] = []
-    for run_index, run_dir in runs:
-        scores = _load_json(run_dir / "score.json")
-        test_result = _read_ctrf_summary(run_dir)
-        per_run.append(_pass_summary_entry(run_index, scores, test_result))
-    return _pass_summary_doc(model_type, per_run)
+    return doc
 
 
 def main() -> int:
@@ -295,14 +134,14 @@ def main() -> int:
 
     if args.in_place:
         dst = args.model_dir / "pass_summary.json"
-        dst.write_text(text, encoding="utf-8")
+        atomic_write_text(dst, text)
         sys.stderr.write(f"wrote {doc['runs']} rep(s) → {dst}\n")
         return 0
     if args.output == "-":
         sys.stdout.write(text)
         return 0
     dst = Path(args.output) if args.output else (args.model_dir / "pass_summary_new.json")
-    dst.write_text(text, encoding="utf-8")
+    atomic_write_text(dst, text)
     sys.stderr.write(f"wrote {doc['runs']} rep(s) → {dst}\n")
     return 0
 

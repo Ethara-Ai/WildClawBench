@@ -11,9 +11,17 @@ on-disk sources:
   * pytest (Channel A)  -> run_N/task_output/logs/verifier/ctrf.json
                            (reward.txt as a fallback for the scalar reward)
 
-The emitted schema matches eval/run_batch.py:_pass_summary_entry — real
-``tests_*`` counts, explicit ``rubric_reward`` / ``test_reward`` /
-``combined_reward``, and ``average_reward`` = combined mean.
+The rollup itself is NOT implemented here: entry, doc, exclusion and the locked
+atomic write all come from ``src/utils/pass_summary.py``, the single
+implementation shared with ``eval/run_batch.py`` (the live batch writer),
+``script/rebuild_pass_summary.py``, ``script/aggregate_runs.py`` and
+``script/regrade.py``. This module is the *bulk repair CLI* over that
+implementation, plus the ``_find_model_dirs`` tree walk that only it needs.
+
+Sharing is load-bearing rather than tidy: ``script/run.sh`` runs this script
+across the ENTIRE backend output tree after every batch, so any divergence
+between this and the live batch writer silently restated every historical
+summary under whichever one ran last.
 
 Usage:
     python3 script/backfill_pass_summary.py <output_root> [--backend NAME] [--dry-run]
@@ -28,187 +36,40 @@ contains run_N subdirectories beneath it is rebuilt. Examples:
 from __future__ import annotations
 
 import argparse
-import json
-import math
-import os
-import re
 import sys
 from pathlib import Path
 
-RUN_DIR_RE = re.compile(r"^run_(\d+)$")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
+# This module's public API: script/regrade.py imports _ctrf_test_result and
+# write_pass_summary from here.
+from src.utils.pass_summary import (  # noqa: E402,F401
+    RUN_DIR_RE,
+    atomic_write_text,
+    ctrf_test_result as _ctrf_test_result,
+    finite_float as _finite_float,
+    include_incomplete_runs as _include_incomplete_runs,
+    include_invalid_runs as _include_invalid_runs,
+    load_json_or_none as _load_json,
+    locked as _locked,
+    mean_or_none as _mean_or_none,
+    pass_summary_doc as _doc,
+    pass_summary_entry as _entry,
+    pass_summary_text as _pass_summary_text,
+    rebuild_model_dir,
+    run_exclusion_reason as _run_exclusion_reason,
+    write_pass_summary,
+)
 
-def _load_json(p: Path):
-    try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-
-
-def _finite_float(v):
-    if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v)):
-        return float(v)
-    return None
-
-
-def _mean_or_none(vals):
-    nums = [v for v in vals if v is not None]
-    return (sum(nums) / len(nums)) if nums else None
-
-
-def _ctrf_test_result(run_dir: Path) -> dict:
-    """Reconstruct a test_result-shaped dict from the verifier ctrf.json.
-
-    Counts are taken from the per-test status list when present (more accurate
-    than the CTRF summary, which lumps errored runs into ``other``), and the
-    scalar reward from summary.overall_score, with reward.txt as a fallback.
-    """
-    verifier = run_dir / "task_output" / "logs" / "verifier"
-    ctrf = _load_json(verifier / "ctrf.json")
-    out = {"tests_total": 0, "tests_passed": 0, "tests_failed": 0,
-           "tests_errored": 0, "tests_skipped": 0, "reward": None}
-    if isinstance(ctrf, dict):
-        results = ctrf.get("results") or {}
-        summary = results.get("summary") or {}
-        tests = results.get("tests") or []
-        if isinstance(tests, list) and tests:
-            counts = {"passed": 0, "failed": 0, "errored": 0, "skipped": 0}
-            for t in tests:
-                st = (t or {}).get("status", "")
-                if st in counts:
-                    counts[st] += 1
-            out["tests_total"] = len(tests)
-            out["tests_passed"] = counts["passed"]
-            out["tests_failed"] = counts["failed"]
-            out["tests_errored"] = counts["errored"]
-            out["tests_skipped"] = counts["skipped"]
-        else:
-            out["tests_total"] = int(summary.get("tests", 0) or 0)
-            out["tests_passed"] = int(summary.get("passed", 0) or 0)
-            out["tests_failed"] = int(summary.get("failed", 0) or 0)
-            out["tests_errored"] = int(summary.get("other", 0) or 0)
-            out["tests_skipped"] = int(summary.get("skipped", 0) or 0)
-        out["reward"] = _finite_float(summary.get("overall_score"))
-    if out["reward"] is None:
-        try:
-            out["reward"] = _finite_float(float((verifier / "reward.txt").read_text().strip()))
-        except (OSError, ValueError):
-            pass
-    return out
-
-
-def _entry(run_index: int, scores: dict, test_result: dict) -> dict:
-    """Mirror of eval/run_batch.py:_pass_summary_entry (kept in sync by hand)."""
-    s = scores or {}
-    tr = test_result or {}
-    crit_total = int(s.get("criteria_total", s.get("tests_total", 0)) or 0)
-    crit_passed = int(s.get("criteria_passed", s.get("tests_passed", 0)) or 0)
-    crit_failed = int(s.get("criteria_failed", s.get("tests_failed", 0)) or 0)
-    rubric_reward = _finite_float(s.get("rubric_based_reward"))
-    if rubric_reward is None:
-        rubric_reward = _finite_float(s.get("overall_score"))
-    rubric_pct = _finite_float(s.get("rubric_weights_percentage"))
-    if rubric_pct is None and rubric_reward is not None:
-        rubric_pct = rubric_reward * 100.0
-    t_total = int(tr.get("tests_total", 0) or 0)
-    test_reward = _finite_float(s.get("test_based_reward"))
-    if test_reward is None and t_total > 0:
-        test_reward = _finite_float(tr.get("reward"))
-    combined = _finite_float(s.get("combined_reward"))
-    if combined is None:
-        if test_reward is not None and rubric_reward is not None:
-            combined = (test_reward + rubric_reward) / 2.0
-        elif test_reward is not None:
-            combined = test_reward
-        else:
-            combined = rubric_reward
-    authoritative = combined if combined is not None else (rubric_reward or 0.0)
-    entry = {
-        "run_index": run_index,
-        "criteria_total": crit_total,
-        "criteria_passed": crit_passed,
-        "criteria_failed": crit_failed,
-        "rubric_reward": rubric_reward,
-        "rubric_weights_percentage": round(rubric_pct, 2) if rubric_pct is not None else None,
-        "tests_total": t_total,
-        "tests_passed": int(tr.get("tests_passed", 0) or 0),
-        "tests_failed": int(tr.get("tests_failed", 0) or 0),
-        "tests_errored": int(tr.get("tests_errored", 0) or 0),
-        "tests_skipped": int(tr.get("tests_skipped", 0) or 0),
-        "test_reward": test_reward,
-        "combined_reward": combined,
-        "reward": authoritative,
-    }
-    if s.get("__last_resort_stub__"):
-        entry["__last_resort_stub__"] = True
-    if s.get("injection_ok") is False:
-        entry["injection_ok"] = False
-    if s.get("run_incomplete"):
-        entry["run_incomplete"] = True
-        entry["turns_planned"] = s.get("turns_planned")
-        entry["turns_completed"] = s.get("turns_completed")
-    if s.get("eval_skipped"):
-        entry["eval_skipped"] = s.get("eval_skipped")
-    if s.get("turns_duplicated"):
-        entry["turns_duplicated"] = list(s["turns_duplicated"])
-    return entry
-
-
-def _include_incomplete_runs() -> bool:
-    return os.environ.get("WCB_INCLUDE_INCOMPLETE_RUNS", "").strip().lower() in (
-        "1", "true", "yes", "on")
-
-
-def _include_invalid_runs() -> bool:
-    return os.environ.get("WCB_INCLUDE_INVALID_RUNS", "").strip().lower() in (
-        "1", "true", "yes", "on")
-
-
-def _run_exclusion_reason(r: dict) -> str | None:
-    # Mirror of run_batch.py:_run_exclusion_reason (fail-closed; `is False` keeps legacy).
-    if r.get("run_incomplete") and not _include_incomplete_runs():
-        return "incomplete"
-    if not _include_invalid_runs():
-        if r.get("injection_ok") is False:
-            return "injection_failed"
-        if r.get("eval_skipped"):
-            return "unmeasured"
-    return None
-
-
-def _doc(model_type: str, per_run: list) -> dict:
-    per_run = sorted(per_run, key=lambda r: r["run_index"])
-    reasons = {r["run_index"]: _run_exclusion_reason(r) for r in per_run}
-    used = [r for r in per_run if reasons[r["run_index"]] is None]
-    reason_counts: dict[str, int] = {}
-    for _v in reasons.values():
-        if _v:
-            reason_counts[_v] = reason_counts.get(_v, 0) + 1
-    excluded = len(per_run) - len(used)
-    avg_reward = _mean_or_none([r.get("reward") for r in used]) or 0.0
-    avg_pct = _mean_or_none([r.get("rubric_weights_percentage") for r in used])
-    doc = {
-        "model": model_type,
-        "runs": len(per_run),
-        "average_reward": avg_reward,
-        "average_combined_reward": _mean_or_none([r.get("combined_reward") for r in used]),
-        "average_rubric_reward": _mean_or_none([r.get("rubric_reward") for r in used]),
-        "average_test_reward": _mean_or_none([r.get("test_reward") for r in used]),
-        "average_rubric_weights_percentage": round(avg_pct, 2) if avg_pct is not None else None,
-        "per_run": per_run,
-    }
-    if excluded:
-        doc["runs_used"] = len(used)
-        for _reason, _key in (
-            ("incomplete", "runs_excluded_incomplete"),
-            ("injection_failed", "runs_excluded_injection_failed"),
-            ("unmeasured", "runs_excluded_unmeasured"),
-        ):
-            if reason_counts.get(_reason):
-                doc[_key] = reason_counts[_reason]
-        if not used:
-            doc["all_runs_excluded"] = True
-    return doc
+__all__ = [
+    "RUN_DIR_RE", "atomic_write_text", "_ctrf_test_result", "_doc", "_entry",
+    "_finite_float", "_find_model_dirs", "_include_incomplete_runs",
+    "_include_invalid_runs", "_load_json", "_locked", "_mean_or_none",
+    "_pass_summary_text", "_run_exclusion_reason", "main", "rebuild_model_dir",
+    "write_pass_summary",
+]
 
 
 def _find_model_dirs(root: Path):
@@ -223,22 +84,6 @@ def _find_model_dirs(root: Path):
         if model_dir not in seen:
             seen.add(model_dir)
             yield model_dir
-
-
-def rebuild_model_dir(model_dir: Path) -> dict | None:
-    runs = []
-    for child in model_dir.iterdir():
-        m = RUN_DIR_RE.match(child.name)
-        if child.is_dir() and m:
-            runs.append((int(m.group(1)), child))
-    if not runs:
-        return None
-    per_run = []
-    for idx, run_dir in sorted(runs):
-        scores = _load_json(run_dir / "score.json") or {}
-        test_result = _ctrf_test_result(run_dir)
-        per_run.append(_entry(idx, scores, test_result))
-    return _doc(model_dir.name, per_run)
 
 
 def main() -> int:
@@ -266,7 +111,7 @@ def main() -> int:
         target = model_dir / "pass_summary.json"
         old = _load_json(target)
         old_avg = (old or {}).get("average_reward")
-        new_text = json.dumps(doc, indent=2)
+        new_text = _pass_summary_text(doc)
         tag = "DRY" if args.dry_run else "WROTE"
         print(f"[{tag}] {target}")
         for r in doc["per_run"]:
@@ -277,7 +122,7 @@ def main() -> int:
         if old_avg is not None and old_avg != doc["average_reward"]:
             print(f"        average_reward: {old_avg} -> {doc['average_reward']}")
         if not args.dry_run:
-            target.write_text(new_text, encoding="utf-8")
+            atomic_write_text(target, new_text)
             written += 1
 
     verb = "would rebuild" if args.dry_run else "rebuilt"

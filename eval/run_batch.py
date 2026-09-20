@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import logging
@@ -12,7 +11,6 @@ import subprocess
 import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -47,11 +45,12 @@ from src.utils.grading import (
     run_grading,
     format_scores,
     print_summary,
-    write_score as write_score_file,
-    FAILED_SCORE_FILENAME,
     print_global_summary,
     write_error_score as write_error_score_file,
+    write_score as write_score_file,
+    FAILED_SCORE_FILENAME,
 )
+from src.utils import pass_summary as _pass_summary
 from src.utils.config import Config
 from src.utils.auth_provider import (
     BEDROCK,
@@ -1959,210 +1958,38 @@ def _claim_run_dir(model_dir: Path) -> tuple[int, Path]:
             i += 1
 
 
-@contextmanager
-def _locked(lock_path: Path):
-    """Hold an exclusive advisory lock for the duration of the block.
-
-    ``fcntl.flock`` is advisory and cross-process on the same host — enough to
-    serialize the read-modify-write of shared per-model files (pass_summary.json)
-    when reps for one (task, model) run in parallel.
-    """
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(lock_path, "w") as fh:
-        fcntl.flock(fh, fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(fh, fcntl.LOCK_UN)
-
-
-def _finite_float(v):
-    """Return v as a float iff it is a finite real number, else None."""
-    if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v)):
-        return float(v)
-    return None
-
-
-def _mean_or_none(vals):
-    nums = [v for v in vals if v is not None]
-    return (sum(nums) / len(nums)) if nums else None
-
-
-def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict | None) -> dict:
-    """Build one per_run record carrying BOTH scoring channels.
-
-    Channel B (rubric): criteria_* + rubric_reward, from score.json.
-    Channel A (pytest): tests_* + test_reward, from the real test_result/ctrf —
-        NOT aliased to criteria_* anymore.
-    combined_reward mirrors _augment_score_with_combined_rewards; `reward` is the
-    authoritative run reward (combined when tests ran, else rubric).
-    """
-    s = scores or {}
-    tr = test_result or {}
-    # --- Channel B: rubric (canonical criteria_*, legacy tests_* fallback) ---
-    crit_total = int(s.get("criteria_total", s.get("tests_total", 0)) or 0)
-    crit_passed = int(s.get("criteria_passed", s.get("tests_passed", 0)) or 0)
-    crit_failed = int(s.get("criteria_failed", s.get("tests_failed", 0)) or 0)
-    rubric_reward = _finite_float(s.get("rubric_based_reward"))
-    if rubric_reward is None:
-        rubric_reward = _finite_float(s.get("overall_score"))
-    rubric_pct = _finite_float(s.get("rubric_weights_percentage"))
-    if rubric_pct is None and rubric_reward is not None:
-        rubric_pct = rubric_reward * 100.0
-    # --- Channel A: real pytest counts ---
-    t_total = int(tr.get("tests_total", 0) or 0)
-    t_passed = int(tr.get("tests_passed", 0) or 0)
-    t_failed = int(tr.get("tests_failed", 0) or 0)
-    t_err = int(tr.get("tests_errored", 0) or 0)
-    t_skip = int(tr.get("tests_skipped", 0) or 0)
-    test_reward = _finite_float(s.get("test_based_reward"))
-    if test_reward is None and t_total > 0:
-        test_reward = _finite_float(tr.get("reward"))
-    # --- combined ---
-    combined = _finite_float(s.get("combined_reward"))
-    if combined is None:
-        if test_reward is not None and rubric_reward is not None:
-            combined = (test_reward + rubric_reward) / 2.0
-        elif test_reward is not None:
-            combined = test_reward
-        else:
-            combined = rubric_reward
-    authoritative = combined if combined is not None else (rubric_reward or 0.0)
-    entry = {
-        "run_index": run_index,
-        # Channel B — rubric judge
-        "criteria_total": crit_total,
-        "criteria_passed": crit_passed,
-        "criteria_failed": crit_failed,
-        "rubric_reward": rubric_reward,
-        "rubric_weights_percentage": round(rubric_pct, 2) if rubric_pct is not None else None,
-        # Channel A — real pytest
-        "tests_total": t_total,
-        "tests_passed": t_passed,
-        "tests_failed": t_failed,
-        "tests_errored": t_err,
-        "tests_skipped": t_skip,
-        "test_reward": test_reward,
-        # authoritative run reward = combined (falls back to rubric when no tests)
-        "combined_reward": combined,
-        "reward": authoritative,
-    }
-    # Preserve the last-resort-stub marker so operators + downstream tools can
-    # distinguish "grader wrote 0" from "no grader ran; stub emitted by finally".
-    if s.get("__last_resort_stub__"):
-        entry["__last_resort_stub__"] = True
-    # Same for the injection-integrity flag: a run whose silent mutations
-    # failed is not a valid measurement of the injection scenario.
-    if s.get("injection_ok") is False:
-        entry["injection_ok"] = False
-    # Turn-completion marker: _pass_summary_doc excludes flagged runs from
-    # averages; the entry itself is preserved so the run never silently
-    # disappears from per_run.
-    if s.get("run_incomplete"):
-        entry["run_incomplete"] = True
-        entry["turns_planned"] = s.get("turns_planned")
-        entry["turns_completed"] = s.get("turns_completed")
-    # Unmeasured marker: the eval phase refused to grade (empty trajectory or
-    # never-ran). overall_score is None; _pass_summary_doc excludes it from
-    # averages so a no-signal run is not folded in as a 0.0.
-    if s.get("eval_skipped"):
-        entry["eval_skipped"] = s.get("eval_skipped")
-    if s.get("turns_duplicated"):
-        entry["turns_duplicated"] = list(s["turns_duplicated"])
-    return entry
-
-
-def _include_incomplete_runs() -> bool:
-    return os.environ.get("WCB_INCLUDE_INCOMPLETE_RUNS", "").strip().lower() in (
-        "1", "true", "yes", "on")
-
-
-def _include_invalid_runs() -> bool:
-    # Opt-OUT of the fail-closed exclusion of invalid runs (injection failed /
-    # unmeasured). Default is fail-CLOSED: an injects-never-landed run or an
-    # empty-trajectory run is NOT a valid measurement of the scenario, so it
-    # must not contaminate pass@K averages. WCB_INCLUDE_INVALID_RUNS=1 folds
-    # them back in for debugging (mirror of WCB_INCLUDE_INCOMPLETE_RUNS).
-    return os.environ.get("WCB_INCLUDE_INVALID_RUNS", "").strip().lower() in (
-        "1", "true", "yes", "on")
-
-
-def _run_exclusion_reason(r: dict) -> str | None:
-    # Why this per_run entry must NOT count toward averages, or None.
-    # Fail-closed: only valid measurements average in.
-    if r.get("run_incomplete") and not _include_incomplete_runs():
-        return "incomplete"
-    if not _include_invalid_runs():
-        # `is False` (not falsy): a missing key on a legacy run must NOT exclude.
-        if r.get("injection_ok") is False:
-            return "injection_failed"
-        # eval_skipped is a non-empty reason string when the eval phase refused
-        # to grade (empty trajectory / never-ran): overall_score is None, so the
-        # run carries no signal and would otherwise be averaged in as a 0.0.
-        if r.get("eval_skipped"):
-            return "unmeasured"
-    return None
-
-
-def _pass_summary_doc(model_type: str, per_run: list) -> dict:
-    per_run = sorted(per_run, key=lambda r: r["run_index"])
-    # Invalid runs (incomplete / injection-failed / unmeasured) are kept in
-    # per_run for visibility but excluded from every average, so pass@K is
-    # computed over valid measurements only. The opt-out envs fold them back.
-    reasons = {r["run_index"]: _run_exclusion_reason(r) for r in per_run}
-    used = [r for r in per_run if reasons[r["run_index"]] is None]
-    reason_counts: dict[str, int] = {}
-    for _v in reasons.values():
-        if _v:
-            reason_counts[_v] = reason_counts.get(_v, 0) + 1
-    excluded = len(per_run) - len(used)
-    avg_reward = _mean_or_none([r.get("reward") for r in used]) or 0.0
-    avg_combined = _mean_or_none([r.get("combined_reward") for r in used])
-    avg_rubric = _mean_or_none([r.get("rubric_reward") for r in used])
-    avg_test = _mean_or_none([r.get("test_reward") for r in used])
-    avg_pct = _mean_or_none([r.get("rubric_weights_percentage") for r in used])
-    doc = {
-        "model": model_type,
-        "runs": len(per_run),
-        # average_reward is now the authoritative (combined) mean, not rubric-only
-        "average_reward": avg_reward,
-        "average_combined_reward": avg_combined,
-        "average_rubric_reward": avg_rubric,
-        "average_test_reward": avg_test,
-        "average_rubric_weights_percentage": round(avg_pct, 2) if avg_pct is not None else None,
-        "per_run": per_run,
-    }
-    if excluded:
-        doc["runs_used"] = len(used)
-        for _reason, _key in (
-            ("incomplete", "runs_excluded_incomplete"),
-            ("injection_failed", "runs_excluded_injection_failed"),
-            ("unmeasured", "runs_excluded_unmeasured"),
-        ):
-            if reason_counts.get(_reason):
-                doc[_key] = reason_counts[_reason]
-        # Every rep excluded: average_reward is a placeholder 0.0, NOT a real
-        # measurement. Surface it so delivery does not read it as a genuine zero.
-        if not used:
-            doc["all_runs_excluded"] = True
-    return doc
+# --------------------------------------------------------------------------- #
+# pass_summary.json
+#
+# The implementation lives in src/utils/pass_summary.py and is SHARED with
+# script/backfill_pass_summary.py, script/rebuild_pass_summary.py,
+# script/aggregate_runs.py and script/regrade.py. It used to be duplicated by
+# hand into each of those, and the copies had already drifted — which mattered
+# because script/run.sh re-runs backfill over the ENTIRE backend output tree
+# after every batch, restating historical summaries under whichever copy's rules
+# happened to run last. The names below are kept as module-level aliases so the
+# live batch path, and everything that imports it, reads exactly as before.
+# --------------------------------------------------------------------------- #
+_locked = _pass_summary.locked
+_finite_float = _pass_summary.finite_float
+_mean_or_none = _pass_summary.mean_or_none
+_pass_summary_entry = _pass_summary.pass_summary_entry
+_include_incomplete_runs = _pass_summary.include_incomplete_runs
+_include_invalid_runs = _pass_summary.include_invalid_runs
+_run_exclusion_reason = _pass_summary.run_exclusion_reason
+_pass_summary_doc = _pass_summary.pass_summary_doc
 
 
 def _write_pass_summary(model_dir: Path, model_type: str, run_index: int,
                         scores: dict | None = None,
                         test_result: dict | None = None) -> None:
-  with _locked(model_dir / ".pass_summary.lock"):
-    p = model_dir / "pass_summary.json"
-    existing = {}
-    if p.is_file():
-        try:
-            existing = json.loads(p.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            existing = {}
-    per_run = [r for r in existing.get("per_run", []) if r.get("run_index") != run_index]
-    per_run.append(_pass_summary_entry(run_index, scores, test_result))
-    p.write_text(json.dumps(_pass_summary_doc(model_type, per_run), indent=2),
-                 encoding="utf-8")
+    # Merges THIS rep's entry into the per-model doc under
+    # `<model_dir>/.pass_summary.lock`, writes atomically, and refuses to
+    # silently drop prior history when the existing doc is unparseable
+    # (PassSummaryCorruptError — the caller, _build_trajectory's try/except,
+    # logs it with exc_info). See src/utils/pass_summary.upsert_pass_summary.
+    _pass_summary.upsert_pass_summary(model_dir, model_type, run_index,
+                                      scores=scores, test_result=test_result)
 
 
 def _condense_transcript_for_judge(traj: dict, limit: int | None = None,

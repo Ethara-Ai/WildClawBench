@@ -7,10 +7,18 @@ Covered modules (loaded via importlib because script/ is not an importable pkg):
   * script/merge_pass_summaries.py  — _f/_mean/_pmax/_round_or_none/_comparable_per_run,
                                        concat vs --dedup, run renumber, model-conflict
                                        exit, legacy vs extended schema.
-  * script/rebuild_pass_summary.py  — reward.txt-first precedence, _pass_summary_entry/
-                                       _doc verbatim ports, discover_run_dirs, rebuild.
-  * script/backfill_pass_summary.py — overall_score-first precedence, per-test-list vs
-                                       summary counting, _find_model_dirs, rebuild_model_dir.
+  * script/rebuild_pass_summary.py  — CLI surface (-o / --in-place / --indent),
+                                       discover_run_dirs, rebuild.
+  * script/backfill_pass_summary.py — bulk-repair CLI, per-test-list vs summary
+                                       counting, _find_model_dirs, rebuild_model_dir.
+
+rebuild and backfill no longer carry their own entry/doc/precedence logic: both
+re-export the single implementation in src/utils/pass_summary.py (shared with
+eval/run_batch.py and script/regrade.py), so the reward-precedence divergence
+these tests used to document as intended is gone and the two now produce
+byte-identical output for identical inputs. The helper-level tests below are
+kept: they still exercise that implementation through each script's public
+names, which is exactly the surface regrade.py and run.sh depend on.
 
 Import bootstrapping and spec_from_file_location loading mirror
 tests/test_repackage_bundle_ground_truth.py. All fixtures are self-contained.
@@ -629,8 +637,14 @@ class TestRebuildHelpers:
 
 
 class TestRebuildCtrfSummary:
-    def test_reward_txt_takes_precedence_over_overall_score(self, rebuild, tmp_path):
-        # reward.txt-first precedence: reward.txt=0.75 wins over summary overall_score=0.1.
+    def test_overall_score_takes_precedence_over_reward_txt(self, rebuild, backfill, tmp_path):
+        # CONSOLIDATED precedence (was reward.txt-first here, overall_score-first
+        # in backfill). Both files are written from the same in-memory
+        # te["reward"] — run_batch writes reward.txt at 6dp and hands the same
+        # value to harbor.ctrf.build_ctrf, which stores round(...,4) — so the two
+        # could only ever differ in precision. Only backfill was wired into
+        # run.sh / deliver.sh / regrade, so its precedence won and this reader is
+        # now literally the same function.
         run_dir = tmp_path / "run_1"
         verifier = run_dir / "task_output" / "logs" / "verifier"
         _write_json(verifier / "ctrf.json",
@@ -638,10 +652,14 @@ class TestRebuildCtrfSummary:
                                              "overall_score": 0.1}}})
         (verifier / "reward.txt").write_text("0.75\n", encoding="utf-8")
         out = rebuild._read_ctrf_summary(run_dir)
-        assert out["reward"] == 0.75
+        assert out["reward"] == 0.1
         assert out["tests_total"] == 4
         assert out["tests_passed"] == 3
         assert out["tests_failed"] == 1
+        assert out == backfill._ctrf_test_result(run_dir)
+
+    def test_rebuild_and_backfill_are_the_same_reader(self, rebuild, backfill):
+        assert rebuild._read_ctrf_summary is backfill._ctrf_test_result
 
     def test_falls_back_to_overall_score_when_no_reward_txt(self, rebuild, tmp_path):
         run_dir = tmp_path / "run_1"

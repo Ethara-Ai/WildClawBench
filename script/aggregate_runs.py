@@ -19,35 +19,32 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import statistics
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Iterable
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-def _include_incomplete_runs() -> bool:
-    return os.environ.get("WCB_INCLUDE_INCOMPLETE_RUNS", "").strip().lower() in (
-        "1", "true", "yes", "on")
+# THE shared exclusion predicate, not a hand-synced mirror of it. This reader
+# feeds raw score.json payloads straight in, so it is the site where a
+# HISTORICAL dead-judge score (written before grading.write_score's failure
+# gate existed: `error` / all-criteria-abstained, but no `grading_status` key)
+# used to slip through as a genuine 0.0 and deflate the rollup.
+from src.utils.pass_summary import (  # noqa: E402,F401
+    include_incomplete_runs as _include_incomplete_runs,
+    include_invalid_runs as _include_invalid_runs,
+    run_exclusion_reason as _run_exclusion_reason,
+)
 
-
-def _include_invalid_runs() -> bool:
-    return os.environ.get("WCB_INCLUDE_INVALID_RUNS", "").strip().lower() in (
-        "1", "true", "yes", "on")
-
-
-def _run_exclusion_reason(score: dict) -> str | None:
-    # Mirror of run_batch.py:_run_exclusion_reason. Fail-closed: incomplete,
-    # injection-failed, and unmeasured (empty-trajectory) runs never average in.
-    # `is False` (not falsy) so a legacy score.json lacking the key is kept.
-    if score.get("run_incomplete") and not _include_incomplete_runs():
-        return "incomplete"
-    if not _include_invalid_runs():
-        if score.get("injection_ok") is False:
-            return "injection_failed"
-        if score.get("eval_skipped"):
-            return "unmeasured"
-    return None
+__all__ = [
+    "_criteria_counts", "_include_incomplete_runs", "_include_invalid_runs",
+    "_pct_from_score", "_print_table", "_read_score", "_run_exclusion_reason",
+    "_walk_score_files", "aggregate", "main",
+]
 
 
 def _read_score(path: Path) -> dict | None:
@@ -105,7 +102,15 @@ def _walk_score_files(output_root: Path, backend_filter: str | None) -> Iterable
                         continue
                     score_path = run_dir / "score.json"
                     if not score_path.is_file():
-                        continue
+                        # A run whose judge died wholly has score.failed.json
+                        # and no score.json. Yield it anyway: `continue` here
+                        # made the run VANISH from the rollup with no counter,
+                        # so a batch could lose runs and still look complete.
+                        # _run_exclusion_reason routes it to `runs_ungraded`.
+                        failed_path = run_dir / "score.failed.json"
+                        if not failed_path.is_file():
+                            continue
+                        score_path = failed_path
                     try:
                         run_idx = int(run_dir.name.split("_", 1)[1])
                     except ValueError:
@@ -119,11 +124,19 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
     per_model: dict[tuple[str, str], list[float]] = defaultdict(list)
 
     excluded_incomplete: dict[tuple[str, str, str], int] = defaultdict(int)
+    # Tracked apart from excluded_incomplete so "the judge never produced a
+    # number" is not silently filed under "the run was invalid" — they need
+    # different operator responses (re-judge vs re-run).
+    ungraded: dict[tuple[str, str, str], int] = defaultdict(int)
     for backend, task_id, model, run_idx, score_path in _walk_score_files(output_root, backend_filter):
         score = _read_score(score_path)
         if score is None:
             continue
-        if _run_exclusion_reason(score) is not None:
+        _reason = _run_exclusion_reason(score)
+        if _reason == "ungraded":
+            ungraded[(backend, task_id, model)] += 1
+            continue
+        if _reason is not None:
             excluded_incomplete[(backend, task_id, model)] += 1
             continue
         pct = _pct_from_score(score)
@@ -173,18 +186,26 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
         n_excl = excluded_incomplete.get((backend, task, model), 0)
         if n_excl:
             task_entry["runs_excluded_incomplete"] = n_excl
+        n_ungraded = ungraded.get((backend, task, model), 0)
+        if n_ungraded:
+            task_entry["runs_ungraded"] = n_ungraded
         summary["by_task_model"].append(task_entry)
     # A task whose every run was excluded must not silently disappear.
-    for (backend, task, model), n_excl in sorted(excluded_incomplete.items()):
-        if (backend, task, model) not in per_task_model:
-            summary["by_task_model"].append({
+    for key in sorted(set(excluded_incomplete) | set(ungraded)):
+        backend, task, model = key
+        if key not in per_task_model:
+            entry = {
                 "backend": backend,
                 "task_id": task,
                 "model": model,
                 "runs": [],
                 "run_count": 0,
-                "runs_excluded_incomplete": n_excl,
-            })
+            }
+            if excluded_incomplete.get(key):
+                entry["runs_excluded_incomplete"] = excluded_incomplete[key]
+            if ungraded.get(key):
+                entry["runs_ungraded"] = ungraded[key]
+            summary["by_task_model"].append(entry)
     for (backend, model), pcts in sorted(per_model.items()):
         task_pass_at_k_values = per_model_pass_at_k[(backend, model)]
         summary["by_model"].append({
@@ -210,10 +231,21 @@ def _print_table(summary: dict) -> None:
     print(f"{'backend':<12} {'task_id':<48} {'model':<24} {'runs':>5} {'avg%':>8} {'pass@K':>8}")
     print("-" * 110)
     for row in summary["by_task_model"]:
+        # A row whose every run was excluded or ungraded carries no averages at
+        # all — indexing them raised KeyError and took the whole rollup down
+        # with it. Render the state instead: a dash is honest, 0.00 is a lie.
+        avg = row.get("average_rubric_weights_percentage")
+        patk = row.get("pass_at_k")
+        avg_s = f"{avg:>8.2f}" if isinstance(avg, (int, float)) else f"{'—':>8}"
+        patk_s = f"{patk:>8.2f}" if isinstance(patk, (int, float)) else f"{'—':>8}"
+        note = ""
+        if row.get("runs_ungraded"):
+            note = f"  UNGRADED x{row['runs_ungraded']} (judge failed)"
+        elif row.get("runs_excluded_incomplete"):
+            note = f"  excluded x{row['runs_excluded_incomplete']}"
         print(
             f"{row['backend']:<12} {row['task_id'][:48]:<48} {row['model'][:24]:<24} "
-            f"{row['run_count']:>5} {row['average_rubric_weights_percentage']:>8.2f} "
-            f"{row['pass_at_k']:>8.2f}"
+            f"{row['run_count']:>5} {avg_s} {patk_s}{note}"
         )
 
     print("\n=== by (backend, model): mean of runs and mean of per-task pass@K ===")

@@ -28,9 +28,16 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from eval.run_batch import _condense_transcript_for_judge, recompute_combined  # noqa: E402
-from script.backfill_pass_summary import _ctrf_test_result, rebuild_model_dir  # noqa: E402
+from script.backfill_pass_summary import (  # noqa: E402
+    _ctrf_test_result,
+    write_pass_summary,
+)
 from src.utils.auth_provider import resolve_provider  # noqa: E402
-from src.utils.grading import grade_with_rubric  # noqa: E402
+from src.utils.grading import (  # noqa: E402
+    grade_with_rubric,
+    grading_failure_reason,
+    write_score,
+)
 
 _USAGE_KEYS = (
     "input_tokens", "output_tokens", "cache_read_tokens",
@@ -217,17 +224,22 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
     # Preserve run-level injection-integrity keys from the ORIGINAL score.json:
     # regrade re-judges Channel B only — whether the run's silent mutations
     # landed is a fact about the run, not the rubric, and must survive.
+    # Falls back to score.failed.json: regrading a run whose judge died is the
+    # main reason to regrade at all, and those run-level facts are just as true
+    # there. `grading_status` is NOT carried over — this pass decides it afresh.
     prev = {}
-    try:
-        prev = json.loads(score_path.read_text(encoding="utf-8"))
+    for _src in (score_path, run_dir / "score.failed.json"):
+        try:
+            prev = json.loads(_src.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
         for k in ("injection_ok", "injection_defects", "eval_skipped",
                   "run_incomplete", "turns_planned", "turns_completed",
                   "recovery_turn_fired", "turns_duplicated", "turns_empty"):
             if k in prev and k not in scores:
                 scores[k] = prev[k]
-    except (OSError, json.JSONDecodeError):
-        pass
-    score_path.write_text(json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
+        break
+    write_score(run_dir, run_dir.name, scores)
 
     # --- Merge Channel A (pytest) fields from ctrf.json/reward.txt so score.json
     # stays self-consistent. Without this, a regrade leaves tests_total/passed/
@@ -253,15 +265,43 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
         if test_reward is not None and rubric_reward is not None
         else test_reward if test_reward is not None else rubric_reward
     )
-    score_path.write_text(json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
+    # Routed through grading.write_score so a regrade obeys the same
+    # total-judge-failure gate as a first grade, in BOTH directions: a healthy
+    # re-judge retires score.failed.json and restores score.json, and a regrade
+    # whose judge dies again retires the stale score.json instead of leaving a
+    # file that claims the run is scored.
+    write_score(run_dir, run_dir.name, scores)
 
     # Regenerate pass_summary.json for the model dir so aggregate is consistent.
+    # This CALLED rebuild_model_dir and threw the return value away — that
+    # function only computes the doc; main() is what persists it. So a regrade
+    # rewrote score.json and left pass_summary.json untouched, and every reader
+    # downstream of pass_summary kept serving the superseded verdict (alpha
+    # koji: pass_summary 17:33 still said run_2 = 0.0 / 0 passed while the
+    # regraded run_2/score.json at 18:01 said 16.42% / 22 passed).
+    # write_pass_summary rebuilds AND writes, under the batch's own
+    # .pass_summary.lock, and re-reads every run_N from disk — so it picks up
+    # the score.json / score.failed.json this regrade just wrote, and drops
+    # ungraded runs instead of averaging them in as 0.0.
     try:
-        rebuild_model_dir(run_dir.parent)
+        doc = write_pass_summary(run_dir.parent)
+        if doc is None:
+            print(f"[regrade] WARNING: no run_N dirs under {run_dir.parent}; "
+                  f"pass_summary.json not written", file=sys.stderr)
+        else:
+            print(f"[regrade] pass_summary refreshed: {run_dir.parent / 'pass_summary.json'} "
+                  f"(average_reward={doc.get('average_reward')}, "
+                  f"runs_used={doc.get('runs_used', doc.get('runs'))}/{doc.get('runs')}"
+                  + (f", ungraded={doc['runs_ungraded']}" if doc.get("runs_ungraded") else "")
+                  + ")", file=sys.stderr)
     except Exception as exc:
-        print(f"[regrade] WARNING: rebuild_model_dir failed: {exc}", file=sys.stderr)
+        print(f"[regrade] WARNING: pass_summary refresh failed: {exc}", file=sys.stderr)
 
-    print(f"[regrade] wrote {score_path}", file=sys.stderr)
+    if grading_failure_reason(scores):
+        print(f"[regrade] UNGRADED: wrote {run_dir / 'score.failed.json'} "
+              f"(no score.json — this run is NOT scored)", file=sys.stderr)
+    else:
+        print(f"[regrade] wrote {score_path}", file=sys.stderr)
 
     _update_usage_json(run_dir, scores)
     return scores
