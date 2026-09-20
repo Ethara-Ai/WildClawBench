@@ -1719,6 +1719,44 @@ def _call_one_judge(
     return _call_judge_openai(m, system, user)
 
 
+# Wall-clock ceiling for ONE council member's call (F5b). 900s is ~3x the
+# slowest healthy Sonnet grade observed on a full-size multimodal chunk, so it
+# only ever fires on a genuinely wedged connection, never on a slow-but-alive
+# one. OPERATIONAL TUNABLE.
+_DEFAULT_MEMBER_DEADLINE_S = 900.0
+
+# Ceiling on the member API calls ONE grade_with_rubric call may spend on
+# retrying and re-splitting chunks (F5a). The retry/re-split tree is
+# T(0)=1+1+2*T(1), T(1)=1+1+2*T(2), T(2)=2 -> 14 council invocations per
+# top-level chunk WORST CASE, i.e. 42 member calls on a 3-member council, for a
+# chunk that was never going to grade. 8 leaves a 3-member council its primary
+# pass plus one full-size retry and stops the exponential fan-out there.
+# OPERATIONAL TUNABLE.
+_DEFAULT_MAX_COUNCIL_CALLS = 8
+
+
+def _judge_member_deadline_s() -> float:
+    raw = os.environ.get("WCB_JUDGE_MEMBER_DEADLINE_S", "").strip()
+    if not raw:
+        return _DEFAULT_MEMBER_DEADLINE_S
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return _DEFAULT_MEMBER_DEADLINE_S
+    return v if v > 0 else _DEFAULT_MEMBER_DEADLINE_S
+
+
+def _judge_max_council_calls() -> int:
+    raw = os.environ.get("WCB_JUDGE_MAX_COUNCIL_CALLS", "").strip()
+    if not raw:
+        return _DEFAULT_MAX_COUNCIL_CALLS
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return _DEFAULT_MAX_COUNCIL_CALLS
+    return n if n > 0 else _DEFAULT_MAX_COUNCIL_CALLS
+
+
 def _run_council(
     members: list[CouncilMember],
     system: str,
@@ -1736,7 +1774,8 @@ def _run_council(
     failing this count return `ok=False, error='parse: ...'` rather than raise.
     Every result carries the member's stable `family` so downstream per-member
     dicts key by family, not by the monthly-rotating ARN profile id."""
-    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
 
     def _resolve_user(model: str) -> str:
         if isinstance(user_for_member, dict):
@@ -1840,8 +1879,63 @@ def _run_council(
             "user_chars": len(user),
         }
 
-    with ThreadPoolExecutor(max_workers=max(1, len(members))) as pool:
-        return list(pool.map(_one, members))
+    def _failed_result(member: CouncilMember, error: str) -> dict:
+        return {
+            "model": member.model,
+            "effective_model": _effective_judge_model(member.model, member.family),
+            "family": member.family, "ok": False,
+            "error": error,
+            "usage": {**_ZERO_USAGE, "error": error},
+            "user_chars": len(_resolve_user(member.model)),
+        }
+
+    # F5b: `pool.map` yields in submission order, so one member wedged in a
+    # socket read with no server-side timeout held the ENTIRE council — and
+    # every chunk behind it — indefinitely, with the other members' verdicts
+    # already in hand and unusable. `as_completed` with a wall-clock deadline
+    # collects whoever finished and converts the stragglers into ordinary
+    # failed members, which the aggregator already knows how to absorb
+    # (survivors still vote; Sonnet still tiebreaks).
+    deadline = _judge_member_deadline_s()
+    pool = ThreadPoolExecutor(max_workers=max(1, len(members)))
+    done: dict[int, dict] = {}
+    try:
+        futures = {pool.submit(_one, m): idx for idx, m in enumerate(members)}
+        try:
+            for fut in as_completed(futures, timeout=deadline):
+                idx = futures[fut]
+                try:
+                    done[idx] = fut.result()
+                except Exception as exc:  # pragma: no cover - _one never raises
+                    done[idx] = _failed_result(members[idx], f"call: {exc}")
+        except FuturesTimeoutError:
+            pass
+        for fut, idx in futures.items():
+            if idx in done:
+                continue
+            fut.cancel()
+            member = members[idx]
+            logger.warning(
+                "Judge call fail: model=%s family=%s stage=deadline "
+                "error=member exceeded WCB_JUDGE_MEMBER_DEADLINE_S=%.0fs; "
+                "counted as a failed member so the remaining verdicts still grade",
+                _short_judge_label(member.model), member.family, deadline,
+            )
+            done[idx] = _failed_result(
+                member, f"deadline: member exceeded {deadline:.0f}s"
+            )
+    finally:
+        # wait=True (what the `with` block did) would block on exactly the
+        # member we just gave up on, re-imposing the hang the deadline exists to
+        # prevent. `cancel_futures` only stops PENDING futures and is absent
+        # before py3.9, so both are handled explicitly.
+        try:
+            pool.shutdown(wait=False, cancel_futures=True)
+        except TypeError:  # pragma: no cover - py3.8 and older
+            pool.shutdown(wait=False)
+    # Restore submission order: downstream zips `surviving` against members and
+    # renders `judge_council.failed` in roster order.
+    return [done[idx] for idx in range(len(members))]
 
 
 def _stddev(values: list[float]) -> float:
@@ -2567,7 +2661,28 @@ def grade_with_rubric(
             )
             for m in members
         }
+        council_calls[0] += len(members)
         return _grade_council(chunk, system, user_for_member, members, images)
+
+    # F5a: retry/re-split budget for THIS grade_with_rubric call, counted in
+    # member API calls. Every _grade_council invocation spends len(members) of
+    # it. The PRIMARY pass for a chunk is never gated — otherwise a late chunk
+    # would abstain having never been graded at all — only the escalation is.
+    max_council_calls = _judge_max_council_calls()
+    council_calls = [0]
+
+    def _budget_allows(invocations: int) -> bool:
+        return council_calls[0] + invocations * len(members) <= max_council_calls
+
+    def _budget_denied(chunk: list, what: str, invocations: int) -> None:
+        logger.error(
+            "JUDGE CALL BUDGET EXHAUSTED: refusing to %s a chunk of %d criteria "
+            "— %d member calls already spent, %d more needed, cap is %d "
+            "(WCB_JUDGE_MAX_COUNCIL_CALLS). The chunk keeps its last result; "
+            "criteria it could not grade abstain to Human Evaluation.",
+            what, len(chunk), council_calls[0], invocations * len(members),
+            max_council_calls,
+        )
 
     def _graded_chunks(chunk: list, depth: int = 0, retried: bool = False) -> list:
         # Refusal re-split (ajax_moreno 2026-09-04, empirically validated on
@@ -2598,6 +2713,9 @@ def grade_with_rubric(
         partial = (not res.get("error") and sonnet_count is not None
                    and int(sonnet_count or 0) < len(chunk))
         if (("parse:" in err or partial) and not retried):
+            if not _budget_allows(1):
+                _budget_denied(chunk, "retry", 1)
+                return [(chunk, res)]
             logger.warning(
                 "judge chunk of %d criteria returned a partial/unparseable "
                 "verdict list — retrying once at full size", len(chunk))
@@ -2605,6 +2723,12 @@ def grade_with_rubric(
         if ((res.get("error") or partial) and depth < 2 and len(chunk) > 4
                 and ("refus" in err or "safety filter" in err
                      or "parse:" in err or partial)):
+            # A split commits to BOTH halves' primary passes, so it must reserve
+            # two invocations up front; the halves re-check before escalating
+            # further, which is what caps the tree instead of merely trimming it.
+            if not _budget_allows(2):
+                _budget_denied(chunk, "re-split", 2)
+                return [(chunk, res)]
             logger.warning(
                 "judge chunk of %d criteria failed or stayed partial — "
                 "re-splitting and retrying halves (depth %d)",
