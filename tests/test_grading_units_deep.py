@@ -120,10 +120,14 @@ def test_parse_verdict_valid_two_criteria():
         "rationale": "yes it did it",
         "satisfied": True,
         "truncation_affected": False,
+        # F1/F1b: the ordinal the judge wrote (0-based) and its criterion echo.
+        "index": 0,
+        "echo": "Did the thing.",
     }
     # Second verdict omits TRUNCATION_AFFECTED -> defaults False (optional group).
     assert v[1]["satisfied"] is False
     assert v[1]["truncation_affected"] is False
+    assert v[1]["index"] == 1
 
 
 def test_parse_verdict_case_and_multiline_rationale():

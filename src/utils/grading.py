@@ -1519,7 +1519,7 @@ def _call_judge_bedrock(
         raise
 
 
-# Parser for the Yes/No verdict format mandated by _judge_system_prompt. Three
+# Parser for the Yes/No verdict format mandated by _judge_system_prompt. Five
 # load-bearing properties: (1) DOTALL so rationale text can span newlines,
 # (2) the leading 'N.' anchor disambiguates each verdict block when judges
 # emit Markdown-style bold/italic markers around the criterion sentence,
@@ -1529,13 +1529,28 @@ def _call_judge_bedrock(
 # against any change to the system prompt's verdict template; deviation here
 # silently zeros all judge votes — see 2026-06-02 alden-croft regression
 # context referenced in _judge_system_prompt.
+# (4) F1 — the leading ordinal is CAPTURED (group 1) so every verdict binds to
+# the criterion the judge itself numbered instead of to its POSITION in the
+# emitted list. A judge that skipped one verdict used to shift every later
+# verdict one criterion to the left, silently grading criterion 4's evidence
+# as criterion 3's verdict for the whole tail of the rubric.
+# (5) F1b — the criterion echo between the ordinal and [[RATIONALE: is captured
+# (group 2). judge_system.md mandates it be "a verbatim, exact-copy repeat of
+# the corresponding criterion in the list including its list number", so it is
+# an independent witness of which criterion the judge believed it was grading.
+# GROUP ORDER IS LOAD-BEARING: (ordinal, echo, rationale, satisfied, truncation).
 _VERDICT_RE = re.compile(
-    r"\d+\.\s.*?"
+    r"(\d+)\.\s(.*?)"
     r"\[\[\s*RATIONALE:\s*(.*?)\s*\]\]\s*"
     r"\[\[\s*SATISFIED:\s*(Yes|No)\s*\]\]"
     r"(?:\s*\[\[\s*TRUNCATION_AFFECTED:\s*(Yes|No)\s*\]\])?",
     re.DOTALL | re.IGNORECASE,
 )
+
+# Longest criterion echo retained per verdict (F1b). Rubric criteria are single
+# sentences; 600 chars is far past the longest real one and stops a pathological
+# unparsed block from riding the whole judge response into every verdict dict.
+_ECHO_KEEP_CHARS = 600
 
 
 def _parse_verdict_text(response: str, n_criteria: int) -> list[dict]:
@@ -1563,14 +1578,51 @@ def _parse_verdict_text(response: str, n_criteria: int) -> list[dict]:
             f"no verdicts parsed (expected up to {n_criteria}); response shape does not match _VERDICT_RE"
         )
     out: list[dict] = []
-    # Cap at n_criteria in case a judge emits stray numbered items beyond the
-    # rubric (defensive — verdict list is ordered, criteria N+1.. would be junk).
-    for rationale, satisfied, truncation in matches[:n_criteria]:
+    seen: set[int] = set()
+    dropped_out_of_range: list[str] = []
+    dropped_duplicate: list[str] = []
+    for ordinal, echo, rationale, satisfied, truncation in matches:
+        # F1: bind by the ordinal the judge WROTE, not by emission position.
+        # Ordinals are per-chunk 1..N — _judge_user_prompt numbers every chunk
+        # from 1 (enumerate over the chunk, not the full rubric) — so ordinal-1
+        # is a LOCAL index and _merge_batched_grades' running offset still
+        # remaps it to the global criterion id.
+        try:
+            idx = int(ordinal) - 1
+        except (TypeError, ValueError):
+            idx = -1
+        if idx < 0 or idx >= n_criteria:
+            dropped_out_of_range.append(str(ordinal))
+            continue
+        if idx in seen:
+            dropped_duplicate.append(str(ordinal))
+            continue
+        seen.add(idx)
         out.append({
             "rationale": (rationale or "").strip(),
             "satisfied": (satisfied or "No").strip().lower() == "yes",
             "truncation_affected": (truncation or "No").strip().lower() == "yes",
+            "index": idx,
+            "echo": (echo or "").strip()[:_ECHO_KEEP_CHARS],
         })
+    if dropped_out_of_range or dropped_duplicate:
+        logger.warning(
+            "Judge verdict ordinals rejected (chunk has %d criteria): "
+            "out-of-range=%s duplicate=%s — those criteria abstain instead of "
+            "shifting every later verdict onto the wrong criterion",
+            n_criteria, dropped_out_of_range or "[]", dropped_duplicate or "[]",
+        )
+    if not out:
+        # Every block carried an unusable ordinal (e.g. a judge that numbered a
+        # chunk with GLOBAL rubric ids). Raising routes this to the existing
+        # "parse:" retry/re-split path rather than returning a successful-looking
+        # empty verdict list that silently abstains the entire chunk.
+        raise ValueError(
+            f"no verdicts bound (expected up to {n_criteria}); every parsed "
+            f"verdict carried an out-of-range or duplicate ordinal: "
+            f"out-of-range={dropped_out_of_range} duplicate={dropped_duplicate}"
+        )
+    out.sort(key=lambda v: v["index"])
     return out
 
 
@@ -1844,6 +1896,94 @@ def _effective_judge_model(model: str, family: str) -> str:
     return model
 
 
+# F1b echo canary. judge_system.md:19 makes every verdict block open with "a
+# verbatim, exact-copy repeat of the corresponding criterion" — an independent
+# witness of which criterion the judge believed it was grading, so a verdict
+# whose ordinal and echo disagree is a mis-binding the ordinal alone cannot see.
+#
+# THRESHOLD RATIONALE (0.45, difflib.SequenceMatcher ratio on normalized text):
+# real judges reproduce the criterion near-verbatim (ratio 0.95-1.0), and every
+# benign deviation we have observed — markdown emphasis, a trailing "[points:
+# 1.0]"/"[target: ...]" tag, a clipped tail, light rewording — stays well above
+# 0.6. Two DIFFERENT criteria in one rubric routinely share boilerplate ("The
+# agent ...", "The report contains ..."), so a high threshold would punish
+# legitimate rewording far more often than it would catch a real scramble. 0.45
+# means fewer than half the aligned character runs survive: the "clearly wrong"
+# band. This gate may only ever ABSTAIN one criterion for one member — it can
+# never flip a verdict — so the cost of a false reject is bounded and the cost
+# of a false accept is the pre-F1 scramble.
+_ECHO_MATCH_THRESHOLD = 0.45
+# Echoes shorter than this carry too little signal to call "clearly wrong"
+# (a judge that emitted only the list number, a hard-clipped block). Skipped
+# rather than rejected — conservative by construction.
+_ECHO_MIN_COMPARE_CHARS = 12
+# Prompt-side decorations _judge_user_prompt appends to the criterion line, and
+# markdown emphasis judges wrap it in. Stripped from BOTH sides before
+# comparison. Filename characters (. / - _ digits) are deliberately preserved:
+# task prompts name deliverable files, so criteria are filename-heavy and a
+# normalizer that ate them would compare the wrong thing.
+_ECHO_TAG_RE = re.compile(r"\[\s*(?:points|target)\s*:[^\]]*\]", re.IGNORECASE)
+_ECHO_EMPHASIS_RE = re.compile(r"[*`#>]+")
+_ECHO_WS_RE = re.compile(r"\s+")
+
+
+def _normalize_echo(text: str) -> str:
+    stripped = _ECHO_TAG_RE.sub(" ", text or "")
+    stripped = _ECHO_EMPHASIS_RE.sub(" ", stripped)
+    return _ECHO_WS_RE.sub(" ", stripped).strip().lower()
+
+
+def _echo_matches_criterion(echo: str, criterion: str) -> tuple[bool, float]:
+    from difflib import SequenceMatcher
+    want = _normalize_echo(criterion)
+    got = _normalize_echo(echo)
+    if not want or len(got) < _ECHO_MIN_COMPARE_CHARS:
+        return True, 1.0
+    # autojunk=False: the default heuristic treats characters appearing in >1%
+    # of a 200+ char sequence as junk, which on normal prose silently discards
+    # spaces and common letters and depresses the ratio unpredictably.
+    ratio = SequenceMatcher(None, want, got, autojunk=False).ratio()
+    return ratio >= _ECHO_MATCH_THRESHOLD, ratio
+
+
+def _bind_verdicts_by_index(
+    verdicts: list[dict], rubrics: list, model: str,
+) -> dict[int, dict]:
+    """Map criterion index -> verdict for ONE member (F1 ordinal binding + F1b
+    echo canary).
+
+    `index` is written by `_parse_verdict_text` from the ordinal the judge
+    itself emitted. Verdict dicts built by other callers (synthetic chunk
+    fixtures, tests) carry no `index`, so they fall back to emission position —
+    the historical binding — and stay byte-identical. A verdict whose echoed
+    criterion clearly is not the criterion its ordinal names is dropped, which
+    abstains that ONE criterion for this member via the existing per_voted=False
+    path; no other verdict is disturbed."""
+    bound: dict[int, dict] = {}
+    for pos, v in enumerate(verdicts):
+        if not isinstance(v, dict):
+            continue
+        try:
+            key = int(v.get("index", pos))
+        except (TypeError, ValueError):
+            key = pos
+        echo = str(v.get("echo") or "")
+        if echo and 0 <= key < len(rubrics):
+            rb = rubrics[key]
+            criterion = rb.get("criterion") if isinstance(rb, dict) else str(rb)
+            ok, ratio = _echo_matches_criterion(echo, str(criterion or ""))
+            if not ok:
+                logger.warning(
+                    "Judge verdict echo mismatch (model=%s ordinal=%d ratio=%.2f "
+                    "< %.2f) — abstaining that criterion; echoed=%r expected=%r",
+                    _short_judge_label(model), key + 1, ratio,
+                    _ECHO_MATCH_THRESHOLD, echo[:120], str(criterion or "")[:120],
+                )
+                continue
+        bound.setdefault(key, v)
+    return bound
+
+
 def _grade_council(
     rubrics: list,
     system: str,
@@ -1896,6 +2036,14 @@ def _grade_council(
     # Hoisted out of the per-criterion loop below (it was rebuilt once per rubric
     # item; the surviving set is constant for the whole aggregation).
     survivor_lookup = {r["model"]: vs for r, vs in zip(surviving, verdicts_per_member)}
+    # F1: criterion index -> verdict, per surviving member. The key is the
+    # ordinal the judge itself wrote (minus 1), recorded by _parse_verdict_text.
+    # A MISSING key means "this member cast no vote on this criterion" and takes
+    # the existing per_voted=False abstain path in the loop below.
+    verdict_by_index: dict[str, dict[int, dict]] = {
+        model: _bind_verdicts_by_index(vs, rubrics, model)
+        for model, vs in survivor_lookup.items()
+    }
     # Verbatim member error keyed like survivor_lookup — surfaced as-is in the
     # per-member rationale when a member cast no verdict (no custom wording).
     error_lookup = {r["model"]: str(r.get("error") or "") for r in results if not r.get("ok")}
@@ -1942,15 +2090,14 @@ def _grade_council(
         # member that failed entirely (not in `surviving`) shows up as Abstain
         # in the votes string, matching the truncated-mid-rubric semantics.
         for m in members:
-            vs = survivor_lookup.get(m.model)
-            if vs is None:
+            if m.model not in survivor_lookup:
                 per_voted.append(False)
                 per_satisfied.append(False)
                 per_rationale.append(error_lookup.get(m.model, ""))
                 per_truncation.append(False)
                 continue
-            if i < len(vs):
-                v = vs[i]
+            v = verdict_by_index.get(m.model, {}).get(i)
+            if v is not None:
                 per_voted.append(True)
                 per_satisfied.append(bool(v.get("satisfied", False)))
                 per_rationale.append(str(v.get("rationale", "") or ""))
