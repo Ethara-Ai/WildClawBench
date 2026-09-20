@@ -46,8 +46,23 @@ _store.register("captures", primary_key="id",
                 initial_loader=lambda: _coerce_captures(_load("captures.json", "captures")))
 _store.register("invoices", primary_key="id",
                 initial_loader=lambda: _coerce_invoices(_load("invoices.json", "invoices")))
+def _keyed_payout(_payout):
+    """Lift the batch id PayPal nests under ``batch_header`` to the row's key.
+
+    The payouts table registers ``primary_key="payout_batch_id"`` but a PayPal
+    payout carries that id one level down, so the loader and every write path
+    have to agree on the same lift. Only the loader did, and the store is right
+    to refuse a row with no identity: POST /v1/payments/payouts raised
+    ``StoreError: upsert into 'payouts' missing primary key 'payout_batch_id'``
+    instead of persisting. Naming the formula once is how 498592a closed the
+    same defect for slack, doordash and spotify.
+    """
+    return {**_strip_ctx(_payout),
+            "payout_batch_id": _payout["batch_header"]["payout_batch_id"]}
+
+
 _store.register("payouts", primary_key="payout_batch_id",
-                initial_loader=lambda: [{**_strip_ctx(r), 'payout_batch_id': r['batch_header']['payout_batch_id']} for r in _coerce_payouts(_load("payouts.json", "payouts"))])
+                initial_loader=lambda: [_keyed_payout(r) for r in _coerce_payouts(_load("payouts.json", "payouts"))])
 _store.register("refunds", primary_key="id",
                 initial_loader=lambda: _coerce_refunds(_load("refunds.json", "refunds")))
 
@@ -342,7 +357,15 @@ def create_payout(sender_batch_id=None, amount_value="0.00", currency_code="USD"
         "recipient_email": recipient_email or "",
         "create_time": _now(),
     }
-    _store_insert("payouts", payout)
+    _store_insert("payouts", _keyed_payout(payout))
     return payout
+
+
+def get_payout(payout_batch_id):
+    for p in _payouts_rows():
+        if p["payout_batch_id"] == payout_batch_id:
+            return {k: v for k, v in p.items() if k != "payout_batch_id"}
+    return {"error": "payout not found",
+            "message": f"Payout {payout_batch_id} not found"}
 
 _store.eager_load()

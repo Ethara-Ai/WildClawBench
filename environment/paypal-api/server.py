@@ -202,3 +202,11 @@ def create_payout(body: PayoutCreateBody):
         currency_code=item.amount.currency_code, recipient_email=item.receiver,
         note=header.email_subject,
     )
+
+
+@app.get("/v1/payments/payouts/{payout_batch_id}")
+def get_payout(payout_batch_id: str):
+    result = paypal_data.get_payout(payout_batch_id)
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result

@@ -1,6 +1,5 @@
 """Data access module for the Kubernetes API mock service."""
 
-import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -9,7 +8,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_seed_with_ctx, get_store, opt_str, strict_bool, strict_int)
+    read_seed_with_ctx, get_store, opt_csv_list, opt_str, strict_bool, strict_int)
 
 _store = get_store("kubernetes-api")
 _API = "kubernetes-api"
@@ -77,9 +76,12 @@ def _to_bool(v):
     return str(v).strip().lower() == "true"
 
 
-def _labels(raw):
+def _labels(row, column):
+    raw = row.get(column)
+    if isinstance(raw, dict):
+        return dict(raw)
     out = {}
-    for pair in (raw or "").split(";"):
+    for pair in opt_csv_list(row, column, sep=";"):
         pair = pair.strip()
         if not pair or "=" not in pair:
             continue
@@ -93,7 +95,7 @@ def _labels(raw):
 # ---------------------------------------------------------------------------
 
 def _coerce_namespaces(rows):
-    return [{**_strip_ctx(r), "labels": _labels(r["labels"])} for r in rows]
+    return [{**_strip_ctx(r), "labels": _labels(r, "labels")} for r in rows]
 
 
 def _coerce_nodes(rows):
@@ -232,7 +234,7 @@ def _service_obj(s):
         "spec": {
             "type": s["type"],
             "clusterIP": s["cluster_ip"],
-            "selector": _labels(s["selector"]),
+            "selector": _labels(s, "selector"),
             "ports": [{"port": s["port"], "targetPort": s["target_port"],
                        "protocol": s["protocol"]}],
         },

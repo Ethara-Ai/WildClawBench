@@ -14,7 +14,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (  # noqa: E402
-    read_seed_with_ctx, get_store, opt_str, strict_bool)
+    read_seed_with_ctx, get_store, opt_csv_list, opt_str, strict_bool)
 
 _store = get_store("segment-api")
 _API = "segment-api"
@@ -65,9 +65,12 @@ def _to_bool(v):
     return str(v).strip().lower() == "true"
 
 
-def _parse_props(raw):
+def _parse_props(row, column):
+    raw = row.get(column)
+    if isinstance(raw, dict):
+        return dict(raw)
     props = {}
-    for pair in (raw or "").split(";"):
+    for pair in opt_csv_list(row, column, sep=";"):
         if not pair:
             continue
         key, _, val = pair.partition("=")
@@ -88,7 +91,7 @@ def _coerce_events(rows):
             "userId": opt_str(r, "userId", default="") or None,
             "event": opt_str(r, "event", default="") or None,
             "timestamp": r["timestamp"],
-            "properties": _parse_props(r["properties"]),
+            "properties": _parse_props(r, "properties"),
         })
     return out
 

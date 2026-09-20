@@ -5,7 +5,6 @@ fiat-equivalent ("native") amounts accompany each balance. Buys/sells and the
 resulting transactions are held in process memory and reset on restart.
 """
 
-import json
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -23,7 +22,7 @@ from _mutable_store import (  # noqa: E402
 _store = get_store("coinbase-api")
 _API = "coinbase-api"
 
-_API = "coinbase-api"
+_NATIVE_CODE = "USD"
 
 
 def _store_insert(_table, _row):
@@ -195,14 +194,14 @@ def get_spot_price(pair):
 
 def _price_for(currency_code):
     return next((x for x in _prices_rows()
-                 if x["base"] == currency_code and x["currency"] == "USD"), None)
+                 if x["base"] == currency_code and x["currency"] == _NATIVE_CODE), None)
 
 
 # ---------------------------------------------------------------------------
 # Buys / Sells
 # ---------------------------------------------------------------------------
 
-def _trade(account_id, amount, side):
+def _trade(account_id, amount, side, currency=None):
     account = _find_account(account_id)
     if not account:
         return {"error": f"Account {account_id} not found"}
@@ -217,7 +216,18 @@ def _trade(account_id, amount, side):
     price = _price_for(code)
     if not price:
         return {"error": f"No spot price available for {code}"}
-    fiat = qty * price["_amount_num"]
+
+    # `currency` says which unit `amount` is denominated in -- the crypto the
+    # account holds, or the fiat it is priced in ("buy $100 of BTC"). Defaulting
+    # to the account's own code is why the field used to read as dropped.
+    denom = (currency or code).upper()
+    if denom == code.upper():
+        fiat = qty * price["_amount_num"]
+    elif denom == _NATIVE_CODE:
+        fiat = qty
+        qty = fiat / price["_amount_num"]
+    else:
+        return {"error": f"currency must be {code} or {_NATIVE_CODE}, got {denom}"}
 
     if side == "buy":
         balance_num = account["_balance_num"] + qty
@@ -246,7 +256,7 @@ def _trade(account_id, amount, side):
         "type": side,
         "status": "completed",
         "amount": {"amount": _fmt_crypto(signed_qty), "currency": code},
-        "native_amount": {"amount": _fmt_fiat(signed_fiat), "currency": "USD"},
+        "native_amount": {"amount": _fmt_fiat(signed_fiat), "currency": _NATIVE_CODE},
         "description": f"{side.capitalize()} {qty} {code}",
         "created_at": _now(),
         "updated_at": _now(),
@@ -258,20 +268,20 @@ def _trade(account_id, amount, side):
         "status": "completed",
         "resource": side,
         "amount": {"amount": _fmt_crypto(qty), "currency": code},
-        "total": {"amount": _fmt_fiat(fiat), "currency": "USD"},
-        "unit_price": {"amount": price["amount"], "currency": "USD"},
+        "total": {"amount": _fmt_fiat(fiat), "currency": _NATIVE_CODE},
+        "unit_price": {"amount": price["amount"], "currency": _NATIVE_CODE},
         "account_id": account_id,
         "transaction_id": txn["id"],
         "created_at": txn["created_at"],
     }}
 
 
-def create_buy(account_id, amount):
-    return _trade(account_id, amount, "buy")
+def create_buy(account_id, amount, currency=None):
+    return _trade(account_id, amount, "buy", currency)
 
 
-def create_sell(account_id, amount):
-    return _trade(account_id, amount, "sell")
+def create_sell(account_id, amount, currency=None):
+    return _trade(account_id, amount, "sell", currency)
 
 
 # ---------------------------------------------------------------------------

@@ -101,7 +101,8 @@ class InstitutionGetByIdBody(_BaseRequest):
 
 @app.post("/institutions/get_by_id")
 def institutions_get_by_id(body: InstitutionGetByIdBody):
-    result = plaid_data.get_institution_by_id(body.institution_id)
+    result = plaid_data.get_institution_by_id(
+        body.institution_id, country_codes=body.country_codes)
     if "error_code" in result:
         return JSONResponse(status_code=404, content=result)
     return result

@@ -5,11 +5,9 @@ the server maps them to POST /accounts/get, /transactions/get, etc.
 Amounts are floats in the account's currency. Mutations (none) reset on restart.
 """
 
-import csv
 import json
 import sys
 import uuid
-from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
@@ -183,11 +181,17 @@ def get_transactions(start_date=None, end_date=None, account_ids=None,
 # Institution
 # ---------------------------------------------------------------------------
 
-def get_institution_by_id(institution_id):
+def get_institution_by_id(institution_id, country_codes=None):
     inst = _item_doc()["institution"]
     if institution_id != inst["institution_id"]:
         return {"error_code": "INSTITUTION_NOT_FOUND",
                 "error_message": f"Unknown institution {institution_id}"}
+    # Plaid scopes the lookup by country: an institution that does not operate
+    # in any requested country is simply not found there.
+    if country_codes and not set(country_codes) & set(inst["country_codes"]):
+        return {"error_code": "INSTITUTION_NOT_FOUND",
+                "error_message": (f"Institution {institution_id} does not operate in "
+                                  f"{', '.join(country_codes)}")}
     return {"institution": inst, "request_id": _request_id()}
 
 

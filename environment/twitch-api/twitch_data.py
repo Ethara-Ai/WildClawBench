@@ -10,7 +10,8 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_seed_with_ctx, get_store, opt_str, strict_bool, strict_float, strict_int)
+    read_seed_with_ctx, get_store, opt_csv_list, opt_str, strict_bool, strict_float,
+    strict_int)
 
 _store = get_store("twitch-api")
 _API = "twitch-api"
@@ -60,8 +61,8 @@ def _to_bool(v):
     return str(v).strip().lower() == "true"
 
 
-def _split_tags(s):
-    return [t for t in (s or "").split(";") if t]
+def _split_tags(row, column):
+    return [t for t in opt_csv_list(row, column, sep=";") if t]
 
 
 # ---------------------------------------------------------------------------
@@ -96,7 +97,7 @@ def _coerce_channels(rows):
     for r in rows:
         out.append({
             **_strip_ctx(r),
-            "tags": _split_tags(r["tags"]),
+            "tags": _split_tags(r, "tags"),
             "follower_count": strict_int(r, "follower_count"),
         })
     return out

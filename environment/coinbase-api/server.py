@@ -72,7 +72,7 @@ class TradeBody(BaseModel):
 
 @app.post("/v2/accounts/{account_id}/buys", status_code=201)
 def create_buy(account_id: str, body: TradeBody):
-    result = coinbase_data.create_buy(account_id, body.amount)
+    result = coinbase_data.create_buy(account_id, body.amount, body.currency)
     if "error" in result:
         status = 404 if "not found" in result["error"] else 400
         return JSONResponse(status_code=status, content=result)
@@ -81,7 +81,7 @@ def create_buy(account_id: str, body: TradeBody):
 
 @app.post("/v2/accounts/{account_id}/sells", status_code=201)
 def create_sell(account_id: str, body: TradeBody):
-    result = coinbase_data.create_sell(account_id, body.amount)
+    result = coinbase_data.create_sell(account_id, body.amount, body.currency)
     if "error" in result:
         status = 404 if "not found" in result["error"] else 400
         return JSONResponse(status_code=status, content=result)
