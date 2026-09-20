@@ -1868,6 +1868,10 @@ tools["deny"] = [
     "chrome", "chromium", "playwright", "puppeteer",
     "selenium", "webdriver", "headless_browser",
     "browser_navigate", "browser_screenshot", "browser_eval",
+    # phantom tools — advertised by the coding profile but absent from this
+    # openclaw build; warn on every run (1P_MUSE_SPARK_INCIDENT.md
+    # §mitigations, owner-approved prune 2026-09-19)
+    "apply_patch", "web_search", "web_fetch",
 ]
 # Exec runs in the openclaw gateway process inside this agent container
 # (host='gateway'). The container itself is the sandbox (network-isolated
@@ -1936,6 +1940,10 @@ tools["deny"] = [
     "chrome", "chromium", "playwright", "puppeteer",
     "selenium", "webdriver", "headless_browser",
     "browser_navigate", "browser_screenshot", "browser_eval",
+    # phantom tools — advertised by the coding profile but absent from this
+    # openclaw build; warn on every run (1P_MUSE_SPARK_INCIDENT.md
+    # §mitigations, owner-approved prune 2026-09-19)
+    "apply_patch", "web_search", "web_fetch",
 ]
 # Mirror the LiteLLM branch: see comments there for the full rationale,
 # including why the chrome/chromium/etc. root-key writes were removed and

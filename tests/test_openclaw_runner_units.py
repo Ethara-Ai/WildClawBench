@@ -444,6 +444,15 @@ class TestSetModelLitellmAnthropic:
         assert '"deny"' in script
         assert '"security"' in script  # exec security=full
 
+    def test_phantom_coding_profile_tools_denied(self, monkeypatch):
+        # apply_patch/web_search/web_fetch are advertised by the coding
+        # profile but not implemented in this openclaw build; pruned via
+        # tools.deny (1P_MUSE_SPARK_INCIDENT.md §mitigations).
+        script = _extract_script(self._run(monkeypatch))
+        assert '"apply_patch"' in script
+        assert '"web_search"' in script
+        assert '"web_fetch"' in script
+
     def test_nonzero_rc_raises_runtime_error(self, monkeypatch):
         a = _bare_agent(litellm_config_yaml="/x", litellm_container_name="ll")
         monkeypatch.setattr(ocr.subprocess, "run", lambda *a2, **k2: _FakeCompleted(returncode=2, stderr="bad json"))
@@ -580,6 +589,12 @@ class TestSetModelOpenrouter:
         script = _extract_script(self._run(monkeypatch))
         assert '"deny"' in script
         assert '"security"' in script
+
+    def test_openrouter_branch_denies_phantom_coding_profile_tools(self, monkeypatch):
+        script = _extract_script(self._run(monkeypatch))
+        assert '"apply_patch"' in script
+        assert '"web_search"' in script
+        assert '"web_fetch"' in script
 
 
 # ---------------------------------------------------------------------------
