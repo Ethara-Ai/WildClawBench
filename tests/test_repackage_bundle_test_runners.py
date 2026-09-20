@@ -1014,3 +1014,232 @@ def test_whole_run_abstention_is_marked_on_every_criterion():
     rubric = rp._build_rubric_block(score, infer_meta=False)
     assert all(item["abstained"] is True for item in rubric)
     assert all(item["passed"] is False for item in rubric)
+
+
+# ---- rubric[].type / evaluation_target / importance <- authoring rubric.json ----
+#
+# score.json drops these three client-schema fields, so they are merged back
+# from the task's authoring rubric.json. Matching is TEXT-FIRST: the normalised
+# criterion text is the only identifier the two files genuinely share. The
+# R-number is a fallback and is honoured ONLY when the candidate's text also
+# agrees, because R-maps do slide out of step with criterion order (a real task
+# shipped a +3 offset from R5 on, citing phantom R56-R58 in a 55-criterion
+# rubric). A bare R-number fallback would stamp metadata from the WRONG
+# criterion into a client artifact; the cross-check turns that into a loud
+# warning plus the safe defaults.
+
+
+def _write_source_rubric(task_dir, entries):
+    task_dir.mkdir(parents=True, exist_ok=True)
+    (task_dir / "rubric.json").write_text(json.dumps(entries), encoding="utf-8")
+    return task_dir
+
+
+def _source_entry(number, criterion, typ="task completion",
+                  target="trajectory", importance="important", score=3):
+    return {
+        "number": number,
+        "criterion": criterion,
+        "is_positive": score >= 0,
+        "type": typ,
+        "evaluation_target": target,
+        "importance": importance,
+        "score": score,
+    }
+
+
+def test_rubric_meta_merged_on_exact_criterion_text_match(tmp_path):
+    """PRIMARY match: identical text is authoritative, source entry wins."""
+    rp = _load_repackage_module()
+    task_dir = _write_source_rubric(tmp_path / "task", [
+        _source_entry("R1", "criterion 1", typ="agent behavior", target="final_answer"),
+        _source_entry("R2", "criterion 2", typ="tool use", target="state_change"),
+    ])
+    score = {"criteria": [
+        _score_criterion(0, 5, True, True),
+        _score_criterion(1, 3, True, True),
+    ]}
+    rubric = rp._build_rubric_block(score, False, task_dir)
+    assert [(i["type"], i["evaluation_target"]) for i in rubric] == [
+        ("agent behavior", "final_answer"),
+        ("tool use", "state_change"),
+    ]
+
+
+def test_rubric_meta_match_is_whitespace_and_case_insensitive(tmp_path):
+    """The text key is normalised, so re-wrapping or re-casing the authoring
+    rubric does not lose the metadata."""
+    rp = _load_repackage_module()
+    task_dir = _write_source_rubric(tmp_path / "task", [
+        _source_entry("R1", "the agent  files\n  the PERMIT before the deadline.",
+                      typ="instruction following", target="user_facing_message"),
+    ])
+    score = {"criteria": [dict(
+        _score_criterion(0, 3, True, True),
+        criterion="The Agent files the permit   before the deadline.",
+    )]}
+    item = rp._build_rubric_block(score, False, task_dir)[0]
+    assert item["type"] == "instruction following"
+    assert item["evaluation_target"] == "user_facing_message"
+    assert item["criterion"] == "The Agent files the permit   before the deadline."
+
+
+def test_rubric_meta_r_number_fallback_accepted_when_text_agrees(tmp_path, capsys):
+    """A copy-edit between rubric.json and score.json breaks the exact text key;
+    the R-number fallback recovers it because the two texts still agree."""
+    rp = _load_repackage_module()
+    task_dir = _write_source_rubric(tmp_path / "task", [
+        _source_entry("R1", "The agent files the permit before the deadline",
+                      typ="factuality and hallucination", target="final_answer"),
+    ])
+    score = {"criteria": [dict(
+        _score_criterion(0, 3, True, True),
+        criterion="The agent files the permit before the deadline.",
+    )]}
+    item = rp._build_rubric_block(score, False, task_dir)[0]
+    assert item["type"] == "factuality and hallucination"
+    assert item["evaluation_target"] == "final_answer"
+    assert "REJECTED" not in capsys.readouterr().err
+
+
+def test_rubric_meta_r_number_fallback_rejected_on_desynced_r_map(tmp_path, capsys):
+    """The willie-shaped hazard: the authoring R-map slid by +3 from R5 on, so
+    source "R5" carries criterion EIGHT's text. Trusting the number alone would
+    stamp R8's metadata onto R5. The cross-check rejects it, emits the safe
+    defaults, and names both texts so the desync is visible."""
+    rp = _load_repackage_module()
+    task_dir = _write_source_rubric(tmp_path / "task", [
+        _source_entry("R4", "The agent confirms the printed lot totals.",
+                      typ="task completion", target="trajectory"),
+        _source_entry("R5", "The agent escalates the unresolved billing dispute "
+                            "to the regional supervisor.",
+                      typ="safety_and_boundaries", target="user_facing_message",
+                      importance="critically_important"),
+    ])
+    score = {"criteria": [dict(
+        _score_criterion(4, 3, True, True),
+        criterion="The agent records the revised runoff coefficient in the survey log.",
+    )]}
+    item = rp._build_rubric_block(score, False, task_dir)[0]
+    assert item["number"] == "R5"
+    assert item["type"] == ""
+    assert item["evaluation_target"] == ""
+    assert item["importance"] == "important"  # derived from |weight| 3, not source
+    err = capsys.readouterr().err
+    assert "R5 R-number fallback REJECTED" in err
+    assert "DESYNCED" in err
+    assert "revised runoff coefficient" in err
+    assert "regional supervisor" in err
+
+
+def test_rubric_meta_phantom_r_number_degrades_silently(tmp_path):
+    """The other half of a slid R-map: the number simply is not in the source
+    (the willie doc cited phantom R56-R58 in a 55-criterion rubric). No
+    candidate, so no fallback and no warning — just the safe defaults."""
+    rp = _load_repackage_module()
+    task_dir = _write_source_rubric(tmp_path / "task", [
+        _source_entry("R1", "criterion 1", typ="tool use", target="trajectory"),
+    ])
+    score = {"criteria": [dict(_score_criterion(55, 5, True, True),
+                               criterion="criterion fifty six")]}
+    item = rp._build_rubric_block(score, False, task_dir)[0]
+    assert (item["number"], item["type"], item["evaluation_target"]) == ("R56", "", "")
+    assert item["importance"] == "critically_important"
+
+
+@pytest.mark.parametrize("payload", [None, "{ not json", "[]", '{"rubric": 3}', '["x", 7]'])
+def test_rubric_meta_missing_or_invalid_source_uses_safe_defaults(tmp_path, payload):
+    """Absent / unparseable / wrong-shaped rubric.json must never crash the
+    bundle conversion — it degrades to exactly the pre-merge behaviour."""
+    rp = _load_repackage_module()
+    task_dir = tmp_path / "task"
+    task_dir.mkdir(parents=True, exist_ok=True)
+    if payload is not None:
+        (task_dir / "rubric.json").write_text(payload, encoding="utf-8")
+    score = {"criteria": [
+        _score_criterion(0, 5, True, True),
+        _score_criterion(1, -3, False, False),
+    ]}
+    rubric = rp._build_rubric_block(score, False, task_dir)
+    assert [i["type"] for i in rubric] == ["", ""]
+    assert [i["evaluation_target"] for i in rubric] == ["", ""]
+    assert [i["importance"] for i in rubric] == ["critically_important", "important"]
+    assert rp._build_rubric_block(score, False, None, None) == rubric
+
+
+def test_rubric_meta_source_importance_beats_weight_derived_value(tmp_path):
+    """|weight| >= 5 is only a STAND-IN for importance. When the authoring
+    rubric states it, the stated value wins in both directions."""
+    rp = _load_repackage_module()
+    task_dir = _write_source_rubric(tmp_path / "task", [
+        _source_entry("R1", "criterion 1", importance="critically_important"),
+        _source_entry("R2", "criterion 2", importance="important"),
+    ])
+    score = {"criteria": [
+        _score_criterion(0, 3, True, True),     # derived: important
+        _score_criterion(1, -5, False, False),  # derived: critically_important
+    ]}
+    rubric = rp._build_rubric_block(score, False, task_dir)
+    assert [i["importance"] for i in rubric] == ["critically_important", "important"]
+
+
+def test_rubric_meta_out_of_enum_importance_falls_back_to_derived(tmp_path):
+    """Only the two values authoring rubrics actually carry are trusted; schema
+    drift must not leak an unknown token into a client artifact."""
+    rp = _load_repackage_module()
+    task_dir = _write_source_rubric(tmp_path / "task", [
+        _source_entry("R1", "criterion 1", importance="super_important"),
+    ])
+    score = {"criteria": [_score_criterion(0, 5, True, True)]}
+    assert rp._build_rubric_block(score, False, task_dir)[0][
+        "importance"] == "critically_important"
+
+
+def test_rubric_meta_infer_flag_only_fills_what_the_source_left_empty(tmp_path):
+    """--infer-rubric-meta stays the LAST resort: authoring truth is never
+    overwritten by a keyword heuristic."""
+    rp = _load_repackage_module()
+    task_dir = _write_source_rubric(tmp_path / "task", [
+        _source_entry("R1", "the agent writes the report file",
+                      typ="agent behavior", target=""),
+    ])
+    score = {"criteria": [dict(_score_criterion(0, 3, True, True),
+                               criterion="the agent writes the report file")]}
+    item = rp._build_rubric_block(score, True, task_dir)[0]
+    assert item["type"] == "agent behavior"
+    assert item["evaluation_target"] == "state_change"
+
+
+def test_rubric_meta_prefers_input_task_dir_over_output_mirror(tmp_path):
+    """convert_task hands both dirs over; the input tree is the authoring
+    source of truth and the run-output copy is only the fallback."""
+    rp = _load_repackage_module()
+    out_dir = _write_source_rubric(tmp_path / "out", [
+        _source_entry("R1", "criterion 1", typ="stale mirror value")])
+    in_dir = _write_source_rubric(tmp_path / "in", [
+        _source_entry("R1", "criterion 1", typ="tool use")])
+    score = {"criteria": [_score_criterion(0, 3, True, True)]}
+    assert rp._build_rubric_block(score, False, out_dir, in_dir)[0]["type"] == "tool use"
+    assert rp._build_rubric_block(
+        score, False, out_dir, tmp_path / "absent")[0]["type"] == "stale mirror value"
+
+
+def test_build_report_plumbs_source_rubric_into_report_json(tmp_path):
+    """End-to-end through the call-site signature: report.json's three
+    previously-empty client fields carry the authoring values."""
+    rp = _load_repackage_module()
+    task_dir = _write_source_rubric(tmp_path / "task", [
+        _source_entry("R1", "criterion 1", typ="safety_and_boundaries",
+                      target="user_facing_message", importance="critically_important"),
+    ])
+    run_dir = task_dir / "trajectories" / "claude" / "run_1"
+    run_dir.mkdir(parents=True)
+    (run_dir / "score.json").write_text(json.dumps({
+        "criteria": [_score_criterion(0, 3, True, True)],
+        "rubric_weights_percentage": 100.0,
+        "combined_reward": 1.0,
+    }), encoding="utf-8")
+    report = rp.build_report(run_dir, task_dir, "Claude Opus 4.7", 1, False, task_dir)
+    assert report["rubric"][0]["type"] == "safety_and_boundaries"
+    assert report["rubric"][0]["evaluation_target"] == "user_facing_message"
+    assert report["rubric"][0]["importance"] == "critically_important"

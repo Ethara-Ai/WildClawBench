@@ -70,10 +70,18 @@ DESIGN CHOICES (documented, since some target fields are absent in our data)
 * rubric[].justification   <- single-judge criteria[].rationale, or, on a council
                               score.json, the first non-empty criteria[].rationales_by_judge
                               entry; emitted ONLY on failed items (empty string if none)
-* rubric[].type / importance / evaluation_target are NOT in our score.json.
-    - importance is DERIVED: abs(weight) >= 5 -> "critically_important" else "important"
-    - type and evaluation_target are emitted as "" (unknown) unless --infer-rubric-meta
-      is passed, in which case light heuristics fill them (see _infer_meta).
+* rubric[].type / importance / evaluation_target are NOT in our score.json; they
+  are merged back from the task's AUTHORING rubric.json (input/<task>/rubric.json,
+  falling back to the copy mirrored into the run-output task dir), matched by
+  normalised criterion text, with an R-number fallback that is only honoured when
+  the two criterion texts also agree (see _build_rubric_block).
+    - importance: source rubric value (validated against the authoring enum
+      "important" / "critically_important"), else DERIVED: abs(weight) >= 5 ->
+      "critically_important" else "important"
+    - type / evaluation_target: source rubric value, else "" (unknown) unless
+      --infer-rubric-meta is passed, in which case light heuristics fill them
+      (see _infer_meta).
+    - nothing is ever fabricated: an unmatched criterion ships the safe defaults.
 * pytest test name           <- bare test name (last "::" segment of the ctrf
                               name; class/module/file qualifiers are stripped)
 * pytest test weight         <- test_weights.json[method]  (default 1 if absent)
@@ -84,6 +92,7 @@ DESIGN CHOICES (documented, since some target fields are absent in our data)
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import mimetypes
 import os
@@ -754,17 +763,156 @@ def _is_abstention(c: dict[str, Any]) -> bool:
     return c.get("resolved_by") == "human_eval" or c.get("human_eval") == "required"
 
 
-def _build_rubric_block(score: dict[str, Any], infer_meta: bool) -> list[dict[str, Any]]:
+# The two importance values every authoring rubric.json actually uses; also
+# exactly what the weight-derived rule produces. A source value outside this set
+# is a typo/schema drift, so it is dropped in favour of the derived value rather
+# than shipped into a client artifact.
+_RUBRIC_IMPORTANCE_VALUES = ("important", "critically_important")
+
+# Similarity floor for accepting the R-number fallback (see _build_rubric_block).
+_RUBRIC_TEXT_MATCH_MIN_RATIO = 0.8
+
+
+def _norm_criterion(text: Any) -> str:
+    """Whitespace-collapsed, lowercased criterion text.
+
+    The join key between score.json ``criteria[].criterion`` and the authoring
+    rubric.json entries — the only identifier the two files genuinely share.
+    """
+    return re.sub(r"\s+", " ", str(text or "")).strip().lower()
+
+
+def _criterion_similarity(a: str, b: str) -> float:
+    """Fuzzy agreement (0.0–1.0) between two already-normalised criterion texts.
+
+    autojunk is OFF: criteria run well past difflib's 200-element threshold, and
+    its "popular element" heuristic treats common letters as junk on long
+    strings, which would depress the ratio of two genuinely near-identical texts.
+    """
+    if not a or not b:
+        return 0.0
+    return difflib.SequenceMatcher(None, a, b, autojunk=False).ratio()
+
+
+def _index_source_rubric(*candidates: Path | None) -> dict[str, dict[str, Any]]:
+    """Index a task's authoring rubric.json by criterion text AND by R-number.
+
+    score.json drops type / evaluation_target / importance, so they are read
+    back from the authoring rubric (a top-level list of
+    ``{number, criterion, is_positive, type, evaluation_target, importance,
+    score}`` entries). Candidate dirs are tried in order and the first one
+    holding a usable rubric.json wins; the result is empty when every candidate
+    is absent/unreadable/malformed, which degrades to the safe defaults.
+    """
+    for task_dir in candidates:
+        if task_dir is None:
+            continue
+        src = _load_json(Path(task_dir) / "rubric.json")
+        if isinstance(src, dict):
+            src = src.get("rubric") or src.get("criteria")
+        if not isinstance(src, list):
+            continue
+        idx: dict[str, dict[str, Any]] = {}
+        for r in src:
+            if not isinstance(r, dict):
+                continue
+            crit = _norm_criterion(r.get("criterion"))
+            if crit:
+                idx.setdefault(f"crit:{crit}", r)
+            num = str(r.get("number") or "").strip()
+            if num:
+                idx.setdefault(f"num:{num}", r)
+        if idx:
+            return idx
+    return {}
+
+
+def _resolve_by_number(
+    source: dict[str, dict[str, Any]], number: str, criterion: str
+) -> dict[str, Any] | None:
+    """R-number fallback, accepted only when the two criterion texts agree.
+
+    Returns None (-> safe defaults) and warns loudly when the source entry
+    carrying this R-number describes a DIFFERENT criterion, which is what a
+    rubric whose R-map has slipped out of step with criterion order looks like.
+    """
+    cand = source.get(f"num:{number}")
+    if cand is None:
+        return None
+    cand_text = str(cand.get("criterion") or "")
+    ratio = _criterion_similarity(_norm_criterion(criterion), _norm_criterion(cand_text))
+    if ratio >= _RUBRIC_TEXT_MATCH_MIN_RATIO:
+        return cand
+    print(
+        f"    WARNING: rubric {number} R-number fallback REJECTED "
+        f"(text similarity {ratio:.2f} < {_RUBRIC_TEXT_MATCH_MIN_RATIO}) — the "
+        f"authoring rubric.json R-map is DESYNCED from score.json criterion "
+        f"order; emitting empty type/evaluation_target + weight-derived "
+        f"importance rather than stamping another criterion's metadata.\n"
+        f"      score.json  {number}: {criterion[:120]!r}\n"
+        f"      rubric.json {number}: {cand_text[:120]!r}",
+        file=sys.stderr,
+    )
+    return None
+
+
+def _build_rubric_block(
+    score: dict[str, Any],
+    infer_meta: bool,
+    task_dir: Path | None = None,
+    input_task_dir: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Build report.json's rubric[], merging authoring metadata onto the score.
+
+    MATCHING POLICY (type / evaluation_target / importance come from the task's
+    authoring rubric.json; everything else comes from score.json):
+
+    1. PRIMARY — normalised criterion text. An exact match on the
+       whitespace-collapsed, lowercased text is AUTHORITATIVE: the two files
+       describe the same criterion, so the source entry is used as-is.
+    2. FALLBACK — R-number (``R{score id + 1}`` vs the source entry's
+       ``number``), accepted ONLY after a cross-check that the two criterion
+       texts actually agree (``_criterion_similarity`` >= 0.8). R-maps do drift
+       out of step with criterion order (a real task shipped a +3 offset from R5
+       on, citing phantom R56–R58 in a 55-criterion rubric), and a bare
+       R-number fallback would stamp metadata from the WRONG criterion. A
+       mismatch is REJECTED — safe defaults + a loud warning, so the desync
+       surfaces instead of silently corrupting a client artifact.
+    3. Never fabricate: source value, else derived importance / "" for
+       type+evaluation_target, with --infer-rubric-meta heuristics remaining the
+       last opt-in resort.
+
+    The emitted ``criterion`` text is score.json's, so the invariant enforced
+    here is rubric.json↔score.json text agreement before any source metadata is
+    trusted.
+    """
+    source = _index_source_rubric(input_task_dir, task_dir)
     rubric: list[dict[str, Any]] = []
     for c in score.get("criteria", []):
         weight = c.get("weight", 0)
         is_positive = bool(c.get("is_positive", weight >= 0))
         criterion = c.get("criterion", "")
-        importance = "critically_important" if abs(float(weight)) >= 5 else "important"
-        typ, target = _infer_meta(criterion, is_positive) if infer_meta else ("", "")
+        number = f"R{int(c.get('id', 0)) + 1}"
+        src = source.get(f"crit:{_norm_criterion(criterion)}")
+        if src is None:
+            src = _resolve_by_number(source, number, criterion)
+        if src is None:
+            src = {}
+        src_importance = str(src.get("importance") or "").strip()
+        if src_importance not in _RUBRIC_IMPORTANCE_VALUES:
+            src_importance = ""
+        importance = src_importance or (
+            "critically_important" if abs(float(weight)) >= 5 else "important"
+        )
+        typ = str(src.get("type") or "")
+        target = str(src.get("evaluation_target") or "")
+        if infer_meta and not (typ and target):
+            inf_typ, inf_target = _infer_meta(criterion, is_positive)
+            typ = typ or inf_typ
+            target = target or inf_target
         passed = bool(c.get("passed", False))
         item: dict[str, Any] = {
-            "number": f"R{int(c.get('id', 0)) + 1}",
+            "number": number,
             "criterion": criterion,
             "type": typ,
             "evaluation_target": target,
@@ -822,6 +970,7 @@ def build_report(
     pretty_model: str,
     run_index: int,
     infer_meta: bool,
+    input_task_dir: Path | None = None,
 ) -> dict[str, Any]:
     score = _load_json(run_dir / "score.json") or {}
     output_json = _load_json(run_dir / "output.json")
@@ -847,7 +996,7 @@ def build_report(
             file=sys.stderr,
         )
 
-    rubric_block = _build_rubric_block(score, infer_meta)
+    rubric_block = _build_rubric_block(score, infer_meta, task_dir, input_task_dir)
 
     rubric_pct = score.get("rubric_weights_percentage", 0.0)
     if rubric_pct is None:
@@ -2464,7 +2613,7 @@ def convert_task(
                 shutil.copy2(src_out, dest_run / "output.json")
 
             # 2) report.json built
-            report = build_report(run_dir, task_dir, pretty, ridx, infer_meta)
+            report = build_report(run_dir, task_dir, pretty, ridx, infer_meta, input_task_dir)
             _write_json(dest_run / "report.json", report)
 
             # 3) output_media
