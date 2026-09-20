@@ -1773,8 +1773,18 @@ class OpenClawAgent(BaseAgent):
                         )
                     except ValueError:
                         context_window = 262144
-                    # Relay output is hard-capped at 32,000 tokens (observed:
-                    # two aleksei run_4 responses stopped at exactly 32000).
+                    # The exactly-32000 output cap is OURS, not the relay's:
+                    # pi-ai defaults maxTokens to min(model.maxTokens, 32000)
+                    # (@mariozechner/pi-ai@0.57.1, dist/providers/
+                    # simple-options.js:4, extracted 2026-09-19 from the
+                    # wildclawbench-ubuntu:v1.4 image). The relay honors
+                    # max_completion_tokens exactly — live wire test
+                    # 2026-09-19, 2 isolated curls from alpha, finish_reason
+                    # "length" at 16/16 (NEWREQ_50_OVERLAP_TODO.md §10.13
+                    # addendum). An earlier revision of this comment blamed
+                    # the relay for the observed cap (two aleksei run_4
+                    # responses stopped at exactly 32000); that attribution
+                    # was wrong — the observation itself was real.
                     # Declaring 128000 wastes ~half the 256K window on output
                     # reserve and compacts far too early.
                     try:

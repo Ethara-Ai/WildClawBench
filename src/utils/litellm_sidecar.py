@@ -199,11 +199,20 @@ def build_litellm_config_yaml(
         # custom api_base; the bridge is a transparent Anthropic-Messages
         # proxy (per Oracle review — pure pass-through, no key rewriting).
         #
-        # Thinking directive shape here MUST be {type:enabled,budget_tokens}
-        # not adaptive+effort:high — Anthropic-direct 400s the adaptive
-        # shape (that's a Bedrock-Converse-specific extension). budget_tokens
-        # 32000 mirrors kaiju-harness's Opus fixed-budget shape and yields
-        # visibly populated thinking blocks on api.anthropic.com's opus route.
+        # Thinking directive shape here MUST be {type:adaptive,display:
+        # summarized} (see `thinking:` line below) — NOT {type:enabled,
+        # budget_tokens}. Live probe on record (2026-08-11, direct
+        # api.anthropic.com curls): enabled+budget_tokens returns HTTP 200
+        # with SILENTLY-EMPTY thinking (1821 thinking tokens billed, 0
+        # chars); adaptive+summarized on the same prompt returned 1875 chars
+        # of real thinking — canonical record in bridge.py's
+        # normalize_body_for_anthropic_direct docstring (lines 442-501). An
+        # earlier revision of this comment demanded enabled+budget_tokens;
+        # that was stale/wrong, corrected 2026-09-19 per
+        # NEWREQ_50_OVERLAP_TODO.md §10.7 ("audit had it BACKWARDS: the code
+        # was right, the test wrong" — the paired test
+        # test_opus_thinking_shape_is_adaptive_summarized already asserts
+        # {"type": "adaptive", "display": "summarized"}).
         #
         # cost_per_token = 0 so LiteLLM's completion_cost() reports $0 for
         # subscription usage (the real subscription is prepaid, per-request
@@ -537,12 +546,18 @@ def build_litellm_config_yaml(
         # PARAMETER POLICY (vendor onboarding guide, non-negotiable): keep ALL
         # inference params at their DEFAULTS for this relay — do NOT set
         # reasoning_effort, temperature, top_p, top_k, max_tokens, or
-        # response_format here. The relay also documents hard gaps: no
-        # structured output, no parallel tool calling, no function tool-call
-        # streaming. The global `litellm_settings.drop_params: true` (set below)
-        # is what makes this safe end-to-end: any of those params an upstream
-        # caller (openclaw, judge, testgen) emits are silently dropped before
-        # the request reaches the relay instead of 400-ing it.
+        # response_format here. The relay documents remaining hard gaps: no
+        # structured output, no parallel tool calling. (Function tool-call
+        # streaming DOES work — live-verified 2026-09-19, 2 isolated curls
+        # from alpha: stream:true+tools[] returns perfect streamed
+        # delta.tool_calls, id/name/incremental JSON args, finish_reason
+        # "tool_calls" — NEWREQ_50_OVERLAP_TODO.md §10.13 addendum. An
+        # earlier revision of this comment claimed no function tool-call
+        # streaming; that was wrong.) The global `litellm_settings.drop_params:
+        # true` (set below) is what makes this safe end-to-end: any of those
+        # params an upstream caller (openclaw, judge, testgen) emits are
+        # silently dropped before the request reaches the relay instead of
+        # 400-ing it.
         # Intentionally NO `stream_options.include_usage` and NO input/output
         # cost overrides — both are non-default request shaping the guide tells
         # us not to add; usage is still recorded post-call by the LiteLLM usage
