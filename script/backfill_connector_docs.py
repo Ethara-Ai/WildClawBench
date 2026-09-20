@@ -4,9 +4,11 @@
 CONTEXT
 -------
 environment/skills/<name>-api-connector/ ships one of two shapes:
-  * RICH  (6 dirs): hand-authored references/<name>-api-guide.md + scripts/fetch_*.py
-          (etsy, amazon-seller, linear, ...). These are upstream/curated — NEVER touched.
-  * THIN  (44 dirs): SKILL.md only. SKILL.md carries a parseable endpoint table
+  * RICH: references/<name>-api-guide.md + scripts/fetch_*.py already present.
+          The hand-authored, upstream-curated ones (etsy, amazon-seller, linear, ...)
+          all left in the newreq convergence, so RICH_CONNECTORS is now empty and
+          every rich dir in the converged 50 is one this tool produced.
+  * THIN: SKILL.md only. SKILL.md carries a parseable endpoint table
           (| Method | Path |) plus the env-var name in its frontmatter/body.
 
 This standalone tool reads each THIN connector's SKILL.md endpoint table and the
@@ -18,7 +20,7 @@ sibling environment/<name>-api/service.toml, then emits, to match the rich shape
 It is ISOLATED: no pipeline import, no Docker, no network, no LLM. Idempotent by
 default (skips a connector that already has references/), so re-runs are safe.
 
-WHY GENERATED (not hand-written): the 91 thin connectors are themselves
+WHY GENERATED (not hand-written): the thin connectors are themselves
 auto-generated mock stubs; their SKILL.md endpoint table is the single source of
 truth, so a deterministic generator stays in lockstep with the mock surface.
 
@@ -27,7 +29,7 @@ DATA SOURCES PER CONNECTOR
   ../<name>-api/service.toml  ->  env_var_name, port (for the localhost fallback)
 
 SELECTION
-  Default: every *-api-connector that LACKS references/ (the 91 thin ones).
+  Default: every *-api-connector that LACKS references/.
   --only NAME[,NAME...]  restrict to specific connectors (by api name, e.g. gmail).
   --force                regenerate even if references/ already exists (still skips
                          the curated RICH set unless --include-rich is also given).
@@ -52,10 +54,11 @@ import sys
 from pathlib import Path
 
 # Curated, hand-authored connectors — never overwrite unless --include-rich.
-RICH_CONNECTORS = {
-    "amazon-seller", "etsy", "google-classroom", "instagram", "linear",
-    "pinterest",
-}
+# EMPTY since the newreq convergence: all six (amazon-seller, etsy,
+# google-classroom, instagram, linear, pinterest) left with their services, and
+# nothing in the converged 50 is hand-authored. Kept as the guard's seam so a
+# future curated connector has somewhere to be declared.
+RICH_CONNECTORS: set = set()
 
 # --bundle-root enrich mode: the two doc subdirs copied from live -> bundle, and the
 # patterns excluded so no build cruft leaks into a published bundle.
@@ -410,7 +413,7 @@ def enrich_one(bundle_skill_dir: Path, skills_root: Path, force: bool,
     if not live_subdirs:
         return "skipped-empty"
 
-    # Already rich and not forcing -> leave it (e.g. originally-rich etsy).
+    # Already rich and not forcing -> leave it.
     if all((bundle_skill_dir / s).is_dir() for s in live_subdirs) and not force:
         return "skipped-rich"
 
@@ -451,11 +454,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--env-root", default="environment",
                     help="Dir holding <name>-api/service.toml (default: environment)")
     ap.add_argument("--only", default="",
-                    help="Comma-separated api names to restrict to (e.g. gmail,slack).")
+                    help="Comma-separated api names to restrict to (e.g. gmail,monday).")
     ap.add_argument("--force", action="store_true",
                     help="Regenerate even if references/ already exists.")
     ap.add_argument("--include-rich", action="store_true",
-                    help="Also (re)generate the 10 curated connectors (NOT recommended).")
+                    help="Also (re)generate the curated connectors in RICH_CONNECTORS "
+                         "(NOT recommended; the set is currently empty).")
     ap.add_argument("--bundle-root", default="",
                     help="Enrich mode: copy live references/+scripts/ into an already-built "
                          "bundle's connector dirs (sourced from --skills-root) instead of "

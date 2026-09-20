@@ -95,60 +95,60 @@ Scoring: `final_reward = sum(weight where test passed) / sum(positive weights)`.
 
 ## API Response Pattern Taxonomy
 
-The 10 mock APIs return data in **6 different patterns**. You MUST correctly navigate the response structure. Code defensively: use `.get()`, check membership and non-emptiness before indexing.
+The 50 mock APIs return data in **4 main patterns**. You MUST correctly navigate the response structure. Code defensively: use `.get()`, check membership and non-emptiness before indexing.
 
-### Pattern A: `{"type": "<entity>", "<entity>": {...}}` Wrapper
-**Used by:** Etsy, Pinterest, Linear
+### Pattern A: Entity-Named Key
+**Used by:** ActiveCampaign, Zendesk, Square, ServiceNow, Confluence, Contentful
 
 ```python
 # GET single entity — verify structure, not guessed values
-response = api_get(ETSY_API_URL, f"/shops/{shop_id}/listings/{listing_id}")
-listing = response["listing"]
-assert isinstance(listing.get("title"), str) and len(listing["title"]) > 0, "listing has no title"
+response = api_get(ZENDESK_API_URL, f"/api/v2/tickets/{ticket_id}")
+ticket = response["ticket"]
+assert isinstance(ticket.get("subject"), str) and len(ticket["subject"]) > 0, "ticket has no subject"
 
 # LIST entities — verify count and structure
-response = api_get(ETSY_API_URL, f"/shops/{shop_id}/listings")
-listings = response["results"]
-assert len(listings) >= 1, "no listings returned"
+response = api_get(ZENDESK_API_URL, "/api/v2/tickets")
+tickets = response["tickets"]
+assert len(tickets) >= 1, "no tickets returned"
 
 # Assert exact values ONLY when the task instruction specifies them:
-# e.g., if task says "create listing titled 'Summer Sale'"
-assert any(l.get("title", "").lower() == "summer sale" for l in listings), "expected listing not found"
+# e.g., if task says "set the POS terminal ticket to solved"
+assert any(t.get("status") == "solved" for t in tickets), "expected ticket not found"
 ```
 
-Etsy paths: Listings require shop_id: `/shops/{shop_id}/listings` — NOT just `/listings`.
+The list key is not always the plural of the single key: confluence answers `results`, contentful answers `items`.
 
 ### Pattern B: Direct Object (No Wrapper)
-**Used by:** Instagram
+**Used by:** Alpaca, BambooHR, Trello, Twilio, Zoom, NASA, OpenLibrary, Ticketmaster
 
 ```python
-response = api_get(INSTAGRAM_API_URL, f"/media/{media_id}")
-assert "caption" in response, "media has no caption field"
+response = api_get(BAMBOOHR_API_URL, f"/api/gateway.php/{company}/v1/employees/{employee_id}")
+assert "department" in response, "employee has no department field"
 ```
 
-Instagram: NO wrapper. User endpoints use `/{user_id}/media`, NOT `/me/media`.
+No envelope to reach through: index the field directly on the response.
 
-### Pattern C: Entity-Named Key (No `type` Field)
-**Used by:** Google Classroom
+### Pattern C: `type`-Tagged Response
+**Used by:** Intercom
 
 ```python
-response = api_get(GOOGLE_CLASSROOM_API_URL, f"/v1/courses/{course_id}")
-course = response["course"]
+response = api_get(INTERCOM_API_URL, f"/contacts/{contact_id}")
+assert response.get("type") == "contact", "not a contact response"
+email = response["email"]          # fields are TOP level, not nested
 ```
 
-Classroom: All endpoints prefixed with `/v1/`.
+Intercom lists tag `type: "list"` and put the rows under `data`. Never index `response[response["type"]]`.
 
-### Pattern D: Amazon Seller (Nested Attribute Arrays)
-**Used by:** Amazon Seller API
+### Pattern D: Envelope with Status Fields
+**Used by:** Cloudflare
 
 ```python
-response = api_get(AMAZON_SELLER_API_URL, f"/listings/2021-08-01/items/{seller_id}/{sku}")
-listing = response["listing"]
-brand = listing["attributes"]["brand"][0]["value"]
-title = listing["attributes"]["item_name"][0]["value"]
+response = api_get(CLOUDFLARE_API_URL, f"/client/v4/zones/{zone_id}/dns_records")
+assert response.get("success") is True, "cloudflare call failed"
+records = response["result"]
 ```
 
-Amazon: Every attribute is `[{"value": X, "marketplace_id": Y}]`. Always `attributes["field"][0]["value"]`.
+Cloudflare: `success: true` only means the call was well-formed. Assert on `result` too.
 
 ### Universal Paginated API Response Handling (MANDATORY for all business endpoints)
 
@@ -328,7 +328,7 @@ assert "summer sale" in body.get("title", "").lower(), "title doesn't match task
 
 The user message lists distractor APIs explicitly under **"Distractor APIs"**. You MUST generate at least one `TestNegativeWeight*` test method for EACH distractor API listed. Missing even one distractor is a lint failure.
 
-**HARD RULE — DO NOT INVENT DISTRACTORS**: The test method name and the test body MUST reference the EXACT distractor API name from the "Distractor APIs" section (e.g. if the section lists `salesforce-api`, `mailchimp-api`, `notion-api`, `instacart-api`, the methods must be `test_salesforce_distractor_touched`, `test_mailchimp_distractor_touched`, `test_notion_distractor_touched`, `test_instacart_distractor_touched` — each calling `api_get(SALESFORCE_API_URL, ...)`, `api_get(MAILCHIMP_API_URL, ...)`, etc.). NEVER invent thematic categories like `TestNegativeWeightCryptoTradesPlaced`, `TestNegativeWeightHRDistractor`, `TestNegativeWeightUnauthorizedMedicalAdvice`. The system already maps the named APIs to mock servers; thematic placeholders cannot reach those servers and will silently no-op.
+**HARD RULE — DO NOT INVENT DISTRACTORS**: The test method name and the test body MUST reference the EXACT distractor API name from the "Distractor APIs" section (e.g. if the section lists `salesforce-api`, `klaviyo-api`, `sentry-api`, `reddit-api`, the methods must be `test_salesforce_distractor_touched`, `test_klaviyo_distractor_touched`, `test_sentry_distractor_touched`, `test_reddit_distractor_touched` — each calling `api_get(SALESFORCE_API_URL, ...)`, `api_get(KLAVIYO_API_URL, ...)`, etc.). NEVER invent thematic categories like `TestNegativeWeightCryptoTradesPlaced`, `TestNegativeWeightHRDistractor`, `TestNegativeWeightUnauthorizedMedicalAdvice`. The system already maps the named APIs to mock servers; thematic placeholders cannot reach those servers and will silently no-op.
 
 For each distractor API and forbidden behavior, write tests inside `TestNegativeWeight*` classes:
 
@@ -470,7 +470,7 @@ assert record["status"] == "approved", f"expected approved, got {record['status'
   - One-arg style: `_get(url)`, `_post(url, data)` — e.g. `_get(f"{INSTAGRAM_API_URL}/audit/summary")`
   - File helpers: `read_file(path)`, `file_exists(path)`
   - The `json` module is also already imported.
-- API base URLs are available as module-level constants: `<SERVICE_NAME>_URL` where `<SERVICE_NAME>` is the uppercased service name with hyphens replaced by underscores (e.g. service `instagram-api` → `INSTAGRAM_API_URL`). Reference these constants directly; do NOT call `os.environ`.
+- API base URLs are available as module-level constants: `<SERVICE_NAME>_URL` where `<SERVICE_NAME>` is the uppercased service name with hyphens replaced by underscores (e.g. service `microsoft-teams-api` → `MICROSOFT_TEAMS_API_URL`). Reference these constants directly; do NOT call `os.environ`.
 - Every test method has a docstring describing what observable state it verifies.
 - One logical assertion group per test method. Independent tests — no fixtures, no shared mutable state.
 - 4-space indentation always. Never tabs.

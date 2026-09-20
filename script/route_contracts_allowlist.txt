@@ -48,32 +48,27 @@ salesforce-api::PATCH /services/data/v59.0/sobjects/{sobject}/{record_id}::OPEN_
 # section to quiet a newly-introduced defect -- that is the exact failure mode
 # this checker exists to prevent.
 #
-#   class B  OPEN_BODY_SCHEMA  EMPTY -- discharged by the F6 fleet pass. All 98
-#            routes that stood here (32 services) now carry
-#            model_config = ConfigDict(extra="forbid"), so an unknown key is a
-#            422 instead of a silent drop. 118 models were tightened in total,
-#            because the route tier only names the top-level body model: 21 of
-#            them are nested sub-models (jira IssueFields, zendesk
-#            TicketCreate/TicketUpdate/TicketComment, square Money/OrderLineItem,
-#            whatsapp TextMessage/TemplateBlock/TemplateLanguage, confluence's
-#            five Content* shapes, mailchimp CampaignRecipients/CampaignSettings,
-#            google-classroom MaterialItem/MaterialLink, airtable RecordItem,
-#            google-calendar FreeBusyItem) that no route entry could have named
-#            and that a forbid on the parent does not protect. Re-arming is
-#            automatic: a new lax body model is an un-allowlisted ERROR, and
+#   class B  OPEN_BODY_SCHEMA  EMPTY IN THIS FILE, BUT NOT DISCHARGED FLEET-WIDE.
+#            The F6 pass tightened 118 models across 34 services and emptied this
+#            section, and every one of those services that survived the newreq
+#            convergence still carries model_config = ConfigDict(extra="forbid").
+#            The 25 services that ARRIVED in that convergence never saw F6: they
+#            come from a tree that predates it, and the guard reports 28
+#            un-allowlisted ERROR routes across 13 of them (alpaca, bamboohr,
+#            cloudflare, coinbase, gitlab, greenhouse, gusto, kubernetes,
+#            mixpanel, paypal, plaid, reddit, sentry). Those ERRORs are
+#            deliberately NOT listed here. Silencing them is what this file's
+#            own protocol forbids, and naming them in the scan output is how the
+#            hardening wave gets its worklist. Re-arming stays automatic: a new
+#            lax body model is an un-allowlisted ERROR, and
 #            tests/test_extra_forbid_fleet.py asserts the invariant statically so
 #            laxness cannot return through a route the guard cannot reach.
-#   class C  SEED_COERCION_LOSS  1 field. A non-empty seed value that does not
-#            survive its own loader.
+#   class C  SEED_COERCION_LOSS  EMPTY. The single field that stood here,
+#            wordpress media.post, left with its service in the convergence; the
+#            defect was never fixed, it simply stopped being ours to fix.
 #
 # class A (QUERY_BOUND_WRITE) has NO pending entries: the one live instance,
 # trello PUT /1/cards/{card_id}, was fixed before this guard landed. The
 # detector still gates -- the synthetic pre-fix replica in
 # tests/test_route_contracts_gate.py pins it.
 # =====================================================================
-
-# --- class C: seed round-trip ---------------------------------------------
-# media.post is seeded "0" and loads as None: the coercer reads "0" as absent.
-# Harmless if "0" means "no parent post", a lost foreign key if it does not --
-# unresolved either way, so it is tracked rather than blessed.
-wordpress-api::SEED media.post::SEED_COERCION_LOSS

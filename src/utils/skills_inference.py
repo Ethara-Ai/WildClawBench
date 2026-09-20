@@ -34,42 +34,45 @@ from pathlib import Path
 DEFAULT_ENVIRONMENT_DIR = Path(__file__).resolve().parents[2] / "environment"
 
 # Optional curated enrichment (NOT the source of truth for which APIs exist).
-# These add domain-specific terms that don't appear in the slug (e.g. quickbooks
-# -> "invoice", "ledger") and coarse domain tags used for distractor selection.
+# These add domain-specific terms that don't appear in the slug (e.g. greenhouse
+# -> "applicant tracking", "ats") and coarse domain tags used for distractor
+# selection. Every entry is re-pointed at a service in the converged 50: the ten
+# the newreq convergence took away were also this module's missing-environment
+# fallback catalogue, so emptying the table would have emptied that fallback.
 _CURATED_KEYWORDS = {
-    "amazon-seller-api":    ("amazon", "asin", "sku", "fba", "seller central"),
-    "etsy-api":             ("etsy", "handmade", "woodwork", "woodcraft"),
-    "pinterest-api":        ("pinterest",),
-    "instagram-api":        ("instagram", "insta", "ig ", "ig,", "reel"),
-    "youtube-api":          ("youtube", "subscriber", "playlist"),
-    "linear-api":           ("linear",),
-    "quickbooks-api":       ("quickbooks", "ledger"),
-    "google-classroom-api": ("google classroom",),
-    "myfitnesspal-api":     ("myfitnesspal",),
-    "ring-api":             ("ring doorbell",),
+    "bamboohr-api":         ("bamboo hr", "hris", "time off", "pto", "employee directory"),
+    "greenhouse-api":       ("greenhouse", "applicant tracking", "ats", "candidate pipeline"),
+    "gusto-api":            ("gusto", "payroll run", "paystub"),
+    "klaviyo-api":          ("klaviyo", "email marketing", "subscriber profile"),
+    "kraken-api":           ("kraken", "order book", "spot trading"),
+    "microsoft-teams-api":  ("microsoft teams", "ms teams", "channel message"),
+    "paypal-api":           ("paypal", "payout", "checkout order"),
+    "plaid-api":            ("plaid", "bank link", "ach", "routing number"),
+    "posthog-api":          ("posthog", "feature flag", "product analytics"),
+    "sentry-api":           ("sentry", "stack trace", "crash report", "exception"),
 }
 
 _GENERIC_KEYWORDS = {
-    "linear-api":           ("issue", "project management", "sprint", "backlog", "ticket"),
-    "quickbooks-api":       ("invoice", "accounting", "expense", "bill", "payment"),
-    "google-classroom-api": ("classroom", "course", "assignment", "student", "teacher", "grading"),
-    "myfitnesspal-api":     ("fitness", "calorie", "exercise", "workout", "nutrition"),
-    "ring-api":             ("doorbell", "motion"),
-    "etsy-api":             ("listing", "shop", "craft"),
-    "amazon-seller-api":    ("seller",),
+    "greenhouse-api":       ("candidate", "applicant", "job", "interview", "offer", "hiring"),
+    "gusto-api":            ("payroll", "salary", "benefits", "contractor", "wage"),
+    "bamboohr-api":         ("employee", "leave", "vacation", "headcount", "onboarding"),
+    "paypal-api":           ("invoice", "payment", "refund", "capture"),
+    "plaid-api":            ("bank", "account balance", "transaction", "institution"),
+    "sentry-api":           ("error", "issue", "release", "regression"),
+    "posthog-api":          ("event", "cohort", "funnel", "experiment"),
 }
 
 _CURATED_TAGS = {
-    "amazon-seller-api":    ("commerce", "retail"),
-    "etsy-api":             ("commerce", "retail", "creative"),
-    "pinterest-api":        ("social", "media", "creative"),
-    "instagram-api":        ("social", "media", "creative"),
-    "youtube-api":          ("social", "media"),
-    "linear-api":           ("productivity", "saas"),
-    "quickbooks-api":       ("finance", "saas"),
-    "google-classroom-api": ("productivity", "education"),
-    "myfitnesspal-api":     ("health", "lifestyle"),
-    "ring-api":             ("iot", "lifestyle"),
+    "bamboohr-api":         ("hr", "saas"),
+    "greenhouse-api":       ("hr", "recruiting", "saas"),
+    "gusto-api":            ("hr", "finance", "saas"),
+    "klaviyo-api":          ("marketing", "commerce"),
+    "kraken-api":           ("finance", "crypto"),
+    "microsoft-teams-api":  ("communication", "productivity"),
+    "paypal-api":           ("finance", "commerce"),
+    "plaid-api":            ("finance", "saas"),
+    "posthog-api":          ("analytics", "saas"),
+    "sentry-api":           ("observability", "devtools"),
 }
 
 # Back-compat alias (nothing external relies on this, but keep it stable).
@@ -79,7 +82,7 @@ DOMAIN_TAGS = _CURATED_TAGS
 # 2026-06-02 user-mandated change from the original 4-API curated-tag selection
 # (see b46, b58/m1296). Rationale: every TestNegativeWeight* guardrail should be
 # exercisable on every possible reach-for-distractor, not just 4 curated picks.
-# Implication: ~96 connectors injected per task and harbor bundle ships all 101
+# Implication: 49 connectors injected per task and harbor bundle ships all 50
 # API dirs. DISTRACTOR_COUNT retained as a non-binding hint for legacy callers
 # that pass `count=` explicitly; the default policy ignores it.
 DISTRACTOR_COUNT = 4
@@ -95,8 +98,8 @@ def _env_dir(environment_dir=None) -> Path:
 def _slug_keywords(api: str) -> tuple[set[str], set[str]]:
     """Derive (token_keywords, phrase_keywords) from an api slug.
 
-    e.g. 'amazon-seller-api' -> tokens {'amazon','seller'},
-                                phrases {'amazon seller','amazonseller'}
+    e.g. 'microsoft-teams-api' -> tokens {'microsoft','teams'},
+                                  phrases {'microsoft teams','microsoftteams'}
     """
     base = api[:-4] if api.endswith("-api") else api  # strip trailing '-api'
     parts = [p for p in base.split("-") if p]

@@ -12,13 +12,5 @@
 # confirmed there is no state the caller expects to survive the call -- do not
 # allowlist a route merely to quiet the scan.
 
-# Search / query endpoints: body is the query, result is a projection.
-algolia-api::POST /1/indexes/{index}/query::NO_STORE_WRITE
-notion-api::POST /v1/search::NO_STORE_WRITE
-notion-api::POST /v1/databases/{database_id}/query::NO_STORE_WRITE
-
 # Quote / rate / availability calculators: derive a price, store nothing.
 google-calendar-api::POST /calendar/v3/freeBusy::NO_STORE_WRITE
-
-# Identity / balance / flag reads that the vendor exposes as POST.
-slack-api::POST /api/auth.test::NO_STORE_WRITE

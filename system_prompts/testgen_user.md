@@ -103,94 +103,77 @@ class TestNegativeCases:
 
 ## Critical: API Response Pattern Taxonomy
 
-The 10 mock APIs return data in **6 different patterns**. You MUST correctly navigate the response structure when writing assertions. The audit log's `response_body` field shows you the exact shape.
+The 50 mock APIs return data in **4 main patterns**. You MUST correctly navigate the response structure when writing assertions. The audit log's `response_body` field shows you the exact shape.
 
-### Pattern A: `{"type": "<entity>", "<entity>": {...}}` Wrapper
-**Used by:** Etsy, Pinterest, Linear
+### Pattern A: Entity-Named Key
+**Used by:** ActiveCampaign, Zendesk, Square, ServiceNow, Confluence, Contentful
 
 ```python
-# GET single entity
-response = _get(f"{ETSY_URL}/shops/{shop_id}/listings/{listing_id}")
-# response = {"type": "listing", "listing": {"listing_id": 123, "title": "...", ...}}
-listing = response["listing"]
-assert listing["title"] == "Expected Title"
+# GET single — the singular entity name wraps the object
+response = _get(f"{ZENDESK_URL}/api/v2/tickets/{ticket_id}")
+# response = {"ticket": {"id": 701, "subject": "...", "status": "open", "priority": "high", ...}}
+ticket = response["ticket"]
+assert ticket["status"] == "solved"
 
-# LIST entities
-response = _get(f"{ETSY_URL}/shops/{shop_id}/listings")
-# response = {"type": "listings", "count": 5, "total": 12, "offset": 0, "limit": 25, "results": [...]}
-listings = response["results"]
-assert any(l["title"] == "Expected" for l in listings)
+# LIST — the plural entity name wraps the array
+response = _get(f"{ZENDESK_URL}/api/v2/tickets")
+# response = {"tickets": [...]}
+tickets = response["tickets"]
+assert any(t["subject"] == "Expected" for t in tickets)
 
-# CREATE — returns same wrapper with full created object
-# response = {"type": "listing", "listing": {"listing_id": NEW_ID, "title": "...", ...}}
+# CREATE — same entity-named wrapper with the full created object
+# response = {"ticket": {"id": NEW_ID, "subject": "...", ...}}
 ```
 
-**⚠️ Etsy paths:** Listings require shop_id: `/shops/{shop_id}/listings` — NOT just `/listings`.
+**⚠️ The list key is not always the plural of the single key:** confluence answers `results` and contentful answers `items`, each beside its own paging fields (`size`/`_links`, `total`/`skip`/`limit`).
 
 ### Pattern B: Direct Object (No Wrapper)
-**Used by:** Instagram
+**Used by:** Alpaca, BambooHR, Trello, Twilio, Zoom, NASA, OpenLibrary, Ticketmaster
 
 ```python
 # GET single — returns object directly
-response = _get(f"{INSTAGRAM_URL}/media/{media_id}")
-# response = {"id": "...", "caption": "...", "media_type": "IMAGE", "timestamp": "..."}
-assert response["caption"] == "Expected caption"
+response = _get(f"{BAMBOOHR_URL}/api/gateway.php/{company}/v1/employees/{employee_id}")
+# response = {"id": "...", "firstName": "...", "lastName": "...", "department": "...", "jobTitle": "..."}
+assert response["department"] == "Engineering"
 
-# LIST — uses user_id in path + "data" array + "paging"
-response = _get(f"{INSTAGRAM_URL}/{user_id}/media")
-# response = {"data": [...], "paging": {"cursors": {"before": "...", "after": "..."}, "next": "..."}}
-media_items = response["data"]
-
-# GET user profile — also direct
-response = _get(f"{INSTAGRAM_URL}/{user_id}")
-# response = {"id": "...", "username": "...", "media_count": 42}
+# GET a singleton resource — also direct
+response = _get(f"{ALPACA_URL}/v2/account")
+# response = {"account_number": "...", "status": "ACTIVE", "cash": "...", "buying_power": "..."}
+assert response["status"] == "ACTIVE"
 ```
 
-**⚠️ Instagram paths:** User endpoints use `/{user_id}/media`, NOT `/me/media`. The user_id is in the audit log requests.
+**⚠️ Do not unwrap:** there is no envelope to reach through. Index the field you want directly on `response`.
 
-### Pattern C: Entity-Named Key (No `type` Field)
-**Used by:** Google Classroom
+### Pattern C: `type`-Tagged Response
+**Used by:** Intercom
 
 ```python
-# GET single
-response = _get(f"{CLASSROOM_URL}/v1/courses/{course_id}")
-# response = {"course": {"id": "...", "name": "...", "courseState": "ACTIVE", ...}}
-course = response["course"]
-assert course["name"] == "Expected Course"
+# GET single — `type` names the entity, fields sit at the TOP level
+response = _get(f"{INTERCOM_URL}/contacts/{contact_id}")
+# response = {"type": "contact", "id": "contact-mara", "name": "...", "email": "...", "company_id": "..."}
+assert response["email"] == "mara@brightpath.io"
 
-# LIST — pluralized key + optional pagination token
-response = _get(f"{CLASSROOM_URL}/v1/courses")
-# response = {"courses": [...], "nextPageToken": "..."}  (or no nextPageToken)
-courses = response["courses"]
-
-# CREATE — same entity-named wrapper
-# response = {"course": {"id": "NEW_ID", "name": "...", ...}}
+# LIST — `type` is "list" and the rows sit under "data"
+response = _get(f"{INTERCOM_URL}/contacts")
+# response = {"type": "list", "data": [...], "total_count": 3}
+contacts = response["data"]
 ```
 
-**⚠️ Classroom paths:** All endpoints are prefixed with `/v1/` (e.g., `/v1/courses`, `/v1/courses/{id}/courseWork`).
+**⚠️ Do NOT index `response[response["type"]]`:** the tag names the entity, it is not a key into the response.
 
-### Pattern D: Amazon Seller (Nested Attribute Arrays)
-**Used by:** Amazon Seller API
+### Pattern D: Envelope with Status Fields
+**Used by:** Cloudflare
 
 ```python
-# GET listing — deeply nested with marketplace_id arrays
-response = _get(f"{AMAZON_URL}/listings/2021-08-01/items/{seller_id}/{sku}")
-# response = {"type": "listing_item", "listing": {"sku": "...", "attributes": {"brand": [{"value": "BrandName", "marketplace_id": "ATVPDKIKX0DER"}], "item_name": [{"value": "Product Title", "marketplace_id": "ATVPDKIKX0DER"}]}}}
-listing = response["listing"]
-brand = listing["attributes"]["brand"][0]["value"]
-title = listing["attributes"]["item_name"][0]["value"]
-
-# CREATE — returns DIFFERENT shape than GET!
-# response = {"type": "listing_item", "status": "ACCEPTED", "sku": "...", "issues": []}
-# ⚠️ CREATE does NOT return the full listing object. Only status + sku + issues.
-
-# LIST orders
-response = _get(f"{AMAZON_URL}/orders/v0/orders")
-# response = {"type": "orders", "orders": [...], "next_token": "..."}
-orders = response["orders"]
+# Every response — single or list — wraps the payload in "result"
+response = _get(f"{CLOUDFLARE_URL}/client/v4/zones/{zone_id}/dns_records")
+# response = {"success": true, "errors": [], "messages": [], "result": [...]}
+assert response["success"] is True
+records = response["result"]
+assert any(r["name"] == "www.orbit-labs.com" for r in records)
 ```
 
-**⚠️ Amazon attribute access pattern:** Always `attributes["field_name"][0]["value"]` — every attribute is an array of `{value, marketplace_id}` objects.
+**⚠️ `success: true` is not proof of the write:** it means the call was well-formed. Assert on `result` too, never on the envelope alone.
 
 ---
 
@@ -416,12 +399,12 @@ Instagram has NO wrapper. `_get(f"{URL}/media/{id}")` returns the media object d
 ## Environment Variable Naming Convention
 
 Derive from docker-compose service names:
-- Service `amazon-seller-api` → `AMAZON_SELLER_API_URL`
-- Service `etsy-api` → `ETSY_API_URL`
-- Service `instagram-api` → `INSTAGRAM_API_URL`
-- Service `pinterest-api` → `PINTEREST_API_URL`
-- Service `linear-api` → `LINEAR_API_URL`
-- Service `google-classroom-api` → `GOOGLE_CLASSROOM_API_URL`
+- Service `activecampaign-api` → `ACTIVECAMPAIGN_API_URL`
+- Service `zendesk-api` → `ZENDESK_API_URL`
+- Service `intercom-api` → `INTERCOM_API_URL`
+- Service `cloudflare-api` → `CLOUDFLARE_API_URL`
+- Service `bamboohr-api` → `BAMBOOHR_API_URL`
+- Service `microsoft-teams-api` → `MICROSOFT_TEAMS_API_URL`
 
 Default port: Use the port mapped in `docker-compose.yaml` for the service.
 

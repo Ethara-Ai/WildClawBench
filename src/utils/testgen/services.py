@@ -102,10 +102,10 @@ def _cached_service_routes(env_dir_str: str) -> Dict[str, tuple]:
 
 
 def read_service_routes(env_dir: Path | str | None) -> Dict[str, List[str]]:
-    """Served route path templates per API, e.g. {"mailchimp-api": ["/3.0/lists", ...]}.
+    """Served route path templates per API, e.g. {"activecampaign-api": ["/api/3/lists", ...]}.
 
     Grounds lint L27: endpoint paths referenced in generated tests must match a
-    real served route *including its full prefix* (Mailchimp's `/3.0`,
+    real served route *including its full prefix* (ActiveCampaign's `/api/3`,
     Salesforce's `/services/data/v59.0`, ...), because the audit summary keys
     requests by the full path. Empty dict when env_dir is missing.
     """

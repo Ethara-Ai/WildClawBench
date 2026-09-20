@@ -312,9 +312,9 @@ def replay_service_ops(applier: InProcessApplier, api: str,
 def _projects_a_sibling(module: Any, table: str, pk: Any) -> bool:
     """Whether this table's getter can be addressed by pk at all.
 
-    Not every ``get_<entity>`` takes one: classroom's submissions are addressed
-    by (course, coursework, submission), and figma's comments getter answers
-    with a LIST. Both come back from ``project_in_process`` as "no projection",
+    Not every ``get_<entity>`` takes one: github's issues are addressed by
+    (owner, repo, number), and zendesk's comments getter answers with a LIST.
+    Both come back from ``project_in_process`` as "no projection",
     which is indistinguishable from "the row is gone" unless something else is
     tried. So a sibling row is tried. If the getter cannot project that one
     either, it was never a pk-addressable projection and says nothing about our

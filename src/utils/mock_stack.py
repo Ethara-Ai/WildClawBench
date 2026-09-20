@@ -522,9 +522,9 @@ def wait_for_ports_healthy(container_name: str, ports: list[int],
     """Readiness for ONLY the given ports inside the container (via exec+curl).
 
     Used by the per-task mock stack: a task that overlays one API
-    (e.g. google-classroom-api:8002) must not wait on the image's baked-in
-    HEALTHCHECK, which probes ALL ~101 ports and may never go green when 100
-    unrelated uvicorn workers are still booting / contending for CPU. We only
+    (e.g. gmail-api:8017) must not wait on the image's baked-in HEALTHCHECK,
+    which probes EVERY port in the fleet and may never go green while the
+    other 49 uvicorn workers are still booting / contending for CPU. We only
     need the task's own API(s) up.
     """
     if not ports:

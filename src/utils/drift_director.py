@@ -19,39 +19,39 @@ drift.yaml schema (v1)
       - id: "ev1"
         at: "30s"                         # also: "1m30s", "500ms", float seconds
         action:
-          api: etsy-api
+          api: monday-api
           inject:
             - op: data.patch
-              table: listings
-              pk: L_42
-              fields: { price_per_night: 999 }
+              table: items
+              pk: item-1001
+              fields: { name: "Blocked: vendor outage" }
 
     triggers:                             # reactive, optional
       - id: "ev2"
         when:
-          audit.first_call_on: { api: google-classroom-api }
+          audit.first_call_on: { api: gmail-api }
         action:
-          api: google-classroom-api
+          api: gmail-api
           inject:
             - op: data.delete
-              table: students
-              pk: S_stephanie_walker
+              table: messages
+              pk: msg-104
 
     one_shot:                             # response-interceptors, optional
       - id: "ev3"
         when:
           audit.after:
-            api: stripe-api
+            api: square-api
             method: GET
-            path_regex: "^/v1/customers/.+$"
+            path_regex: "^/v2/payments/.+$"
         action:
-          api: stripe-api
+          api: square-api
           one_shot:
-            path_regex: "^/v1/customers/cus_anchor$"
+            path_regex: "^/v2/payments/PAY_AURORA01$"
             method: GET
             transform:
               ops:
-                - { op: set, path: "balance", value: -50000 }
+                - { op: set, path: "status", value: "FAILED" }
 
 Triggers (the ``when`` clause)
 ------------------------------
@@ -417,7 +417,7 @@ class DriftDirector(threading.Thread):
         director = DriftDirector(
             script=DriftScript.load(task["drift_script_path"]),
             targets={
-                "etsy-api": _ApiTarget("etsy-api", "http://localhost:8011"),
+                "monday-api": _ApiTarget("monday-api", "http://localhost:8080"),
                 ...
             },
             workspace_dir=Path(task["workspace_dir"]),

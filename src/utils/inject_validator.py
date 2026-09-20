@@ -144,8 +144,8 @@ def _row_ids(row: Dict[str, Any]) -> Set[str]:
     """All identifier-ish values on a row, case-insensitively.
 
     Stores key rows by heterogeneous pk columns (``Id`` for salesforce,
-    ``item_id`` for monday, ``sys_id`` for servicenow, ``objectID`` for
-    algolia, ``file_key``/``component_key`` for figma, ``*_key`` for
+    ``item_id`` for monday, ``sys_id`` for servicenow, ``refund_id`` for
+    square, ``catalog_object_id`` for square inventory, ``*_key`` for
     jira/confluence, ...). A static validator has no /admin/tables to consult,
     so it collects every scalar under a key that lowercases to ``pk``, ends in
     ``id``, or is exactly ``key``/ends in ``_key`` — over-collecting only

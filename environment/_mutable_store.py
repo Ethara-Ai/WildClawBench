@@ -41,26 +41,26 @@ Design properties
 Usage from a data module
 ------------------------
 
-    # environment/etsy-api/etsy_data.py
+    # environment/monday-api/monday_data.py
     from _mutable_store import get_store
 
-    _store = get_store("etsy-api")
+    _store = get_store("monday-api")
 
-    def _initial_listings():
-        return _coerce_listings(_load("listings.csv"))
+    def _initial_items():
+        return _coerce_items(_load("items.json", "items"))
 
-    _store.register("listings", primary_key="listing_id",
-                    initial_loader=_initial_listings)
+    _store.register("items", primary_key="item_id",
+                    initial_loader=_initial_items)
 
-    def get_listing(listing_id):
-        row = _store.table("listings").get(listing_id)
-        return row or {"error": "listing not found"}
+    def get_item(item_id):
+        row = _store.table("items").get(item_id)
+        return row or {"error": "item not found"}
 
-That's it. The admin plane can now mutate the "listings" table via:
+That's it. The admin plane can now mutate the "items" table via:
 
-    PATCH /admin/data/listings/L_42  {"price_per_night": 999.0}
+    PATCH /admin/data/items/item-1001  {"name": "Blocked: vendor outage"}
 
-and ``get_listing("L_42")`` will return the updated row on the very next call.
+and ``get_item("item-1001")`` will return the updated row on the very next call.
 
 Why not just expose the underlying dict?
 ----------------------------------------
@@ -696,7 +696,7 @@ class Store:
     """Holds the tables and documents for a single mock API service.
 
     One ``Store`` instance per API (keyed by API directory name, e.g.
-    "etsy-api"). The store is reachable from anywhere in the process via
+    "monday-api"). The store is reachable from anywhere in the process via
     ``get_store(api_name)``, so the admin plane can mutate state without the
     data module having to expose its internals.
 
@@ -991,7 +991,7 @@ def get_store(api_name: str) -> Store:
     """Return the Store for ``api_name``, creating it on first call.
 
     ``api_name`` is the directory name under ``environment/`` (e.g.
-    ``"etsy-api"``). Using the directory name --- not a pretty name ---
+    ``"monday-api"``). Using the directory name --- not a pretty name ---
     makes the admin plane's URL path mirror the filesystem layout, which
     helps operators when debugging.
     """
@@ -1005,13 +1005,19 @@ def get_store(api_name: str) -> Store:
 # File-blob download helper (shared by drive-like APIs: box, google-drive)
 # ---------------------------------------------------------------------------
 #
-# The fleet's drive-shaped APIs (box-api, google-drive-api) expose
-# a "download file content" endpoint that returns RAW TEXT only (the design is
-# deliberately scoped to text/markdown/PDF -- images/video/audio are out of
-# scope per WildClawBench design). Each per-API <name>_data.py owns the route's
-# business logic (file-id/path lookup against its own _store schema); this
-# helper centralizes the mime allow-list + PDF text extraction + size cap so
-# the three implementations cannot drift from each other.
+# CURRENTLY UNUSED. Its only two consumers, box-api and google-drive-api, both
+# left the fleet in the newreq convergence, and the converged 50 ship no
+# drive-shaped API. The helper is kept whole because the contract it encodes is
+# the reason it exists, and the next drive-shaped arrival should inherit it
+# rather than re-derive it; removing it is a separate, deliberate call.
+#
+# The drive-shaped APIs expose a "download file content" endpoint that returns
+# RAW TEXT only (the design is deliberately scoped to text/markdown/PDF --
+# images/video/audio are out of scope per WildClawBench design). Each per-API
+# <name>_data.py owns the route's business logic (file-id/path lookup against
+# its own _store schema); this helper centralizes the mime allow-list + PDF
+# text extraction + size cap so the implementations cannot drift from each
+# other.
 #
 # Bytes physically live INSIDE the mock container at
 # ``<api_dir>/file_blobs/<basename>`` and NEVER touch the agent's
@@ -1095,8 +1101,8 @@ _DOWNLOAD_EXT_MIMES = {
 
 
 def guess_download_mime(name: str) -> str:
-    """Deterministic mime resolution for the download routes (box, whose seed
-    rows carry no mime column).
+    """Deterministic mime resolution for the download routes, for a seed whose
+    rows carry no mime column (box-api's shape, before it left the fleet).
 
     ``mimetypes.guess_type`` depends on the host's mime database: python:slim
     images ship no /etc/mime.types at all, and macOS's Apache table lacks

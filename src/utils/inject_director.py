@@ -562,8 +562,6 @@ def parse_prompts_json(path: Path | str) -> Tuple[List[str], Dict[str, Any]]:
 # the columns that hold a human/business key we can match a placeholder against.
 # Each entry: (candidate_table_prefixes, business_key_columns).
 _SERVICE_RESOLUTION = {
-    "airtable-api": (("records_",), ("PlotID", "plot_id", "Name", "name", "id")),
-    "notion-api": (("pages",), ("title", "Name", "name", "id")),
     "confluence-api": (("pages",), ("title", "Name", "name", "id")),
 }
 
@@ -1161,7 +1159,7 @@ class InjectApplier:
 
     def _resolve_store_table(self, api: str, wanted: Optional[str]) -> Optional[str]:
         """Map a friendly table name to the real registered store table name
-        (airtable registers tables as ``records_<tableId>``, etc.)."""
+        (a store may register a derived name such as ``records_<tableId>``)."""
         if not wanted:
             return wanted
         names = self._list_tables(api)
@@ -1419,7 +1417,7 @@ class InjectApplier:
     def _patch_row(self, api: str, table: str, row: Dict[str, Any],
                    set_: Dict[str, Any], fallback_pk: Optional[str] = None) -> Dict[str, Any]:
         """Patch one row, nested-``fields`` aware. The admin PATCH shallow-merges
-        top-level keys, so an airtable-style nested ``fields`` object must be
+        top-level keys, so a contentful-style nested ``fields`` object must be
         resent whole (existing + overrides). ``fallback_pk`` covers stores whose
         rows key on a domain column (order_id, store_id, ...) and expose no
         ``id``/``pk`` — the explicit-admin caller already knows the true pk.
@@ -1518,9 +1516,9 @@ class InjectApplier:
                     rec.update(after=dict(set_) if ok else before,
                                changed=ok > 0 and before != (dict(set_) if ok else before))
             elif kind == "upsert":
-                # Inject a new row (an incoming email / slack message / page) so it
+                # Inject a new row (an incoming email / chat message / page) so it
                 # appears when the agent next READS that service — silent (no audit
-                # POST). For airtable-style stores the row nests under ``fields``.
+                # POST). For contentful-style stores the row nests under ``fields``.
                 table = self._resolve_store_table(api, spec.get("table"))
                 row = dict(spec.get("row") or {})
                 pk_field = spec.get("pk_field") or "id"
@@ -1565,7 +1563,7 @@ class InjectApplier:
 
     def _admin_doc_set(self, api: str, doc: str, path: List[Any], value: Any) -> Dict[str, Any]:
         """Read-modify-merge a nested value in a registered document store
-        (e.g. notion ``properties`` = ``{page_id:{prop:{type,value}}}``)."""
+        (e.g. plaid ``identity`` = ``{owners:{account_id:[...]}}``)."""
         cur = self._admin_get(api, f"/admin/doc/{doc}")
         if not isinstance(cur, dict):
             return {"ok": False, "before": None, "after": None, "changed": False,
@@ -1690,8 +1688,8 @@ class InjectApplier:
                         ) -> Optional[Tuple[str, str, Dict[str, Any], List[str]]]:
         """Resolve a Talos REST mutation to (table, pk, fields) against live state.
 
-        Strategy: pull the flat field map from the op body (supports the airtable
-        ``{fields:{...}}`` and notion/confluence ``{properties:{...}}`` shapes),
+        Strategy: pull the flat field map from the op body (supports the contentful
+        ``{fields:{...}}`` and confluence ``{properties:{...}}`` shapes),
         extract the business key embedded in the path placeholder, then scan the
         candidate store tables for the matching row and map field casing to the
         row's real column names.
@@ -1723,7 +1721,7 @@ class InjectApplier:
             for row in rows:
                 if not isinstance(row, dict):
                     continue
-                # airtable-style rows nest the business columns under "fields";
+                # contentful-style rows nest the business columns under "fields";
                 # other services keep them top-level. Match + patch the bag that
                 # actually holds the columns.
                 nested = isinstance(row.get("fields"), dict)
@@ -1763,7 +1761,7 @@ class InjectApplier:
             flat = {k: v for k, v in body["fields"].items() if not k.startswith("_")}
             return flat
         if isinstance(body.get("properties"), dict):
-            # Flatten notion/confluence property shapes to leaf scalar values.
+            # Flatten confluence property shapes to leaf scalar values.
             flat = {}
             for k, v in body["properties"].items():
                 flat[k] = _flatten_property_value(v)
@@ -1861,7 +1859,7 @@ class InjectApplier:
 
 
 def _flatten_property_value(v: Any) -> Any:
-    """Reduce a notion/confluence property object to a representative scalar."""
+    """Reduce a confluence property object to a representative scalar."""
     if isinstance(v, dict):
         if "email" in v:
             return v["email"]
