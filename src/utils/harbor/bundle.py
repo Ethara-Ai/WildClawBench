@@ -373,10 +373,12 @@ def write_bundle(
     ) or None
 
     # Harbor injects [environment.env]/[verifier.env]/[solution.env] itself,
-    # so the LLM-proxy routing and CURRENT_DATE pin must live here as well as
-    # in docker-compose.yaml. LLAMA_API_KEY is compose-only (secret; resolved
+    # so the LLM-proxy routing must live here as well as in docker-compose.yaml. LLAMA_API_KEY is compose-only (secret; resolved
     # from the host at `docker compose up` time, never baked into task.toml).
-    runtime_env = runtime_env_defaults(task_dir)
+    # CURRENT_DATE is compose-only: docker-compose.yaml pins the container's
+    # "today"; task.toml's env tables do not carry it.
+    runtime_env = {k: v for k, v in runtime_env_defaults(task_dir).items()
+                   if k != "CURRENT_DATE"}
     environment_env = {**env_vars, **runtime_env}
     verifier_env = {**env_vars, **runtime_env, "TEST_DIR": "/tests"}
     solution_env = {**env_vars, **runtime_env}

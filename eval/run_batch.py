@@ -2499,12 +2499,17 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             from src.utils.grading import grade_with_rubric
             transcript_text = _condense_transcript_for_judge(
                 traj, turns_duplicated=result.get("turns_duplicated"))
+            # Mock-service before/after diff (snapshot/workspace_{before,after}
+            # were written before this point). Empty for runs with no mock stack.
+            from src.utils.state_diff import build_state_changes_for_run
+            state_changes = build_state_changes_for_run(output_dir)
             scores = grade_with_rubric(
                 rubrics,
                 task.get("task_description") or task.get("initial_prompt") or "",
                 results_dir,
                 transcript_text=transcript_text,
                 use_council=task.get("__use_judge_council__"),
+                state_changes=state_changes,
             )
             result["scores"] = scores
             # tests_* in score.json are the DETERMINISTIC pytest counts, not a
@@ -2523,6 +2528,16 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             if isinstance(scores, dict) and scores.get("usage"):
                 result["__judge_usage__"] = dict(scores["usage"])
             _augment_score_with_combined_rewards(scores, result)
+            # Gateway friction stamp (same on-disk-marker pattern): approval-gate
+            # waits and image-tool failures cost the agent time/calls without
+            # failing the run. Absent key == clean log or a non-openclaw backend.
+            if isinstance(scores, dict):
+                from src.utils.gateway_events import scan_gateway_log
+                gateway_events = scan_gateway_log(output_dir / "gateway.log")
+                if gateway_events:
+                    scores["gateway_events"] = gateway_events
+                    logger.warning("[%s] gateway friction events: %s",
+                                   task["task_id"], gateway_events)
             (output_dir / "score.json").write_text(
                 json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
             logger.info("[%s] Rubric judged: overall=%.3f (%.2f%%) — %d/%d criteria passed, model=%s",

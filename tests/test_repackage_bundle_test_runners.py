@@ -1093,7 +1093,7 @@ def test_task_toml_authors_from_task_yaml(tmp_path):
 
     assert rp._stage_task_toml(input_task_dir, bundle, verbose=False)
     toml_text = (bundle / "data" / "task.toml").read_text()
-    assert 'authors = [{ name = "Jane Doe" }]' in toml_text
+    assert 'authors = ["Jane Doe"]' in toml_text
     # Harbor field order: authors sits between description and keywords.
     assert toml_text.find("description =") < toml_text.find("authors =")
     assert toml_text.find("authors =") < toml_text.find("keywords =")
@@ -1369,3 +1369,41 @@ def test_whole_run_abstention_is_marked_on_every_criterion():
     rubric = rp._build_rubric_block(score, infer_meta=False)
     assert all(item["abstained"] is True for item in rubric)
     assert all(item["passed"] is False for item in rubric)
+
+
+def test_task_toml_authors_is_a_plain_string_array(tmp_path):
+    """authors = ["A", "B", "C"] — never the { name = ... } inline-table form —
+    and both writers (repackager + harbor) emit the identical line."""
+    import tomllib
+    from src.utils.harbor.task_toml import _arr_authors
+
+    rp = _load_repackage_module()
+    names = ["Sanskar Gupta", "Satyam", "Adarsh"]
+    line = rp._arr_toml_authors(names)
+    assert line == '["Sanskar Gupta", "Satyam", "Adarsh"]'
+    assert rp._arr_toml_authors(["Sanskar Gupta"]) == '["Sanskar Gupta"]'
+    assert rp._arr_toml_authors([]) == "[]"
+    assert _arr_authors([{"name": n} for n in names]) == line  # writer parity
+    assert tomllib.loads(f"authors = {line}")["authors"] == names
+
+    d = tmp_path / "t"
+    d.mkdir()
+    (d / "task.yaml").write_text("authors: [Sanskar Gupta, Satyam, Adarsh]\n", encoding="utf-8")
+    assert rp._resolve_authors(d) == names
+
+
+def test_current_date_is_compose_only_not_in_task_toml(tmp_path):
+    """CURRENT_DATE pins the container's "today" in docker-compose.yaml; the
+    task.toml env tables ([environment.env]/[verifier.env]/[solution.env]) must
+    not carry it. The other runtime keys stay."""
+    rp = _load_repackage_module()
+    task_dir = tmp_path / "t"
+    task_dir.mkdir()
+    (task_dir / "prompt.txt").write_text("Do the thing.\n")
+    bundle = tmp_path / "b"
+    (bundle / "data" / "environment").mkdir(parents=True)
+    rp._stage_task_toml(task_dir, bundle, verbose=False)
+    toml_text = (bundle / "data" / "task.toml").read_text(encoding="utf-8")
+    assert "CURRENT_DATE" not in toml_text
+    assert "LITELLM_BASE_URL" in toml_text and "OPENAI_API_KEY" in toml_text
+    assert "CURRENT_DATE" in rp._compose_runtime_env_defaults(task_dir)  # compose keeps it

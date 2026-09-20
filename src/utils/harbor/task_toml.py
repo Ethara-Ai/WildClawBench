@@ -25,10 +25,12 @@ def _arr_strs(values: Iterable[str]) -> str:
 def _arr_authors(authors: Iterable[Mapping]) -> str:
     if not authors:
         return "[]"
+    # Plain string array: authors = ["Jane Doe", "John Roe"] (one name ->
+    # ["Jane Doe"]). Records ({"name": ...}) are still accepted as input.
     items = []
     for a in authors:
         name = a.get("name", "") if isinstance(a, Mapping) else str(a)
-        items.append("{ name = %s }" % _q(name))
+        items.append(_q(name))
     return "[" + ", ".join(items) + "]"
 
 

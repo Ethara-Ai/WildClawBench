@@ -1910,7 +1910,8 @@ def _arr_toml_authors(authors: list[str]) -> str:
     """Inline port of src/utils/harbor/task_toml.py::_arr_authors."""
     if not authors:
         return "[]"
-    return "[" + ", ".join("{ name = %s }" % _q_toml(a) for a in authors) + "]"
+    # Plain string array: authors = ["Jane Doe", "John Roe"].
+    return "[" + ", ".join(_q_toml(a) for a in authors) + "]"
 
 
 def _arr_toml_strs(values: list[Any]) -> str:
@@ -2458,7 +2459,10 @@ def _stage_task_toml(
         )
         or _TOML_DEFAULTS["healthcheck_command"]
     )
-    runtime_env = _compose_runtime_env_defaults(input_task_dir)
+    # CURRENT_DATE is compose-only: docker-compose.yaml pins the container's
+    # "today"; task.toml's env tables do not carry it.
+    runtime_env = {k: v for k, v in _compose_runtime_env_defaults(input_task_dir).items()
+                   if k != "CURRENT_DATE"}
     environment_env = {**env_vars, **runtime_env}
     verifier_env = {**environment_env, "TEST_DIR": "/tests"}
     solution_env = dict(environment_env)

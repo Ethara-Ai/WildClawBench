@@ -168,12 +168,12 @@ class TestTaskTomlHelpers:
 
     def test_arr_authors_maps_name(self):
         out = _arr_authors([{"name": "Ada"}, {"name": "Bo"}])
-        assert out == '[{ name = "Ada" }, { name = "Bo" }]'
+        assert out == '["Ada", "Bo"]'
 
     def test_arr_authors_non_mapping_stringified(self):
         # a plain string author -> str(a) is used as the name
         out = _arr_authors(["Solo"])
-        assert out == '[{ name = "Solo" }]'
+        assert out == '["Solo"]'
 
     def test_truncate_collapses_newlines(self):
         assert _truncate_for_description("a\r\nb\nc\rd") == "a b c d"

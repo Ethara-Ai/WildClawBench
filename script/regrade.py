@@ -202,12 +202,14 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
         "%(asctime)s | %(levelname)s | %(name)s | %(message)s"))
     _logging.getLogger().addHandler(_tee)
     try:
+        from src.utils.state_diff import build_state_changes_for_run
         scores = grade_with_rubric(
             rubrics,
             task_description,
             results_dir,
             transcript_text=transcript_text,
             use_council=True,
+            state_changes=build_state_changes_for_run(run_dir),
         )
     finally:
         _logging.getLogger().removeHandler(_tee)
@@ -222,7 +224,8 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
         prev = json.loads(score_path.read_text(encoding="utf-8"))
         for k in ("injection_ok", "injection_defects", "eval_skipped",
                   "run_incomplete", "turns_planned", "turns_completed",
-                  "recovery_turn_fired", "turns_duplicated", "turns_empty"):
+                  "recovery_turn_fired", "turns_duplicated", "turns_empty",
+                  "gateway_events"):
             if k in prev and k not in scores:
                 scores[k] = prev[k]
     except (OSError, json.JSONDecodeError):

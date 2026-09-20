@@ -241,6 +241,26 @@ class TestRegradeScoreOverwrite:
         assert on_disk["rubric_based_reward"] is None
         assert on_disk["combined_reward"] is None
 
+    def test_regrade_sends_the_mock_state_diff_to_the_judge(
+            self, regrade_mod, tmp_path, monkeypatch):
+        run_dir = _mk_run_dir(tmp_path)
+        (run_dir / "output.json").write_text(json.dumps({"messages": []}), encoding="utf-8")
+        rubric = tmp_path / "rubric.json"
+        rubric.write_text(json.dumps([{"criterion": "c", "weight": 5}]), encoding="utf-8")
+        for side, state in (("before", "open"), ("after", "closed")):
+            d = run_dir / "snapshot" / f"workspace_{side}" / "mock_data" / "github-api"
+            d.mkdir(parents=True)
+            (d / "issues.csv").write_text(f"id,state\n502,{state}\n", encoding="utf-8")
+        captured = {}
+
+        def fake_grade(rubrics, task_description, results_dir, **kw):
+            captured.update(kw)
+            return {"overall_score": 1.0, "criteria_total": 1}
+
+        monkeypatch.setattr(regrade_mod, "grade_with_rubric", fake_grade)
+        regrade_mod.regrade(run_dir, rubric_override=rubric)
+        assert "~ [agent] issues 502: state: 'open' -> 'closed'" in captured["state_changes"]
+
     def test_regrade_reads_prompt_into_task_description(self, regrade_mod, tmp_path, monkeypatch):
         run_dir = _mk_run_dir(tmp_path)
         (run_dir / "output.json").write_text(json.dumps({"messages": []}), encoding="utf-8")

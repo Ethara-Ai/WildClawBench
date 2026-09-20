@@ -1192,8 +1192,94 @@ def _extract_text_deliverable(path: Path) -> str | None:
     return text[:_EXTRACT_CHAR_CAP] if text else None
 
 
+_DEFAULT_JUDGE_PDF_MAX_PAGES = 4
+_PDF_RENDER_DPI = 110
+_PDF_RENDER_DPI_RETRY = 72
+_PDF_PAGE_MAX_B64 = 1_500_000  # one page must never take the whole request's image budget
+
+
+def _judge_pdf_max_pages() -> int:
+    """WCB_JUDGE_PDF_MAX_PAGES: image-bearing pages rendered per rubric-named
+    PDF (default 4, 0 disables)."""
+    raw = (os.environ.get("WCB_JUDGE_PDF_MAX_PAGES") or "").strip()
+    try:
+        n = int(raw)
+    except ValueError:
+        return _DEFAULT_JUDGE_PDF_MAX_PAGES
+    return n if 0 <= n <= 20 else _DEFAULT_JUDGE_PDF_MAX_PAGES
+
+
+def _judge_pdf_page_detail() -> str:
+    """Vision detail for PDF page renders. Defaults to "high": a whole page at
+    the cheap "low" tier (512px) cannot show the text on a photographed card,
+    which is exactly what these renders exist to prove."""
+    raw = (os.environ.get("WCB_JUDGE_PDF_PAGE_DETAIL") or "").strip().lower()
+    return raw if raw in _JUDGE_IMAGE_DETAILS else "high"
+
+
+def _pdf_page_images(path: Path, label: str) -> list[tuple[int, ImagePart]]:
+    """JPEG renders of the image-bearing pages of a PDF, as (page_no, ImagePart).
+
+    pypdf text extraction returns nothing for a photo, chart or diagram, so a
+    criterion about what a PDF page SHOWS was otherwise graded blind (benicio
+    875c criterion 14: the MCRI-RG-2170 card photo on page 3 abstained). Pages
+    without embedded images are skipped: their text already reaches the judge.
+    Guarded import (PyMuPDF): absent -> [] and today's text-only behaviour.
+    Never raises."""
+    max_pages = _judge_pdf_max_pages()
+    if max_pages <= 0:
+        return []
+    try:
+        try:
+            import pymupdf as _pdf
+        except ImportError:
+            import fitz as _pdf  # older PyMuPDF name
+    except ImportError:
+        return []
+    import base64
+
+    out: list[tuple[int, ImagePart]] = []
+    detail = _judge_pdf_page_detail()
+    try:
+        with _pdf.open(str(path)) as doc:
+            for pno in range(doc.page_count):
+                if len(out) >= max_pages:
+                    break
+                page = doc.load_page(pno)
+                if not page.get_images(full=True):
+                    continue
+                data = page.get_pixmap(dpi=_PDF_RENDER_DPI).tobytes("jpg", jpg_quality=80)
+                b64 = base64.b64encode(data).decode("ascii")
+                if len(b64) > _PDF_PAGE_MAX_B64:
+                    data = page.get_pixmap(dpi=_PDF_RENDER_DPI_RETRY).tobytes(
+                        "jpg", jpg_quality=70)
+                    b64 = base64.b64encode(data).decode("ascii")
+                    if len(b64) > _PDF_PAGE_MAX_B64:
+                        continue
+                out.append((pno + 1, ImagePart(
+                    data_uri=f"data:image/jpeg;base64,{b64}",
+                    mime="image/jpeg",
+                    detail=detail,
+                    label=f"{label}#page{pno + 1}",
+                )))
+    except Exception:
+        return out
+    return out
+
+
+def _pdf_page_placeholders(pages: list[tuple[int, ImagePart]]) -> str:
+    return "".join(
+        f"\n{_image_placeholder_prefix(img.label)} {img.mime}, "
+        f"~{_data_uri_b64_len(img.data_uri) * 3 / 4 / 1024:.1f}KB] "
+        f"(rendered image of PDF page {pno}: the page as it looks, including its "
+        f"photos and figures)"
+        for pno, img in pages
+    )
+
+
 def _deliverable_evidence_marker(
-    path: Path, label: str | None = None, skip_reason: str | None = None
+    path: Path, label: str | None = None, skip_reason: str | None = None,
+    render_pdf_pages: bool = False,
 ) -> tuple[str, list[ImagePart]]:
     # Single dispatch point turning one collected deliverable into an evidence
     # block. Returns (block_text, images). Text deliverables read verbatim EXCEPT
@@ -1247,19 +1333,31 @@ def _deliverable_evidence_marker(
             ), []
         if _is_binary_deliverable(path):
             extracted = _extract_document_text(path)
+            # Rubric-named PDFs on an image-capable judge also carry renders of
+            # their image-bearing pages; the placeholders sit at the head of the
+            # block so a budget cut of the long text cannot drop them.
+            pages = (_pdf_page_images(path, label)
+                     if render_pdf_pages and path.suffix.lower() == ".pdf" else [])
+            page_images = [img for _, img in pages]
+            placeholders = _pdf_page_placeholders(pages)
             if not extracted:
+                if pages:
+                    return (f"\n----- DELIVERABLE: {label} (rendered pages; no "
+                            f"extractable text) -----{placeholders}\n"), page_images
                 return _presence_marker(label, path, _REASON_NOT_EXTRACTABLE), []
             if len(extracted) <= _EXTRACT_CHAR_CAP:
-                return f"\n----- DELIVERABLE: {label} (extracted text) -----\n{extracted}", []
+                return (f"\n----- DELIVERABLE: {label} (extracted text) -----"
+                        f"{placeholders}\n{extracted}"), page_images
             size = _file_size(path)
             size_txt = f"{size} bytes" if size is not None else "size unknown"
             return (
                 f"\n----- DELIVERABLE: {label} (extracted text, truncated: first "
                 f"{_EXTRACT_CHAR_CAP} of {len(extracted)} chars included; "
                 f"{size_txt}, present — remaining contents not included: extracted "
-                f"text exceeds the {_EXTRACT_CHAR_CAP}-char extraction cap) -----\n"
+                f"text exceeds the {_EXTRACT_CHAR_CAP}-char extraction cap) -----"
+                f"{placeholders}\n"
                 f"{extracted[:_EXTRACT_CHAR_CAP]}"
-            ), []
+            ), page_images
     except Exception:
         return _presence_marker(label, path, _REASON_UNREADABLE), []
     return _presence_marker(label, path, _REASON_UNSUPPORTED), []
@@ -1273,8 +1371,179 @@ _TRANSCRIPT_MARKER = "\n----- TRANSCRIPT (condensed) -----\n"
 _TERMINAL_LANDMARKS = ("[FINAL ASSISTANT MESSAGE]", "[SUBMIT TOOL OUTPUT]")
 
 
+_TOOL_CALL_LINE_RE = re.compile(r"^\[([A-Za-z]+):tool\] (\S+) ?(.*)$")
+_USER_TURN_LINE_RE = re.compile(r"^\[user turn (\d+)")
+_TOOL_INDEX_HEAD = "[tool calls in the omitted section — call only, output not shown]\n"
+_TOOL_INDEX_ENTRY_CHARS = 260
+# What a call TOUCHED, lifted from anywhere in its command so a long script's
+# boilerplate (imports, helper defs) cannot push it past the entry cap:
+# the mock-service env vars it reads, HTTP methods it sends, and API paths.
+_API_ENV_RE = re.compile(r"\b([A-Z][A-Z0-9_]*)_API_URL\b")
+_HTTP_METHOD_RES = (
+    re.compile(r"-X\s*['\"]?(GET|POST|PUT|PATCH|DELETE)\b"),
+    re.compile(r"method\s*=\s*['\"](GET|POST|PUT|PATCH|DELETE)['\"]", re.IGNORECASE),
+    re.compile(r"\brequests\.(get|post|put|patch|delete)\(", re.IGNORECASE),
+)
+_API_PATH_RE = re.compile(r"""(?:_API_URL\}?|['"}])(/[A-Za-z0-9_\-.$\{\}/:%?=&]{2,})""")
+_NON_API_PATH_PREFIXES = ("/root", "/tmp", "/usr", "/home", "/workspace", "/opt", "/etc",
+                          "/bin", "/dev", "/proc", "/var", "/app", "/tmp_workspace", "/sys")
+
+
+def _tool_call_touches(text: str) -> str:
+    """"[apis: … | methods: … | paths: …] " for a tool call, or "" when it
+    touched no mock service. Deduplicated, first-seen order, capped."""
+    apis = list(dict.fromkeys(_API_ENV_RE.findall(text)))[:4]
+    methods: list[str] = []
+    for rx in _HTTP_METHOD_RES:
+        methods += [m.upper() for m in rx.findall(text)]
+    methods = list(dict.fromkeys(methods))[:4]
+    paths = [p for p in dict.fromkeys(_API_PATH_RE.findall(text))
+             if not p.startswith(_NON_API_PATH_PREFIXES) and any(c.isalpha() for c in p)]
+    paths = [p if len(p) <= 60 else p[:59] + "…" for p in paths[:4]]
+    if not (apis or methods or paths):
+        return ""
+    parts = []
+    if apis:
+        parts.append("apis: " + ", ".join(apis))
+    if methods:
+        parts.append("methods: " + ", ".join(methods))
+    if paths:
+        parts.append("paths: " + ", ".join(paths))
+    return "[" + " | ".join(parts) + "] "
+
+
+def _tool_call_index_entries(lines: list[str]) -> list[tuple[int, str]]:
+    """(line position, one-line summary) for every tool call in *lines*, tagged
+    with the user turn it belongs to. Stdlib only; never raises."""
+    entries: list[tuple[int, str]] = []
+    turn = "T?"
+    for pos, line in enumerate(lines):
+        mt = _USER_TURN_LINE_RE.match(line)
+        if mt:
+            turn = f"T{mt.group(1)}"
+            continue
+        mc = _TOOL_CALL_LINE_RE.match(line)
+        if not mc:
+            continue
+        name, raw = mc.group(2), mc.group(3)
+        summary = raw
+        try:
+            args = json.loads(raw) if raw else {}
+            if isinstance(args, dict):
+                summary = str(args.get("command") or args.get("path")
+                              or args.get("file_path") or json.dumps(args))
+        except ValueError:
+            pass
+        summary = " ".join(summary.split())
+        entry = f"{turn} {name}: {_tool_call_touches(summary)}{summary}"
+        if len(entry) > _TOOL_INDEX_ENTRY_CHARS:
+            entry = entry[: _TOOL_INDEX_ENTRY_CHARS - 1] + "…"
+        entries.append((pos, entry))
+    return entries
+
+
+def _render_tool_index(entries: list[str], room: int) -> str:
+    """Fit the dropped-section tool-call index into *room* chars. When it does
+    not fit whole, keep the earliest and latest calls and name the gap."""
+    if not entries or room <= len(_TOOL_INDEX_HEAD) + 2:
+        return ""
+    body = "\n".join(entries) + "\n"
+    if len(_TOOL_INDEX_HEAD) + len(body) <= room:
+        return _TOOL_INDEX_HEAD + body
+    keep_first: list[str] = []
+    keep_last: list[str] = []
+    used = len(_TOOL_INDEX_HEAD) + 48
+    lo, hi = 0, len(entries) - 1
+    while lo <= hi:
+        for side in (0, 1):
+            if lo > hi:
+                break
+            e = entries[lo] if side == 0 else entries[hi]
+            if used + len(e) + 1 > room:
+                lo = hi + 1
+                break
+            used += len(e) + 1
+            if side == 0:
+                keep_first.append(e)
+                lo += 1
+            else:
+                keep_last.append(e)
+                hi -= 1
+    omitted = len(entries) - len(keep_first) - len(keep_last)
+    if not keep_first and not keep_last:
+        return ""
+    gap = [f"… {omitted} more call(s) not listed …"] if omitted > 0 else []
+    out = _TOOL_INDEX_HEAD + "\n".join(keep_first + gap + list(reversed(keep_last))) + "\n"
+    return out if len(out) <= room else ""
+
+
+# Only the prefixes _condense_transcript_for_judge emits: a tool output line that
+# merely starts with "[" ("[S2]", "['', '']") must not split its block.
+_BLOCK_START_RE = re.compile(
+    r"^\[(?:user turn \d+|(?:assistant|user|system|tool|toolResult)(?::tool)?\])")
+_TOOL_BLOCK_RE = re.compile(r"^\[(?:[A-Za-z]+:tool|toolResult)\] ")
+_FILE_WRITE_CALL_RE = re.compile(r"^\[[A-Za-z]+:tool\] (?:write|edit) ")
+_TOOL_BLOCK_CUT = "\n... [truncated {n} chars of this tool block] ...\n"
+_TOOL_BLOCK_MARK = " chars of this tool block] ..."
+# Per-block caps tried widest first; the floor keeps enough of a call/output to
+# judge what it was (measured 2026-09-20: a 2,000 cap fits both runs that lost
+# whole turns — 649K->359K and 506K->322K against ~408K of room).
+_TOOL_BLOCK_CAPS = (12_000, 6_000, 3_000, 1_500)
+
+
+def _clip_block(block: str, cap: int) -> str:
+    if len(block) <= cap:
+        return block
+    room = cap - len(_TOOL_BLOCK_CUT) - 8
+    if room <= 0:
+        return block
+    head = room * 2 // 3
+    dropped = len(block) - room
+    return block[:head] + _TOOL_BLOCK_CUT.format(n=dropped) + block[len(block) - (room - head):]
+
+
+def _shrink_tool_blocks(transcript: str, budget: int) -> str:
+    """Make an over-budget transcript fit by clipping its cheapest content
+    first, before any turn is dropped. Tool calls + outputs are 85-93% of a
+    long run's transcript while user turns and assistant replies — what
+    "the response states ..." criteria are graded on — are 6-16%, yet the
+    middle-drop below removes whole turns of both. Order: file-write call
+    bodies (the file itself is already in <output_files>), then every tool
+    block, each at progressively tighter caps. Conversation text and
+    everything from the terminal landmark on are never touched. Returns the
+    first version that fits, else the tightest one for the middle-drop."""
+    lines = transcript.split("\n")
+    end = len(lines)
+    for i in range(len(lines) - 1, -1, -1):
+        if any(mark in lines[i] for mark in _TERMINAL_LANDMARKS):
+            end = i
+            break
+    blocks: list[str] = []
+    for line in lines[:end]:
+        if blocks and not _BLOCK_START_RE.match(line):
+            blocks[-1] += "\n" + line
+        else:
+            blocks.append(line)
+    tail = lines[end:]
+    best = transcript
+    for only_file_writes in (True, False):
+        for cap in _TOOL_BLOCK_CAPS:
+            shrunk = [
+                _clip_block(b, cap)
+                if (_FILE_WRITE_CALL_RE if only_file_writes else _TOOL_BLOCK_RE).match(b)
+                else b
+                for b in blocks
+            ]
+            best = "\n".join(shrunk + tail)
+            if len(best) <= budget:
+                return best
+        blocks = shrunk
+    return best
+
+
 def _budget_transcript(transcript: str, budget: int) -> str:
-    # Middle-drop on physical-line boundaries: keep a head window, an explicit
+    # Priority shrink first (_shrink_tool_blocks), then middle-drop on
+    # physical-line boundaries: keep a head window, an explicit
     # truncation marker, and a tail window anchored on the terminal landmark so
     # the final turn survives. INVARIANT: the return is ALWAYS <= budget chars
     # (the OAuth judge 200K ceiling, AGENTS.md #18, is a hard gate — an
@@ -1283,6 +1552,9 @@ def _budget_transcript(transcript: str, budget: int) -> str:
     # its END (most-recent content) clamped to budget, never the whole transcript.
     if budget <= 0:
         return ""
+    if len(transcript) <= budget:
+        return transcript
+    transcript = _shrink_tool_blocks(transcript, budget)
     if len(transcript) <= budget:
         return transcript
     lines = transcript.split("\n")
@@ -1306,13 +1578,24 @@ def _budget_transcript(transcript: str, budget: int) -> str:
         if room <= 0:
             return tail[-budget:]
         return rendered_marker + tail[-room:]
+    # Index of the tool calls a middle cut would drop (one short line each), so
+    # an action taken in the cut ("PATCH issues/502", "GET issues/501") stays
+    # visible to the judge even though its output does not. Up to a quarter of
+    # the room left after the tail is reserved for it; the head fills the rest.
+    entries = _tool_call_index_entries(lines[:tail_start])
+    free = budget - len(tail) - 1 - len(marker.format(n=tail_start)) - len(_TOOL_INDEX_HEAD)
+    reserve = 0
+    if entries and free > 0:
+        reserve = min(sum(len(e) + 1 for _, e in entries) + len(_TOOL_INDEX_HEAD) + 64,
+                      free // 4)
     head: list[str] = []
     head_len = 0
     tail_len = len(tail) + 1
     i = 0
     while i < tail_start:
         add = len(lines[i]) + 1
-        if head_len + add + tail_len + len(marker.format(n=tail_start - i)) >= budget:
+        if (head_len + add + tail_len + reserve
+                + len(marker.format(n=tail_start - i)) >= budget):
             break
         head.append(lines[i])
         head_len += add
@@ -1320,7 +1603,58 @@ def _budget_transcript(transcript: str, budget: int) -> str:
     dropped = tail_start - i
     if dropped <= 0:
         return "\n".join(head + [tail])[:budget]
-    return "\n".join(head) + marker.format(n=dropped) + tail
+    base = "\n".join(head) + marker.format(n=dropped)
+    index = _render_tool_index([e for pos, e in entries if pos >= i],
+                               budget - len(base) - len(tail))
+    out = base + index + tail
+    if len(out) > budget:  # defensive: never trade the budget invariant for the index
+        out = base + tail
+    return out
+
+
+_TRANSCRIPT_CUT_RE = re.compile(r"\n\.\.\. \[truncated (\d+) lines\] \.\.\.\n")
+
+
+def _user_turns_in(text: str) -> list[int]:
+    return [int(m.group(1)) for line in text.split("\n")
+            for m in [_USER_TURN_LINE_RE.match(line)] if m]
+
+
+def _evidence_budget_report(transcript_text: str,
+                            evidence: "str | JudgeUserPayload") -> dict:
+    """What the evidence budget cost this judge, read back off the assembled
+    evidence. truncation_flags is the JUDGE's self-report and the judge cannot
+    know what it was never shown (2026-09-19 ariadne_kostas_8c8579bb: turns
+    6-15 cut, truncation_flags == []), so the harness stamps the cut itself.
+    Stdlib only; never raises."""
+    try:
+        text = _payload_text(evidence)
+        _, shown = _split_evidence(text)
+        cut = _TRANSCRIPT_CUT_RE.search(shown)
+        report: dict = {
+            "transcript_chars": len(transcript_text),
+            "transcript_chars_shown": len(shown),
+            "evidence_chars": len(text),
+            # A cut marker alone is not proof: agent output can echo the string.
+            "transcript_truncated": bool(cut) and len(shown) < len(transcript_text),
+            "deliverable_cuts": text.count(_BUDGET_CUT_MARK),
+            # Clipped, not dropped: the call/output is still there, shortened.
+            "tool_blocks_clipped": max(
+                0, shown.count(_TOOL_BLOCK_MARK) - transcript_text.count(_TOOL_BLOCK_MARK)),
+        }
+        if not report["transcript_truncated"]:
+            return report
+        report["dropped_lines"] = int(cut.group(1))
+        all_turns = _user_turns_in(transcript_text)
+        shown_turns = set(_user_turns_in(shown))
+        report["dropped_user_turns"] = [t for t in all_turns if t not in shown_turns]
+        # The turn the cut lands inside keeps its marker but loses its tail.
+        head_turns = _user_turns_in(shown[:cut.start()])
+        if head_turns:
+            report["partial_user_turn"] = head_turns[-1]
+        return report
+    except Exception:  # noqa: BLE001 - a stamp must never cost the run its grade
+        return {}
 
 
 # Directory names that hold agent scratch/work-product (build scripts, the
@@ -1529,12 +1863,18 @@ def _gather_evidence(
     budget: int | None = None,
     rubric_names: frozenset[str] | None = None,
     attach_images: bool = True,
+    state_changes: str = "",
 ) -> JudgeUserPayload:
     """Assemble one judge member's evidence text (and image attachments).
 
     *attach_images* is False for text-only judge transports; every inline image
     placeholder is then marked as not attached instead of silently losing the
-    pixels at the transport."""
+    pixels at the transport.
+
+    *state_changes* is the mock-service before/after diff
+    (src/utils/state_diff.py). It leads the deliverables half and is fitted
+    first, so a transcript middle-cut can no longer hide what the agent changed
+    in the world."""
     deliverables = _collect_deliverables_with_status(workspace_results)
     # Scrub inline base64 out of the TRANSCRIPT too, discarding the images: a
     # tool result that cat'd an image-bearing deliverable would otherwise carry
@@ -1576,7 +1916,9 @@ def _gather_evidence(
         label_uses[label] = uses
         if uses > 1:
             label = f"{label} [{uses}]"
-        block, block_images = _deliverable_evidence_marker(f, label, skip_reason)
+        block, block_images = _deliverable_evidence_marker(
+            f, label, skip_reason,
+            render_pdf_pages=attach_images and f.name.lower() in named)
         rendered.append((f, label, block, block_images))
     rendered.sort(key=lambda r: (_rank(r[0]), len(r[2]), r[0].name, r[1]))
 
@@ -1635,10 +1977,17 @@ def _gather_evidence(
         + ")\n"
     )
 
-    def _fit_deliverables(limit: int) -> tuple[str, list[ImagePart]]:
+    def _fit_files(limit: int) -> tuple[str, list[ImagePart]]:
         if not blocks:
             return (no_deliverables if len(no_deliverables) <= limit else ""), []
         return _budget_deliverables(blocks, limit)
+
+    def _fit_deliverables(limit: int) -> tuple[str, list[ImagePart]]:
+        # The state diff is small (capped in state_diff.py) and is the one piece
+        # of evidence a budget cut must not remove, so it is fitted first.
+        state = state_changes[: max(0, limit)] if state_changes else ""
+        files, imgs = _fit_files(max(0, limit - len(state)))
+        return state + files, imgs
 
     effective = _JUDGE_MAX_EVIDENCE if budget is None else budget
     # Budget deliverables and transcript SEPARATELY. The transcript marker can
@@ -1651,7 +2000,8 @@ def _gather_evidence(
     # longer in the text at all (only their placeholders are), and _judge_max_*
     # caps bound the attachment cost.
     if effective is None:
-        deliv_out = "".join(block for _, block, _, _ in blocks) or no_deliverables
+        deliv_out = (state_changes or "") + (
+            "".join(block for _, block, _, _ in blocks) or no_deliverables)
         kept_images = [i for _, _, imgs, _ in blocks for i in imgs]
         text = deliv_out + (
             f"{_TRANSCRIPT_MARKER}{transcript_text}" if transcript_text else ""
@@ -3224,6 +3574,7 @@ def _grade_gpt_primary(
     workspace_results: Path,
     transcript_text: str,
     system: str,
+    state_changes: str = "",
 ) -> dict:
     """Grade `rubrics` with a SINGLE gpt-5.6 judge, reusing the council machinery.
 
@@ -3255,6 +3606,7 @@ def _grade_gpt_primary(
         evidence = _gather_evidence(
             workspace_results, transcript_text, budget=budget,
             rubric_names=_rubric_file_names(rubrics),
+            state_changes=state_changes,
         )
 
         def _grade_chunk(chunk: list) -> dict:
@@ -3297,6 +3649,7 @@ def _grade_gpt_primary(
         }
 
     result["judge_model"] = model
+    result["evidence_budget"] = {model: _evidence_budget_report(transcript_text, evidence)}
     council = result.get("judge_council")
     if isinstance(council, dict):
         council["aggregation"] = "gpt_primary_single_judge"
@@ -3310,6 +3663,7 @@ def grade_with_rubric(
     transcript_text: str = "",
     judge_model: str | None = None,
     use_council: bool | None = None,
+    state_changes: str = "",
 ) -> dict:
     """Score `rubrics` with the GPT-5.6 primary judge, else the LLM judge COUNCIL.
 
@@ -3339,7 +3693,8 @@ def grade_with_rubric(
 
     if _gpt_judge_configured():
         gpt_result = _grade_gpt_primary(
-            rubrics, task_description, workspace_results, transcript_text, system
+            rubrics, task_description, workspace_results, transcript_text, system,
+            state_changes=state_changes,
         )
         if _grade_is_signal(gpt_result):
             return gpt_result
@@ -3395,6 +3750,7 @@ def grade_with_rubric(
             # Only the gpt transport carries image parts; the rest are text-only
             # by contract, so their placeholders must say the image is not shown.
             attach_images=(m.family == "gpt"),
+            state_changes=state_changes,
         )
 
     def _grade_chunk(chunk: list) -> dict:
@@ -3454,17 +3810,25 @@ def grade_with_rubric(
                 "abstain", res.get("criteria_abstained"), len(chunk))
         return [(chunk, res)]
 
+    def _stamped(res: dict) -> dict:
+        if isinstance(res, dict) and not res.get("error"):
+            res["evidence_budget"] = {
+                m.model: _evidence_budget_report(transcript_text, evidence_for_member[m.model])
+                for m in members
+            }
+        return res
+
     if len(rubrics) <= batch_size:
         parts = _graded_chunks(rubrics)
         if len(parts) == 1:
-            return parts[0][1]
-        return _merge_batched_grades(rubrics, members, parts)
+            return _stamped(parts[0][1])
+        return _stamped(_merge_batched_grades(rubrics, members, parts))
 
     chunk_results: list[tuple[list, dict]] = []
     for start in range(0, len(rubrics), batch_size):
         chunk = rubrics[start:start + batch_size]
         chunk_results.extend(_graded_chunks(chunk))
-    return _merge_batched_grades(rubrics, members, chunk_results)
+    return _stamped(_merge_batched_grades(rubrics, members, chunk_results))
 
 
 def _write_score(output_dir: Path, task_id: str, scores: dict) -> None:

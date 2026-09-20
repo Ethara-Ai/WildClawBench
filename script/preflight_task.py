@@ -575,7 +575,9 @@ def _task_toml_current_date(task: Path) -> str | None:
     for candidate in (task / "task.toml", task / "data" / "task.toml"):
         if candidate.is_file():
             m = _TOML_DATE_RE.search(candidate.read_text(encoding="utf-8"))
-            return m.group(1) if m else ""
+            # Bundles no longer write CURRENT_DATE into task.toml (it lives in
+            # docker-compose.yaml); an older bundle that still pins one is checked.
+            return m.group(1) if m else None
     return None
 
 

@@ -1928,8 +1928,10 @@ print({json.dumps(_EXEC_GUARD_MARKER)} + _guard_state)
             )
         elif state == "not-required":
             logger.info(
-                "[%s] exec obfuscation guard not required (installed openclaw "
-                "predates the inline-eval prefilter)", task_id,
+                "[%s] inline-eval guard not required (installed openclaw "
+                "predates that prefilter); the 'Shell heredoc execution' "
+                "approval gate can still fire on this build — see "
+                "score.json gateway_events", task_id,
             )
         else:
             logger.warning(
