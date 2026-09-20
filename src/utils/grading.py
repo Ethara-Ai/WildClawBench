@@ -1648,6 +1648,29 @@ def _judge_use_litellm() -> bool:
     return v in ("1", "true", "yes", "on")
 
 
+# Council families whose models accept an image modality. Kimi/GLM are text-only
+# on their Bedrock profiles, so pixels addressed to them are silently dropped.
+_VISION_JUDGE_FAMILIES = frozenset({"sonnet"})
+
+
+def _will_receive_pixels(member: "CouncilMember", images: list[dict] | None) -> bool:
+    """Does THIS member actually get the pixels for this chunk?
+
+    Single source of truth for F4a (which members are told "ATTACHED IMAGES")
+    and F4b (which members route through the multimodal transport). Keeping one
+    predicate is the whole point: the note used to be handed to every member
+    whenever images were merely COLLECTED, so text-only members were told
+    authoritative pixels were attached to a message that carried none — and
+    graded image-content criteria against that fiction.
+
+    There is no transport term any more. F4b makes an image-bearing chunk route
+    its vision-capable member through the multimodal transport unconditionally,
+    so family + "were any pixels collected" IS the whole answer."""
+    if not images:
+        return False
+    return (getattr(member, "family", "") or "") in _VISION_JUDGE_FAMILIES
+
+
 def _call_one_judge(
     model: str, system: str, user: str, family: str | None = None,
     images: list[dict] | None = None,
@@ -1671,7 +1694,21 @@ def _call_one_judge(
     # LiteLLM call) means a missing dep, a misconfigured env, a network blip,
     # or a LiteLLM-internal regression all degrade gracefully to the production
     # path without losing the verdict.
-    if _judge_use_litellm():
+    # F4b: a call that carries pixels MUST take the LiteLLM transport — it is
+    # the only one that builds a multimodal user turn. `_call_judge_bedrock` and
+    # `_call_judge_openai` have no `images` parameter at all, so under the
+    # default (flag-off) configuration every attached image was collected,
+    # base64'd, paid for in _collect_image_attachments, and then dropped on the
+    # floor while the judge was told the pixels were authoritative evidence.
+    # This is unconditional, not flag-gated: `images` is non-empty only for a
+    # vision-capable member on an image-bearing chunk (`_will_receive_pixels`).
+    # BOTH lanes verified to carry the blocks: the Bedrock lane routes the same
+    # ARN through judge_litellm unchanged, and on the OAuth lane
+    # call_judge_via_litellm builds `user_content` BEFORE the bridge override,
+    # LiteLLM emits Anthropic-native image blocks for the `anthropic/` model id,
+    # and bridge.normalize_body_for_anthropic_direct rewrites only
+    # `output_config`/`thinking` — `messages` reach api.anthropic.com verbatim.
+    if images or _judge_use_litellm():
         try:
             from . import judge_litellm  # local import: avoid import-time cost
             arn_tail = _arn_from_model(m)
@@ -1705,6 +1742,17 @@ def _call_one_judge(
                 "Judge LiteLLM path failed for %s: %s — falling back to direct urllib path",
                 _short_judge_label(m), str(exc)[:200],
             )
+            if images:
+                # The urllib lane below cannot carry pixels. A text-only verdict
+                # still beats abstaining the whole chunk ("grading must NEVER
+                # fail because LiteLLM had a bad day"), but it is a silent
+                # downgrade of image-content criteria unless it is said out loud.
+                logger.warning(
+                    "Judge %s loses %d attached image(s) on the urllib fallback "
+                    "— image-content criteria grade from the presence-only "
+                    "markers in <output_files> for this call",
+                    _short_judge_label(m), len(images),
+                )
             # fall through to urllib routing below
 
     head = m.partition("/")[0]
@@ -1801,7 +1849,7 @@ def _run_council(
         )
         t0 = _time.monotonic()
         try:
-            member_images = images if family == "sonnet" else None
+            member_images = images if _will_receive_pixels(member, images) else None
             raw, usage = _call_one_judge(model, system, user, family, member_images)
         except Exception as exc:
             elapsed = _time.monotonic() - t0
@@ -2655,8 +2703,15 @@ def grade_with_rubric(
                 "of the form 'file.pdf#pageN' is a rendered page N of that PDF, "
                 "showing the figures and layout its text extraction cannot.\n\n"
             )
+        # F4a: the note is a factual claim about THIS message, so only the
+        # members that actually receive the pixels may be told it. A text-only
+        # member told "the images above are authoritative evidence" grades
+        # image-content criteria against an attachment list it cannot see;
+        # without the note it correctly falls back to the "(image WxH, presence
+        # only)" markers in <output_files>, which are unchanged either way.
         user_for_member = {
-            m.model: note + _judge_user_prompt(
+            m.model: (note if _will_receive_pixels(m, images) else "")
+            + _judge_user_prompt(
                 task_description, chunk, evidence_for_member[m.model]
             )
             for m in members
