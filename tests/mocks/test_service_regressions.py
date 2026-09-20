@@ -12,7 +12,6 @@ which is exactly what `POST /admin/data/{table}` calls in admin_plane.py.
 from __future__ import annotations
 
 import base64
-from pathlib import Path
 
 import pytest
 
@@ -506,3 +505,207 @@ def test_notion_nested_children_still_resolve(notion):
 def test_notion_page_update_rejects_unknown_field(notion):
     r = notion.patch("/v1/pages/page-task-001", json={"titel": "typo"})
     assert r.status_code == 422, r.text
+
+
+# ---------------------------------------------------------------------------
+# The arriving 25 -- defects the newreq convergence brought in with them.
+# Each block pins one finding from the wave-2 hardening; the write-read-back
+# specs in _writeback_specs.py cover the id-addressable half, and these cover
+# the rest: list-shaped read-backs, and fields that were declared but dropped.
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def coinbase():
+    with _client("coinbase-api") as c:
+        yield c
+
+
+@pytest.fixture(scope="module")
+def plaid():
+    with _client("plaid-api") as c:
+        yield c
+
+
+@pytest.fixture(scope="module")
+def posthog():
+    with _client("posthog-api") as c:
+        yield c
+
+
+@pytest.fixture(scope="module")
+def segment():
+    with _client("segment-api") as c:
+        yield c
+
+
+@pytest.fixture(scope="module")
+def teams():
+    with _client("microsoft-teams-api") as c:
+        yield c
+
+
+@pytest.fixture(scope="module")
+def kubernetes():
+    with _client("kubernetes-api") as c:
+        yield c
+
+
+@pytest.fixture(scope="module")
+def webflow():
+    with _client("webflow-api") as c:
+        yield c
+
+
+@pytest.fixture(scope="module")
+def reddit():
+    with _client("reddit-api") as c:
+        yield c
+
+
+@pytest.fixture(scope="module")
+def sentry():
+    with _client("sentry-api") as c:
+        yield c
+
+
+def _btc_account(coinbase):
+    accounts = coinbase.get("/v2/accounts").json()["data"]
+    return next(a for a in accounts if a["currency"]["code"] == "BTC")["id"]
+
+
+def test_coinbase_buy_denominated_in_the_crypto_uses_amount_as_quantity(coinbase):
+    r = coinbase.post(f"/v2/accounts/{_btc_account(coinbase)}/buys",
+                      json={"amount": "0.5", "currency": "BTC"})
+    assert r.status_code == 201, r.text
+    data = r.json()["data"]
+    assert data["amount"] == {"amount": "0.50000000", "currency": "BTC"}
+    assert data["total"] == {"amount": "32500.00", "currency": "USD"}
+
+
+def test_coinbase_buy_denominated_in_fiat_converts_at_the_spot_price(coinbase):
+    """`currency` used to be declared and never read, so "buy $1000 of BTC"
+    silently bought 1000 BTC. 1000 USD / 65000 USD-per-BTC = 0.01538462."""
+    r = coinbase.post(f"/v2/accounts/{_btc_account(coinbase)}/buys",
+                      json={"amount": "1000.00", "currency": "USD"})
+    assert r.status_code == 201, r.text
+    data = r.json()["data"]
+    assert data["amount"] == {"amount": "0.01538462", "currency": "BTC"}
+    assert data["total"] == {"amount": "1000.00", "currency": "USD"}
+
+
+def test_coinbase_buy_rejects_a_currency_the_account_cannot_be_denominated_in(coinbase):
+    r = coinbase.post(f"/v2/accounts/{_btc_account(coinbase)}/buys",
+                      json={"amount": "1", "currency": "EUR"})
+    assert r.status_code == 400, r.text
+    assert "EUR" in r.json()["error"]
+
+
+def test_coinbase_sell_honours_the_currency_field_too(coinbase):
+    r = coinbase.post(f"/v2/accounts/{_btc_account(coinbase)}/sells",
+                      json={"amount": "650.00", "currency": "USD"})
+    assert r.status_code == 201, r.text
+    assert r.json()["data"]["amount"] == {"amount": "0.01000000", "currency": "BTC"}
+
+
+def test_plaid_institution_lookup_is_scoped_by_country_codes(plaid):
+    """`country_codes` was declared on the body and never read."""
+    body = {"institution_id": "ins_109512"}
+    assert plaid.post("/institutions/get_by_id",
+                      json=dict(body, country_codes=["US"])).status_code == 200
+    assert plaid.post("/institutions/get_by_id",
+                      json=dict(body, country_codes=["GB"])).status_code == 404
+    assert plaid.post("/institutions/get_by_id", json=body).status_code == 200
+
+
+def test_posthog_capture_event_is_served_back_by_the_events_read(posthog):
+    assert posthog.post("/capture", json={
+        "project_id": 1, "distinct_id": "u-probe", "event": "wrb_capture",
+        "properties": {"plan": "pro"}}).status_code == 200
+    hit = posthog.get("/api/projects/1/events?event=wrb_capture").json()["results"]
+    assert [e["distinct_id"] for e in hit] == ["u-probe"], hit
+    assert hit[0]["properties"] == {"plan": "pro"}
+
+
+def test_posthog_decide_evaluates_flags_without_persisting_anything(posthog):
+    before = posthog.get("/api/projects/1/events").json()["count"]
+    r = posthog.post("/decide", json={"project_id": 1, "distinct_id": "u-probe"})
+    assert r.status_code == 200, r.text
+    assert isinstance(r.json()["featureFlags"], dict)
+    assert posthog.get("/api/projects/1/events").json()["count"] == before
+
+
+def test_segment_track_is_served_back_by_the_events_read(segment):
+    assert segment.post("/v1/track", json={
+        "userId": "u-probe", "event": "WRB Event",
+        "properties": {"revenue": 1}}).status_code == 200
+    hit = segment.get("/v1/events?userId=u-probe").json()["events"]
+    assert [e["event"] for e in hit] == ["WRB Event"], hit
+
+
+def test_microsoft_teams_message_lands_in_the_channel(teams):
+    team = "19:team-eng0001@thread.tacv2"
+    channel = teams.get(f"/v1.0/teams/{team}/channels").json()["value"][0]["id"]
+    route = f"/v1.0/teams/{team}/channels/{channel}/messages"
+    assert teams.post(route, json={"body": {"contentType": "html",
+                                            "content": "WRB teams message"},
+                                   "importance": "high"}).status_code == 201
+    hit = [m for m in teams.get(route).json()["value"]
+           if m["body"]["content"] == "WRB teams message"]
+    assert len(hit) == 1 and hit[0]["importance"] == "high", hit
+
+
+def test_kubernetes_scale_patch_persists_the_replica_count(kubernetes):
+    route = "/apis/apps/v1/namespaces/prod/deployments/api-gateway"
+    assert kubernetes.patch(f"{route}/scale",
+                            json={"spec": {"replicas": 7}}).status_code == 200
+    assert kubernetes.get(route).json()["spec"]["replicas"] == 7
+
+
+def test_webflow_created_item_is_listed_back(webflow):
+    route = "/v2/collections/660b2a0000000000000002b1/items"
+    r = webflow.post(route, json={"fieldData": {"name": "WRB item", "slug": "wrb-item"}})
+    assert r.status_code == 202, r.text
+    item_id = r.json()["id"]
+    listed = {i["id"]: i for i in webflow.get(route).json()["items"]}
+    assert item_id in listed, listed.keys()
+    assert listed[item_id]["fieldData"]["name"] == "WRB item"
+
+
+def test_reddit_submitted_post_is_listed_back(reddit):
+    r = reddit.post("/api/submit", json={"sr": "homelab", "title": "WRB post",
+                                         "kind": "self", "text": "seed body"})
+    assert r.status_code == 200, r.text
+    post_id = r.json()["json"]["data"]["id"]
+    children = reddit.get("/r/homelab/new").json()["data"]["children"]
+    hit = [c["data"] for c in children if c["data"]["id"] == post_id]
+    assert len(hit) == 1 and hit[0]["title"] == "WRB post", children[:2]
+
+
+def test_sentry_issue_update_persists_and_unknown_ids_404(sentry):
+    route = "/api/0/organizations/orbit-labs/issues/40001/"
+    assert sentry.put(route, json={"status": "resolved"}).status_code == 200
+    assert sentry.get(route).json()["status"] == "resolved"
+    assert sentry.put("/api/0/organizations/orbit-labs/issues/zzz-nope-404/",
+                      json={"status": "resolved"}).status_code == 404
+
+
+def test_paypal_payout_create_persists_under_its_batch_id(paypal_svc):
+    """The _pk defect: the write path never lifted batch_header.payout_batch_id
+    to the row's registered primary key, so this route raised StoreError."""
+    r = paypal_svc.post("/v1/payments/payouts", json={
+        "sender_batch_header": {"sender_batch_id": "Regression_01"},
+        "items": [{"amount": {"currency_code": "USD", "value": "42.00"},
+                   "receiver": "payee@orbit-labs.com"}]})
+    assert r.status_code == 201, r.text
+    batch_id = r.json()["batch_header"]["payout_batch_id"]
+    store = _data_module(paypal_svc.app, "paypal_data")._store
+    assert store.table("payouts").get(batch_id) is not None
+    back = paypal_svc.get(f"/v1/payments/payouts/{batch_id}")
+    assert back.status_code == 200, back.text
+    assert back.json()["batch_header"]["amount"]["value"] == "42.00"
+
+
+@pytest.fixture(scope="module")
+def paypal_svc():
+    with _client("paypal-api") as c:
+        yield c

@@ -7,9 +7,16 @@ and splits, yielding a one-element list holding a Python repr. The route then
 serves one garbage member, or none, with a 200 and nothing in the logs. That
 silent corruption is what these tests pin shut.
 
-Covered: the shared `opt_csv_list` coercer, the two services that used to
-bypass it with a raw `.split()` / `json.loads()`, and the load-time detector
-that shouts when a table is populated with an already-garbled value.
+Covered: the shared `opt_csv_list` coercer, the services that used to bypass it
+with a raw `.split()` / `json.loads()`, and the load-time detector that shouts
+when a table is populated with an already-garbled value.
+
+The four arriving-fleet bypasses (kubernetes `_labels`, posthog and segment
+`_parse_props`, twitch `_split_tags`) took a raw VALUE and split it, so they
+could never see the list shape at all -- they now take the row and the column
+and go through `opt_csv_list` like the other 17 services. microsoft-teams was
+fixed for free by that shared hoist and is pinned here so the freebie cannot
+quietly regress.
 """
 from __future__ import annotations
 
@@ -141,6 +148,128 @@ def test_contentful_fields_round_trip_from_a_dict():
 def test_contentful_empty_values_still_take_the_default():
     assert _contentful_parse("", []) == []
     assert _contentful_parse(None) == {}
+
+
+# ---------------------------------------------------------------------------
+# The four arriving-fleet bypasses: a raw value `.split(";")` cannot see a list
+# ---------------------------------------------------------------------------
+
+def _coerced(api, module, fn, rows):
+    with TestClient(load_app(ENV_DIR / api)) as client:
+        return getattr(data_module(client.app, module), fn)(rows)
+
+
+def _k8s_namespace(labels):
+    return {"name": "prod", "status": "Active", "labels": labels,
+            "created_time": "2026-05-01T00:00:00Z"}
+
+
+def test_kubernetes_labels_round_trip_from_a_string():
+    rows = _coerced("kubernetes-api", "kubernetes_data", "_coerce_namespaces",
+                    [_k8s_namespace("tier=gold;team=core")])
+    assert rows[0]["labels"] == {"tier": "gold", "team": "core"}
+
+
+def test_kubernetes_labels_round_trip_from_a_list():
+    rows = _coerced("kubernetes-api", "kubernetes_data", "_coerce_namespaces",
+                    [_k8s_namespace(["tier=gold", "team=core"])])
+    assert rows[0]["labels"] == {"tier": "gold", "team": "core"}
+
+
+def test_kubernetes_labels_round_trip_from_a_mapping():
+    rows = _coerced("kubernetes-api", "kubernetes_data", "_coerce_namespaces",
+                    [_k8s_namespace({"tier": "gold", "team": "core"})])
+    assert rows[0]["labels"] == {"tier": "gold", "team": "core"}
+
+
+def _posthog_event(properties):
+    return {"id": "evt_1", "project_id": "1", "distinct_id": "u1",
+            "event": "clicked", "timestamp": "2026-05-01T00:00:00Z",
+            "properties": properties}
+
+
+def test_posthog_properties_round_trip_from_a_string():
+    rows = _coerced("posthog-api", "posthog_data", "_coerce_events",
+                    [_posthog_event("name=export;plan=pro")])
+    assert rows[0]["properties"] == {"name": "export", "plan": "pro"}
+
+
+def test_posthog_properties_round_trip_from_a_list():
+    rows = _coerced("posthog-api", "posthog_data", "_coerce_events",
+                    [_posthog_event(["name=export", "plan=pro"])])
+    assert rows[0]["properties"] == {"name": "export", "plan": "pro"}
+
+
+def _segment_event(properties):
+    return {"messageId": "msg_1", "type": "track", "userId": "u1",
+            "event": "Order Completed", "timestamp": "2026-05-01T00:00:00Z",
+            "properties": properties}
+
+
+def test_segment_properties_round_trip_from_a_string():
+    rows = _coerced("segment-api", "segment_data", "_coerce_events",
+                    [_segment_event("order_id=ord_1;revenue=42.5")])
+    assert rows[0]["properties"] == {"order_id": "ord_1", "revenue": "42.5"}
+
+
+def test_segment_properties_round_trip_from_a_list():
+    rows = _coerced("segment-api", "segment_data", "_coerce_events",
+                    [_segment_event(["order_id=ord_1", "revenue=42.5"])])
+    assert rows[0]["properties"] == {"order_id": "ord_1", "revenue": "42.5"}
+
+
+def _twitch_channel(tags):
+    return {"broadcaster_id": "40001", "broadcaster_login": "probe",
+            "broadcaster_name": "Probe", "game_id": "1", "game_name": "Chess",
+            "title": "t", "broadcaster_language": "en", "tags": tags,
+            "follower_count": "10"}
+
+
+def test_twitch_tags_round_trip_from_a_string():
+    rows = _coerced("twitch-api", "twitch_data", "_coerce_channels",
+                    [_twitch_channel("RPG;Blind;English")])
+    assert rows[0]["tags"] == ["RPG", "Blind", "English"]
+
+
+def test_twitch_tags_round_trip_from_a_list():
+    rows = _coerced("twitch-api", "twitch_data", "_coerce_channels",
+                    [_twitch_channel(["RPG", "Blind", "English"])])
+    assert rows[0]["tags"] == ["RPG", "Blind", "English"]
+
+
+def test_twitch_tags_never_yield_a_repr_of_the_list():
+    rows = _coerced("twitch-api", "twitch_data", "_coerce_channels",
+                    [_twitch_channel(["RPG", "Blind"])])
+    assert all("[" not in t for t in rows[0]["tags"]), rows[0]["tags"]
+
+
+# microsoft-teams was the trello `_ME in member_ids` clone; the shared
+# opt_csv_list hoist fixed it without touching the service, so these pin the
+# freebie rather than a change of our own.
+
+def _teams_team(member_ids):
+    return {"id": "19:t1@thread.tacv2", "display_name": "Eng", "description": "d",
+            "visibility": "private", "is_archived": "false",
+            "web_url": "https://example.invalid/t1", "member_ids": member_ids}
+
+
+def test_microsoft_teams_member_ids_round_trip_from_a_string():
+    rows = _coerced("microsoft-teams-api", "microsoft_teams_data", "_coerce_teams",
+                    [_teams_team("u-amelia;u-ben")])
+    assert rows[0]["member_ids"] == ["u-amelia", "u-ben"]
+
+
+def test_microsoft_teams_member_ids_round_trip_from_a_list():
+    rows = _coerced("microsoft-teams-api", "microsoft_teams_data", "_coerce_teams",
+                    [_teams_team(["u-amelia", "u-ben"])])
+    assert rows[0]["member_ids"] == ["u-amelia", "u-ben"]
+
+
+def test_microsoft_teams_membership_check_survives_the_list_shape():
+    """The trello defect proper: a garbled list makes `x in member_ids` false."""
+    rows = _coerced("microsoft-teams-api", "microsoft_teams_data", "_coerce_teams",
+                    [_teams_team(["u-amelia", "u-ben"])])
+    assert "u-amelia" in rows[0]["member_ids"], rows[0]["member_ids"]
 
 
 # ---------------------------------------------------------------------------
