@@ -405,7 +405,7 @@ Runtime env-var → dataclass mapping is in `src/utils/config.py::Config.from_en
 | `openrouter_api_key` | `OPENROUTER_API_KEY` | `""` |
 | `openrouter_base_url` | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` |
 | `brave_api_key` | `BRAVE_API_KEY` | `placeholder` |
-| `docker_image` | `DOCKER_IMAGE` | `wildclawbench-ubuntu:v1.3` |
+| `docker_image` | `DOCKER_IMAGE` | `wildclawbench-ubuntu:v1.6` (base v1.3 + whisper + LibreOffice; `bash script/build_agent_image.sh`) |
 | `tmp_workspace` | `TMP_WORKSPACE` | `/tmp_workspace` |
 | `gateway_port` | `GATEWAY_PORT` | `18789` |
 | `upload_media_to_s3` | `UPLOAD_MEDIA_TO_S3` (bool) | `false` |

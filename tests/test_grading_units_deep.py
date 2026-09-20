@@ -440,11 +440,29 @@ def test_gather_evidence_header_carries_relative_path_not_host_path(tmp_path):
     assert str(tmp_path) not in ev
 
 
+
+def _real_png_uri(seed: int) -> str:
+    """A distinct, decodable 12x12 PNG per seed. The old `QUFB`*20 stand-ins were
+    not images at all, and an undecodable blob is now refused on purpose (one bad
+    image part fails the whole judge request)."""
+    import base64
+    import io
+    from PIL import Image
+    img = Image.new("RGB", (12, 12), (seed * 37 % 256, seed * 91 % 256, 40))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def _kb(uri: str) -> str:
+    return f"{len(uri.partition(',')[2]) * 3 / 4 / 1024:.1f}"
+
+
 def test_gather_evidence_same_basename_files_get_distinct_image_labels(tmp_path):
     artifacts = tmp_path / "task_output" / "artifacts"
     (artifacts / "output").mkdir(parents=True)
-    uri_a = "data:image/png;base64," + "QUFB" * 20
-    uri_b = "data:image/png;base64," + "QkJC" * 20
+    uri_a = _real_png_uri(1)
+    uri_b = _real_png_uri(2)
     (artifacts / "page.html").write_text(f"<img src='{uri_a}'>", encoding="utf-8")
     (artifacts / "output" / "page.html").write_text(f"<img src='{uri_b}'>", encoding="utf-8")
     payload = grading._gather_evidence(artifacts, "T", budget=None)
@@ -1452,18 +1470,18 @@ def test_evidence_never_exceeds_budget_and_discloses_all_files(tmp_path, budget)
 def test_inline_image_over_count_limit_is_disclosed_and_not_attached(tmp_path, monkeypatch):
     monkeypatch.setenv("KENSEI_JUDGE_MAX_IMAGES", "1")
     root = _artifacts_root(tmp_path)
-    uri_a = "data:image/png;base64," + "QUFB" * 20
-    uri_b = "data:image/png;base64," + "QkJC" * 20
+    uri_a = _real_png_uri(1)
+    uri_b = _real_png_uri(2)
     (root / "page.html").write_text(f"<img src='{uri_a}'><img src='{uri_b}'>", encoding="utf-8")
     payload = grading._gather_evidence(root, "T", budget=None)
     assert [i.label for i in payload.images] == ["page.html#1"]
-    assert "[inline image page.html#2, image/png, ~0.1KB; present — contents not included: judge image count limit reached (1 per request)]" in payload.text
-    assert "[inline image page.html#1, image/png, ~0.1KB]" in payload.text
+    assert f"[inline image page.html#2, image/png, ~{_kb(uri_b)}KB; present — contents not included: judge image count limit reached (1 per request)]" in payload.text
+    assert f"[inline image page.html#1, image/png, ~{_kb(uri_a)}KB]" in payload.text
 
 
 def test_text_only_member_marks_every_inline_image_not_attached(tmp_path):
     root = _artifacts_root(tmp_path)
-    uri = "data:image/png;base64," + "QUFB" * 20
+    uri = _real_png_uri(1)
     (root / "page.html").write_text(f"<img src='{uri}'>", encoding="utf-8")
     payload = grading._gather_evidence(root, "T", budget=50_000, attach_images=False)
     assert payload.images == []
@@ -1474,7 +1492,7 @@ def test_text_only_member_marks_every_inline_image_not_attached(tmp_path):
 def test_image_limit_disclosure_counts_against_budget(tmp_path, monkeypatch):
     monkeypatch.setenv("KENSEI_JUDGE_MAX_IMAGES", "0")
     root = _artifacts_root(tmp_path)
-    uri = "data:image/png;base64," + "QUFB" * 20
+    uri = _real_png_uri(1)
     (root / "page.html").write_text("".join(f"<img src='{uri}'>" for _ in range(40)), encoding="utf-8")
     for budget in (800, 2500, 6000):
         payload = grading._gather_evidence(root, "T", budget=budget)
@@ -1491,8 +1509,8 @@ def test_same_label_files_get_distinct_names_and_independent_image_decisions(tmp
     artifacts = _artifacts_root(tmp_path)
     wf = tmp_path / "task_output" / "workspace_full"
     wf.mkdir()
-    uri_a = "data:image/png;base64," + "QUFB" * 20
-    uri_b = "data:image/png;base64," + "QkJC" * 20
+    uri_a = _real_png_uri(1)
+    uri_b = _real_png_uri(2)
     (artifacts / "page.html").write_text(f"A <img src='{uri_a}'>", encoding="utf-8")
     (wf / "page.html").write_text(f"B-diverged <img src='{uri_b}'>", encoding="utf-8")
     payload = grading._gather_evidence(artifacts, "T", budget=None)
@@ -1501,8 +1519,8 @@ def test_same_label_files_get_distinct_names_and_independent_image_decisions(tmp
     assert "----- DELIVERABLE: page.html [2] -----" in text
     assert [i.label for i in payload.images] == ["page.html#1"]
     assert payload.images[0].data_uri == uri_a
-    assert "[inline image page.html#1, image/png, ~0.1KB]" in text
-    assert "[inline image page.html [2]#1, image/png, ~0.1KB; present — contents not included: judge image count limit reached (1 per request)]" in text
+    assert f"[inline image page.html#1, image/png, ~{_kb(uri_a)}KB]" in text
+    assert f"[inline image page.html [2]#1, image/png, ~{_kb(uri_b)}KB; present — contents not included: judge image count limit reached (1 per request)]" in text
 
 
 def test_presence_wording_matches_judge_prompt_contract():

@@ -1,6 +1,6 @@
 """Offline audio transcription for judge evidence.
 
-Sonnet judges accept no audio modality, so audio deliverables reach the
+The judges accept no audio modality, so audio deliverables reach the
 judge as TEXT: this module transcribes them host-side with a local
 sherpa-onnx model (default: NVIDIA Parakeet TDT 0.6B v3 int8 — 6.34% WER,
 beats hosted whisper-large-v3, CPU-only, no network at grade time).
@@ -36,6 +36,25 @@ def _model_dir() -> Path | None:
         if c.is_dir() and list(c.glob("*.onnx")):
             return c
     return None
+
+
+def status() -> tuple[bool, str]:
+    """(ready, detail) WITHOUT loading the model: a cheap preflight so a host that
+    cannot transcribe says so up front instead of silently grading audio
+    deliverables on a duration marker alone."""
+    if not transcription_enabled():
+        return False, "disabled (WCB_JUDGE_AUDIO_TRANSCRIBE=0)"
+    import importlib.util
+    if importlib.util.find_spec("sherpa_onnx") is None:
+        return False, ("sherpa-onnx not installed "
+                       "(pip install -r requirements-asr.txt)")
+    mdir = _model_dir()
+    if mdir is None:
+        return False, ("no model under WCB_JUDGE_ASR_MODEL_DIR or ~/.wcb/asr "
+                       "(bash script/setup_judge_asr.sh)")
+    if not (mdir / "tokens.txt").is_file():
+        return False, f"{mdir} has no tokens.txt"
+    return True, str(mdir)
 
 
 def _load_recognizer():
@@ -165,4 +184,9 @@ def transcribe(path: Path) -> str | None:
         logger.warning("judge ASR transcription failed for %s: %s",
                        path.name, str(exc)[:200])
         return None
-    return text[:_TRANSCRIPT_CHAR_CAP] or None
+    if len(text) > _TRANSCRIPT_CHAR_CAP:
+        # Same rule as document evidence: text beyond the cap is not sent, and
+        # the judge is told so rather than reading a cut transcript as complete.
+        text = (text[:_TRANSCRIPT_CHAR_CAP]
+                + f"\n... [transcript truncated at {_TRANSCRIPT_CHAR_CAP} chars]")
+    return text or None

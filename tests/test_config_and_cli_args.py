@@ -92,7 +92,7 @@ class TestConfigDataclassDefaults:
         assert c.s3_prefix == "WildClaw"
         assert c.s3_region == "us-east-1"
         assert c.brave_api_key == "placeholder"
-        assert c.docker_image == "wildclawbench-ubuntu:v1.3"
+        assert c.docker_image == "wildclawbench-ubuntu:v1.6"
         assert c.litellm_master_key == "sk-talos-litellm"
         assert c.litellm_port == 4000
         assert c.tmp_workspace == "/tmp_workspace"
@@ -158,7 +158,7 @@ class TestFromEnvDefaults:
         assert c.s3_prefix == "WildClaw"
         assert c.s3_region == "us-east-1"
         assert c.brave_api_key == "placeholder"
-        assert c.docker_image == "wildclawbench-ubuntu:v1.3"
+        assert c.docker_image == "wildclawbench-ubuntu:v1.6"
         assert c.tmp_workspace == "/tmp_workspace"
         assert c.gateway_port == 18789
         assert c.litellm_master_key == "sk-talos-litellm"

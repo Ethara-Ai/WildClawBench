@@ -54,6 +54,7 @@ USAGE
   bash script/prepare.sh --skip-mocks          # skip kensei3-mocks:v1 eager build
   bash script/prepare.sh --skip-tasks          # skip HF tasks/ clone
   bash script/prepare.sh --validate-overlays   # also walk input/*/mock_data/ CSVs
+  bash script/prepare.sh --judge-asr           # also set up judge audio transcription (~480 MB model)
   bash script/prepare.sh --strict              # treat overlay shape warnings as fatal
   bash script/prepare.sh -h | --help           # show this help
 
@@ -83,6 +84,7 @@ SKIP_MOCKS=0
 SKIP_TASKS=0
 VALIDATE_OVERLAYS=0
 STRICT=0
+JUDGE_ASR=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -92,6 +94,7 @@ while [[ $# -gt 0 ]]; do
         --skip-tasks)         SKIP_TASKS=1; shift ;;
         --validate-overlays)  VALIDATE_OVERLAYS=1; shift ;;
         --strict)             STRICT=1; shift ;;
+        --judge-asr)          JUDGE_ASR=1; shift ;;
         *) err "unknown flag: $1"; print_usage; exit 2 ;;
     esac
 done
@@ -415,6 +418,21 @@ PY
     fi
 }
 
+# Judge audio transcription is optional host state (pip package + ~640 MB model
+# under ~/.wcb/asr), so it is opt-in — but its absence is never silent: without
+# --judge-asr this still reports whether the judge can transcribe.
+step_judge_asr(){
+    if [[ $JUDGE_ASR -eq 1 ]]; then
+        info "setting up judge audio transcription ..."
+        bash script/setup_judge_asr.sh || die "judge ASR setup failed"
+        ok "Judge ASR ready"
+    elif bash script/setup_judge_asr.sh --check >/dev/null 2>&1; then
+        ok "Judge ASR ready"
+    else
+        warn "Judge ASR unavailable — audio deliverables will be graded on a duration marker only (run: bash script/prepare.sh --judge-asr)"
+    fi
+}
+
 log::section "WildClawBench Bootstrap"
 log::kv "Repo" "$(pwd)"
 log::kv "Skip" "image-check=$SKIP_IMAGE_CHECK mocks=$SKIP_MOCKS tasks=$SKIP_TASKS strict=$STRICT overlays=$VALIDATE_OVERLAYS"
@@ -426,6 +444,7 @@ step_env_file
 [[ $SKIP_MOCKS       -eq 0 ]] && step_mock_stack
 [[ $SKIP_TASKS       -eq 0 ]] && step_tasks_clone
 step_validate_overlays
+step_judge_asr
 
 log::section "Bootstrap complete"
 log::summary_box "Next steps" \

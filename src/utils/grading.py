@@ -9,6 +9,7 @@ import re
 import struct
 import subprocess
 import tempfile
+import time
 import zipfile
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -526,12 +527,15 @@ def _payload_images(user: "str | JudgeUserPayload") -> list[ImagePart]:
 
 # Image attachment budget. Deliberately small: images are for image-CONTENT
 # criteria ("did the agent render the chart?"), not for bulk evidence, and every
-# attached part costs vision tokens. `detail="low"` is the cheap fixed-cost tier.
+# attached part costs vision tokens. `detail="auto"` lets the endpoint pick: a
+# small image still takes the cheap fixed-cost tier, while a chart or screenshot
+# whose labels were unreadable in the ~512px `low` thumbnail gets tiled.
+# KENSEI_JUDGE_IMAGE_DETAIL=low restores the old flat tier.
 # Excess images keep their TEXT placeholder (so the judge still knows the image
 # existed) but are not attached — see _select_judge_images.
 _DEFAULT_JUDGE_MAX_IMAGES = 8
 _DEFAULT_JUDGE_MAX_IMAGE_BYTES = 4 * 1024 * 1024
-_DEFAULT_JUDGE_IMAGE_DETAIL = "low"
+_DEFAULT_JUDGE_IMAGE_DETAIL = "auto"
 _JUDGE_IMAGE_DETAILS = frozenset({"low", "high", "auto"})
 
 
@@ -648,19 +652,154 @@ def _data_uri_b64_len(data_uri: str) -> int:
     return len(payload)
 
 
-def _extract_inline_images(body: str, label_stem: str) -> tuple[str, list[ImagePart]]:
+# What the vision endpoint accepts. Anything else PIL can decode (BMP, TIFF, an
+# animated GIF's first frame, ...) is re-encoded to PNG; anything it cannot
+# (SVG, a truncated blob, random bytes behind an image/* mime) is never attached.
+_JUDGE_IMAGE_FORMATS = {"PNG": "image/png", "JPEG": "image/jpeg",
+                        "GIF": "image/gif", "WEBP": "image/webp"}
+_JUDGE_IMAGE_MAGIC = (
+    (b"\x89PNG\r\n\x1a\n", "image/png"), (b"\xff\xd8\xff", "image/jpeg"),
+    (b"GIF87a", "image/gif"), (b"GIF89a", "image/gif"),
+)
+# One invalid image part fails the WHOLE request with HTTP 400 — and with it
+# every criterion of the chunk. The endpoint rejects degenerate rasters (the 1x1
+# probe incident), so the floor is enforced here, before anything is attached.
+_JUDGE_IMAGE_MIN_SIDE = 8
+_JUDGE_IMAGE_MAX_SIDE = 2048
+_JUDGE_IMAGE_MAX_B64 = 1_500_000
+_JUDGE_IMAGE_MAX_READ_BYTES = 25 * 1024 * 1024
+
+
+def _image_dimensions_from_bytes(data: bytes) -> tuple[int, int] | None:
+    try:
+        if data[:8] == b"\x89PNG\r\n\x1a\n" and data[12:16] == b"IHDR":
+            w, h = struct.unpack(">II", data[16:24])
+            return int(w), int(h)
+        if data[:2] == b"\xff\xd8":
+            i, n = 2, len(data)
+            while i + 9 < n:
+                if data[i] != 0xFF:
+                    i += 1
+                    continue
+                marker = data[i + 1]
+                if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+                    h, w = struct.unpack(">HH", data[i + 5:i + 9])
+                    return int(w), int(h)
+                i += 2 + struct.unpack(">H", data[i + 2:i + 4])[0]
+    except Exception:
+        return None
+    return None
+
+
+def _prepare_judge_image(
+    raw: bytes, label: str, detail: str | None = None,
+) -> tuple[ImagePart | None, str, tuple[int, int] | None]:
+    """Turn raw image bytes into an attachable ImagePart, or say why not.
+
+    Returns (part, reason, (w, h)). `part` is None when the image must not be
+    attached; `reason` is then the judge-facing explanation. Oversized images are
+    downscaled rather than rejected. NEVER raises."""
+    import base64
+    import io
+    detail = detail or _judge_image_detail()
+    if not raw:
+        return None, "empty image data", None
+
+    def _part(data: bytes, mime: str) -> ImagePart:
+        return ImagePart(
+            data_uri=f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}",
+            mime=mime, detail=detail, label=label)
+
+    try:
+        from PIL import Image
+    except ImportError:
+        # No Pillow: attach only what the header proves is a supported raster of
+        # sane size. Nothing can be re-encoded or downscaled on this host.
+        mime = next((m for sig, m in _JUDGE_IMAGE_MAGIC if raw.startswith(sig)), None)
+        if mime is None and raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+            mime = "image/webp"
+        if mime is None:
+            return None, "not a PNG/JPEG/GIF/WEBP image", None
+        dims = _image_dimensions_from_bytes(raw)
+        if dims and min(dims) < _JUDGE_IMAGE_MIN_SIDE:
+            return None, (f"image is {dims[0]}x{dims[1]} px, below the "
+                          f"{_JUDGE_IMAGE_MIN_SIDE} px minimum"), dims
+        if len(raw) * 4 // 3 > _JUDGE_IMAGE_MAX_B64:
+            return None, "image too large to attach (Pillow unavailable to downscale)", dims
+        return _part(raw, mime), "", dims
+
+    try:
+        with Image.open(io.BytesIO(raw)) as img:
+            fmt = (img.format or "").upper()
+            img.load()
+            if getattr(img, "is_animated", False):
+                img.seek(0)
+            w, h = img.size
+            if min(w, h) < _JUDGE_IMAGE_MIN_SIDE:
+                return None, (f"image is {w}x{h} px, below the "
+                              f"{_JUDGE_IMAGE_MIN_SIDE} px minimum"), (w, h)
+            fits = (max(w, h) <= _JUDGE_IMAGE_MAX_SIDE
+                    and len(raw) * 4 // 3 <= _JUDGE_IMAGE_MAX_B64)
+            if fits and fmt in _JUDGE_IMAGE_FORMATS and not getattr(img, "is_animated", False):
+                # Untouched bytes; only the mime is corrected to what the file IS.
+                return _part(raw, _JUDGE_IMAGE_FORMATS[fmt]), "", (w, h)
+            has_alpha = img.mode in ("RGBA", "LA") or (
+                img.mode == "P" and "transparency" in img.info)
+            for side, quality in ((_JUDGE_IMAGE_MAX_SIDE, 85), (1536, 80), (1024, 70)):
+                frame = img.convert("RGBA" if has_alpha else "RGB")
+                frame.thumbnail((side, side))
+                buf = io.BytesIO()
+                if has_alpha and side == _JUDGE_IMAGE_MAX_SIDE:
+                    frame.save(buf, format="PNG", optimize=True)
+                    mime = "image/png"
+                else:
+                    if has_alpha:
+                        flat = Image.new("RGB", frame.size, (255, 255, 255))
+                        flat.paste(frame, mask=frame.split()[-1])
+                        frame = flat
+                    frame.save(buf, format="JPEG", quality=quality)
+                    mime = "image/jpeg"
+                if len(buf.getvalue()) * 4 // 3 <= _JUDGE_IMAGE_MAX_B64:
+                    return _part(buf.getvalue(), mime), "", (w, h)
+            return None, "image too large to attach even after downscaling", (w, h)
+    except Exception:
+        return None, "not a decodable raster image", None
+
+
+def _image_placeholder(img: ImagePart) -> str:
+    approx_kb = _data_uri_b64_len(img.data_uri) * 3 / 4 / 1024
+    return f"{_image_placeholder_prefix(img.label)} {img.mime}, ~{approx_kb:.1f}KB]"
+
+
+def _unattached_placeholder(label: str, mime: str, reason: str) -> str:
+    return (f"{_image_placeholder_prefix(label)} {mime}; "
+            f"present — contents not included: {reason}]")
+
+
+def _extract_inline_images(
+    body: str, label_stem: str, attach: bool = True,
+) -> tuple[str, list[ImagePart]]:
     """Replace each inline base64 image in *body* with a compact placeholder and
     return (rewritten_text, images) in document order. NEVER raises.
 
-    The attached `data_uri` is REBUILT from the whitespace-stripped payload, so a
+    The attached `data_uri` is REBUILT from the decoded payload, so a
     newline-wrapped blob yields one valid single-line data URI and leaves no
     base64 behind in the text.
+
+    Every blob is lifted out of the text, but only a VALID raster is returned as
+    an image: an undecodable, degenerate (1x1) or non-raster (SVG) blob keeps a
+    placeholder that says so, because one bad image part fails the whole judge
+    request. With *attach* False (the conversation log) nothing is returned and
+    every placeholder discloses that it is not attached.
     """
+    import base64
+    import binascii
     images: list[ImagePart] = []
     try:
         detail = _judge_image_detail()
         out: list[str] = []
         pos = 0
+        seen = 0
         for head in _INLINE_IMAGE_DATA_URI_HEAD_RE.finditer(body):
             if head.start() < pos:
                 continue  # inside a payload already consumed
@@ -668,20 +807,25 @@ def _extract_inline_images(body: str, label_stem: str) -> tuple[str, list[ImageP
             if len(payload) < _B64_MIN_PAYLOAD:
                 continue  # degenerate stub: leave it in the text verbatim
             mime = f"image/{head.group('mime').lower()}"
-            label = f"{label_stem}#{len(images) + 1}"
-            images.append(ImagePart(
-                data_uri=f"data:{mime};base64,{payload}",
-                mime=mime,
-                detail=detail,
-                label=label,
-            ))
-            approx_kb = (len(payload) * 3 / 4) / 1024
+            seen += 1
+            label = f"{label_stem}#{seen}"
             out.append(body[pos:head.start()])
-            out.append(
-                f"{_image_placeholder_prefix(label)} {mime}, ~{approx_kb:.1f}KB]"
-            )
             pos = end
-        if not images:
+            if not attach:
+                out.append(_unattached_placeholder(
+                    label, mime, "images inside the conversation log are not attached"))
+                continue
+            try:
+                raw = base64.b64decode(payload + "=" * (-len(payload) % 4))
+            except (binascii.Error, ValueError):
+                raw = b""
+            part, reason, _dims = _prepare_judge_image(raw, label, detail)
+            if part is None:
+                out.append(_unattached_placeholder(label, mime, reason))
+                continue
+            images.append(part)
+            out.append(_image_placeholder(part))
+        if not seen:
             return body, []
         out.append(body[pos:])
         return "".join(out), images
@@ -1277,9 +1421,154 @@ def _pdf_page_placeholders(pages: list[tuple[int, ImagePart]]) -> str:
     )
 
 
+def _read_image_file(path: Path) -> bytes | None:
+    try:
+        if path.stat().st_size > _JUDGE_IMAGE_MAX_READ_BYTES:
+            return None
+        return path.read_bytes()
+    except OSError:
+        return None
+
+
+# Relative image references in a text deliverable: <img src="charts/q1.png"> and
+# ![alt](charts/q1.png). data:, http(s): and absolute paths are not files of this
+# deliverable and are left alone.
+_IMG_TAG_SRC_RE = re.compile(
+    r"""<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]+)"|'([^']+)')[^>]*>""", re.IGNORECASE)
+_MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+[^)]*)?\)")
+_LINKED_IMAGE_TEXT_EXTS = frozenset({".html", ".htm", ".md", ".markdown"})
+_LINKED_IMAGES_MAX_PER_FILE = 8
+
+
+def _attach_linked_images(
+    body: str, path: Path, label: str, image_root: Path | None,
+) -> tuple[str, list[ImagePart]]:
+    """Attach the image FILES a text deliverable points at with a relative path.
+
+    A report.html that shows `<img src="chart.png">` renders a chart to a human
+    and used to reach the judge as a bare tag. The referenced file must exist
+    inside *image_root* (the evidence dir): a `../` escape, an absolute path or a
+    URL is ignored. Each reference gets a placeholder right after it. Never raises."""
+    if path.suffix.lower() not in _LINKED_IMAGE_TEXT_EXTS:
+        return body, []
+    try:
+        from urllib.parse import unquote
+        root = (image_root or path.parent).resolve()
+        hits: list[tuple[int, str]] = []
+        for m in _IMG_TAG_SRC_RE.finditer(body):
+            hits.append((m.end(), m.group(1) or m.group(2)))
+        for m in _MD_IMAGE_RE.finditer(body):
+            hits.append((m.end(), m.group(1)))
+        if not hits:
+            return body, []
+        hits.sort()
+        images: list[ImagePart] = []
+        inserts: list[tuple[int, str]] = []
+        by_target: dict[Path, str] = {}
+        for end, src in hits:
+            src = (src or "").strip()
+            if (not src or src.startswith(("#", "/", "\\")) or ":" in src.split("/", 1)[0]):
+                continue  # anchor, absolute, or scheme (data:, http:, file:, C:)
+            target = (path.parent / unquote(src.split("?", 1)[0].split("#", 1)[0])).resolve()
+            if root not in target.parents or not target.is_file():
+                continue
+            if not _is_image_deliverable(target):
+                continue
+            if target in by_target:
+                inserts.append((end, f" [same image as {by_target[target]}]"))
+                continue
+            if len(by_target) >= _LINKED_IMAGES_MAX_PER_FILE:
+                break
+            ref_label = f"{label}#ref{len(by_target) + 1}"
+            by_target[target] = ref_label
+            raw = _read_image_file(target)
+            part, reason, _ = (_prepare_judge_image(raw, ref_label) if raw is not None
+                               else (None, "image file is unreadable or too large", None))
+            if part is None:
+                inserts.append((end, " " + _unattached_placeholder(
+                    ref_label, "image", reason)))
+                continue
+            images.append(part)
+            inserts.append((end, f" {_image_placeholder(part)} (the file {src})"))
+        if not inserts:
+            return body, []
+        out, pos = [], 0
+        for end, text in inserts:
+            out.append(body[pos:end])
+            out.append(text)
+            pos = end
+        out.append(body[pos:])
+        return "".join(out), images
+    except Exception:
+        return body, []
+
+
+_OFFICE_MEDIA_DIRS = {".docx": "word/media/", ".pptx": "ppt/media/", ".xlsx": "xl/media/"}
+_DEFAULT_JUDGE_OFFICE_MAX_IMAGES = 4
+
+
+def _judge_office_max_images() -> int:
+    raw = os.environ.get("WCB_JUDGE_OFFICE_MAX_IMAGES")
+    if raw is None or raw.strip() == "":
+        return _DEFAULT_JUDGE_OFFICE_MAX_IMAGES
+    try:
+        n = int(raw)
+    except ValueError:
+        return _DEFAULT_JUDGE_OFFICE_MAX_IMAGES
+    return n if n >= 0 else _DEFAULT_JUDGE_OFFICE_MAX_IMAGES
+
+
+def _office_media_images(path: Path, label: str) -> tuple[list[ImagePart], str]:
+    """Embedded pictures of a .docx/.pptx/.xlsx, as (images, placeholder_text).
+
+    Text extraction returns nothing for a pasted chart or screenshot, so a
+    criterion about what a slide SHOWS was graded blind. OOXML keeps every
+    embedded picture as a plain file under <kind>/media/ — stdlib zipfile is
+    enough. Vector (EMF/WMF) and undecodable members are named, not attached.
+    Never raises."""
+    media_dir = _OFFICE_MEDIA_DIRS.get(path.suffix.lower())
+    cap = _judge_office_max_images()
+    if not media_dir or cap <= 0:
+        return [], ""
+    import zipfile
+    images: list[ImagePart] = []
+    lines: list[str] = []
+    skipped = 0
+    try:
+        with zipfile.ZipFile(path) as zf:
+            members = sorted(
+                (i for i in zf.infolist()
+                 if i.filename.startswith(media_dir) and not i.is_dir()),
+                key=lambda i: i.filename)
+            for info in members:
+                if len(images) >= cap:
+                    skipped += 1
+                    continue
+                name = info.filename.rsplit("/", 1)[-1]
+                img_label = f"{label}#{name}"
+                if info.file_size > _JUDGE_IMAGE_MAX_READ_BYTES:
+                    part, reason = None, "embedded image is too large"
+                else:
+                    part, reason, _ = _prepare_judge_image(zf.read(info), img_label)
+                if part is None:
+                    lines.append("\n" + _unattached_placeholder(img_label, "image", reason))
+                    continue
+                images.append(part)
+                lines.append(f"\n{_image_placeholder(part)} (picture embedded in the "
+                             f"document: {info.filename})")
+    except Exception:
+        return images, "".join(lines)
+    if skipped:
+        lines.append(f"\n({skipped} more embedded picture(s) not shown: per-document "
+                     f"limit of {cap})")
+    return images, "".join(lines)
+
+
 def _deliverable_evidence_marker(
     path: Path, label: str | None = None, skip_reason: str | None = None,
     render_pdf_pages: bool = False,
+    attach_images: bool = False, image_root: Path | None = None,
+    attach_standalone: bool | None = None,
 ) -> tuple[str, list[ImagePart]]:
     # Single dispatch point turning one collected deliverable into an evidence
     # block. Returns (block_text, images). Text deliverables read verbatim EXCEPT
@@ -1300,17 +1589,42 @@ def _deliverable_evidence_marker(
         if _is_text_deliverable(path):
             body = path.read_text(encoding="utf-8", errors="replace")
             body, images = _extract_inline_images(body, label)
+            if attach_images:
+                body, linked = _attach_linked_images(body, path, label, image_root)
+                images = images + linked
             return f"\n----- DELIVERABLE: {label} -----\n{body}", images
         if _is_image_deliverable(path):
-            # Standalone image files are never attached as pixels; the marker
-            # carries stdlib-parsed dimensions for "did it produce an image of
-            # size WxH?" criteria.
+            # The marker always carries stdlib-parsed dimensions for "did it
+            # produce an image of size WxH?" criteria. On an image-capable judge
+            # the pixels are attached too; a text-only judge (and any file that
+            # is not a usable raster) keeps the presence marker.
             dims = _image_dimensions(path)
             size = f"image {dims[0]}x{dims[1]}" if dims else "image"
-            return _presence_marker(
-                label, path,
-                f"image pixels are not attached for standalone image files ({size})",
-            ), []
+            if not attach_images:
+                return _presence_marker(
+                    label, path,
+                    f"image pixels are not attached for standalone image files ({size})",
+                ), []
+            if attach_standalone is False:
+                # An agent's working pictures (_scratch/pg1.png, _pen_raw.png, a
+                # sweep of 60 crops) are not deliverables and would spend the whole
+                # per-request image cap before the real ones. A page that SHOWS one
+                # still gets it, through its <img src> reference.
+                return _presence_marker(
+                    label, path,
+                    f"image not attached: agent working file (scratch) ({size})",
+                ), []
+            raw = _read_image_file(path)
+            part, reason, real_dims = (
+                _prepare_judge_image(raw, f"{label}#image") if raw is not None
+                else (None, "image file is unreadable or too large", None))
+            if part is None:
+                return _presence_marker(
+                    label, path, f"image not attached: {reason} ({size})"), []
+            if real_dims:
+                size = f"image {real_dims[0]}x{real_dims[1]}"
+            return (f"\n----- DELIVERABLE: {label} ({size}, attached) -----\n"
+                    f"{_image_placeholder(part)} (this image file itself)\n"), [part]
         if _is_audio_deliverable(path):
             size = _file_size(path)
             if size is not None and size > _AUDIO_MAX_TRANSCRIBE_BYTES:
@@ -1340,9 +1654,16 @@ def _deliverable_evidence_marker(
                      if render_pdf_pages and path.suffix.lower() == ".pdf" else [])
             page_images = [img for _, img in pages]
             placeholders = _pdf_page_placeholders(pages)
+            if attach_images:
+                media_images, media_text = _office_media_images(path, label)
+                page_images = page_images + media_images
+                placeholders += media_text
             if not extracted:
                 if pages:
                     return (f"\n----- DELIVERABLE: {label} (rendered pages; no "
+                            f"extractable text) -----{placeholders}\n"), page_images
+                if page_images:
+                    return (f"\n----- DELIVERABLE: {label} (embedded pictures; no "
                             f"extractable text) -----{placeholders}\n"), page_images
                 return _presence_marker(label, path, _REASON_NOT_EXTRACTABLE), []
             if len(extracted) <= _EXTRACT_CHAR_CAP:
@@ -1697,6 +2018,13 @@ def _rubric_file_names(rubrics: list) -> frozenset[str]:
     return frozenset(names)
 
 
+def _is_working_image(path: Path) -> bool:
+    """A loose image file that is the agent's working material, not a deliverable:
+    anything under a scratch subtree, or whose own name is dot/underscore-prefixed
+    (the same hidden-work-area convention _in_scratch_subdir applies to dirs)."""
+    return _in_scratch_subdir(path) or path.name[:1] in (".", "_")
+
+
 def _in_scratch_subdir(path: Path) -> bool:
     # Scratch check scoped to components BELOW the last deliverable-root
     # component (results/artifacts/... or workspace_full) so host-path noise
@@ -1880,7 +2208,7 @@ def _gather_evidence(
     # tool result that cat'd an image-bearing deliverable would otherwise carry
     # the same blobs back into the same user turn through the other seam. Text
     # only (placeholders), so no vision cost and nothing to survivor-filter.
-    transcript_text, _ = _extract_inline_images(transcript_text, "transcript")
+    transcript_text, _ = _extract_inline_images(transcript_text, "transcript", attach=False)
     # Order so the files the rubric is actually ABOUT survive every member's
     # truncation budget: rubric-named files first, then report/flagged stems,
     # then other deliverables, then scratch subtrees — within each rank, by the
@@ -1916,9 +2244,12 @@ def _gather_evidence(
         label_uses[label] = uses
         if uses > 1:
             label = f"{label} [{uses}]"
+        is_named = f.name.lower() in named
         block, block_images = _deliverable_evidence_marker(
             f, label, skip_reason,
-            render_pdf_pages=attach_images and f.name.lower() in named)
+            render_pdf_pages=attach_images and is_named,
+            attach_images=attach_images, image_root=workspace_results,
+            attach_standalone=is_named or not _is_working_image(f))
         rendered.append((f, label, block, block_images))
     rendered.sort(key=lambda r: (_rank(r[0]), len(r[2]), r[0].name, r[1]))
 
@@ -1940,8 +2271,32 @@ def _gather_evidence(
     # image that will not be attached is disclosed in the block text, and that
     # disclosure is counted against the budget like any other text.
     candidates = [img for _, _, _, imgs in rendered for img in imgs]
+    # The same picture often arrives twice (chart.png as a file AND as report.html's
+    # <img src>): attach it once so a duplicate cannot spend the count/byte caps.
+    # Who gets the (small) per-request cap, in order: pictures of the files the
+    # rubric names, then pictures INSIDE documents (inline, linked, office media,
+    # PDF pages), then loose image files. Stable, so evidence order holds within
+    # a class.
+    def _image_priority(f: Path, img: ImagePart) -> int:
+        if _rank(f) == 0:
+            return 0
+        return 2 if img.label.endswith("#image") else 1
+
+    prio = {img.label: _image_priority(f, img)
+            for f, _, _, imgs in rendered for img in imgs}
+    candidates.sort(key=lambda i: prio.get(i.label, 1))
+    duplicates: dict[str, str] = {}
+    first_by_uri: dict[str, str] = {}
+    unique: list[ImagePart] = []
+    for img in candidates:
+        owner = first_by_uri.setdefault(img.data_uri, img.label)
+        if owner != img.label:
+            duplicates[img.label] = f"same image as {owner}, attached once"
+        else:
+            unique.append(img)
     if attach_images:
-        selected, rejected = _select_judge_images_with_reasons(candidates)
+        selected, rejected = _select_judge_images_with_reasons(unique)
+        rejected.update(duplicates)
     else:
         selected = []
         rejected = {
@@ -2208,7 +2563,61 @@ def _judge_codex_bridge_model() -> str:
 _JUDGE_GPT_REASONING_EFFORT = "low"
 
 
+_IMAGE_REJECTION_HINTS = ("image", "invalid_base64", "unsupported_file", "mime", "media")
+
+
+def _looks_like_image_rejection(exc: BaseException) -> bool:
+    """An error the endpoint raised ABOUT an attached image (vs. auth, quota,
+    context length...). HTTP 400/413/415/422 with images attached counts on its
+    own: the identical text-only body is the known-good shape."""
+    import urllib.error
+    if isinstance(exc, urllib.error.HTTPError):
+        if exc.code in (413, 415, 422):
+            return True
+        if exc.code != 400:
+            return False
+        try:
+            detail = exc.read().decode("utf-8", errors="replace").lower()
+        except Exception:
+            detail = ""
+        return (not detail) or any(h in detail for h in _IMAGE_REJECTION_HINTS)
+    text = str(exc).lower()
+    return "judge stream error" in text and any(h in text for h in _IMAGE_REJECTION_HINTS)
+
+
 def _call_judge_openai(
+    model: str,
+    system: str,
+    user: "str | JudgeUserPayload",
+    **kwargs,
+) -> tuple[str, dict]:
+    """_call_judge_openai_once, plus ONE retry without images.
+
+    Images are validated before they are attached (_prepare_judge_image), but the
+    endpoint has the last word, and one rejected part fails the request for every
+    criterion in the chunk. Losing the pictures costs the image-content criteria;
+    losing the call costs all of them — so an image rejection is retried as text,
+    with a note telling the judge the placeholders are now unattached."""
+    images = _payload_images(user)
+    try:
+        return _call_judge_openai_once(model, system, user, **kwargs)
+    except Exception as exc:  # noqa: BLE001
+        if not images or not _looks_like_image_rejection(exc):
+            raise
+        logger.warning(
+            "[grading] judge endpoint rejected a request carrying %d image(s) (%s) — "
+            "retrying once WITHOUT images", len(images), str(exc)[:200])
+        note = (
+            "\n[NOTE: the image attachments for this request were rejected by the "
+            "judge endpoint and are NOT attached: "
+            + ", ".join(i.label for i in images)
+            + ". Treat each of their placeholders as 'present — contents not included'.]"
+        )
+        return _call_judge_openai_once(
+            model, system, _payload_text(user) + note, **kwargs)
+
+
+def _call_judge_openai_once(
     model: str,
     system: str,
     user: "str | JudgeUserPayload",
@@ -2421,6 +2830,18 @@ def _image_probe_refusal(text: str) -> str:
     return ""
 
 
+_IMAGE_PROBE_BACKOFF_S = 3.0
+
+
+def _judge_image_probe_retries() -> int:
+    raw = os.environ.get("WCB_JUDGE_IMAGE_PROBE_RETRIES")
+    try:
+        n = int(raw) if raw not in (None, "") else 2
+    except ValueError:
+        n = 2
+    return max(0, min(n, 5))
+
+
 def preflight_judge_codex(timeout_s: float = 90.0) -> tuple[str, str]:
     """Validate the GPT judge's codex-subscription grading path END-TO-END.
 
@@ -2476,17 +2897,30 @@ def preflight_judge_codex(timeout_s: float = 90.0) -> tuple[str, str]:
             label="preflight-probe#1",
         )],
     )
-    try:
-        img_text, _ = _call_judge_openai(
-            model, "You are a preflight probe.", probe_payload,
-            family="gpt",
-            api_key=secret,
-            reasoning_effort=_JUDGE_GPT_REASONING_EFFORT,
-            base_url=url,
-            timeout=timeout_s,
-        )
-    except Exception as exc:  # noqa: BLE001 — probe must never raise into caller
-        return "fail", f"image probe: {type(exc).__name__}: {str(exc)[:400]}"
+    # _once, NOT the retrying wrapper: its retry-without-images would turn a dead
+    # image leg into a green probe. A failure here disables attachment for the
+    # whole batch, so a transient blip (timeout, 5xx, a cap-wait) gets retried
+    # before it is believed; a refusal is the model's answer and is not retried.
+    attempts = 1 + _judge_image_probe_retries()
+    img_text = ""
+    for attempt in range(1, attempts + 1):
+        try:
+            img_text, _ = _call_judge_openai_once(
+                model, "You are a preflight probe.", probe_payload,
+                family="gpt",
+                api_key=secret,
+                reasoning_effort=_JUDGE_GPT_REASONING_EFFORT,
+                base_url=url,
+                timeout=timeout_s,
+            )
+            break
+        except Exception as exc:  # noqa: BLE001 — probe must never raise into caller
+            if attempt >= attempts:
+                return "fail", (f"image probe: {type(exc).__name__}: {str(exc)[:400]}"
+                                f" (after {attempts} attempt(s))")
+            logger.warning("[grading] codex image probe attempt %d/%d failed (%s) — retrying",
+                           attempt, attempts, str(exc)[:160])
+            time.sleep(_IMAGE_PROBE_BACKOFF_S * attempt)
     refusal = _image_probe_refusal(img_text)
     if refusal:
         return "fail", f"image probe: {refusal}"

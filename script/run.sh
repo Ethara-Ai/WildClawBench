@@ -28,21 +28,31 @@ source "$(dirname "$0")/lib/log.sh"
 # fetch, and no Dockerfile in this repo produces it — so it stays the
 # acquisition target and must never be deleted or retagged.
 #
-# AGENT_IMAGE is what actually runs tasks: BASE_IMAGE plus openai-whisper and
-# preloaded 'small' weights, built locally by preflight_agent_image() from
-# docker/agent-whisper.Dockerfile. That layer is what makes the local fallback
-# rung of environment/skills/audio-extract/scripts/transcribe.sh work on runs
-# where the sidecar advertises no whisper route (OAuth/Bedrock-only batches —
-# see src/agents/openclaw/runner.py:601). Delivered bundles already bake the
-# same thing via src/utils/harbor/dockerfile.py; this brings our own runtime
-# image to parity. Rollback = point AGENT_IMAGE back at BASE_IMAGE; v1.4 is
-# purely additive and leaves v1.3 on disk untouched.
+# AGENT_IMAGE is what actually runs tasks. It defaults to v1.6 (both layers); the
+# tags below are built locally by preflight_agent_image() / build_agent_image():
+#   v1.4  + openai-whisper and preloaded 'small' weights (docker/agent-whisper.Dockerfile).
+#         This is the openai-whisper rung of
+#         environment/skills/audio-extract/scripts/transcribe.sh, the only one
+#         left on runs whose sidecar advertises no whisper route (OAuth /
+#         Bedrock-only batches). Delivered bundles bake the same thing via
+#         src/utils/harbor/dockerfile.py.
+#   v1.5  + LibreOffice (docker/agent-office.Dockerfile).
+#   v1.6  + both, office stacked on v1.4.
+# Every layer is additive and leaves v1.3 on disk untouched; rollback = unset
+# DOCKER_IMAGE.
 readonly BASE_IMAGE="wildclawbench-ubuntu:v1.3"
-# HarnessV2 keeps the base image as the default (v1.4 is opt-in via
-# DOCKER_IMAGE=wildclawbench-ubuntu:v1.4). When AGENT_IMAGE equals BASE_IMAGE,
-# preflight/recovery only acquire the base and never build the whisper layer
-# onto the base tag.
-readonly AGENT_IMAGE_DEFAULT="$BASE_IMAGE"
+# The locally-built agent images, by tag. Each tag has exactly ONE recipe:
+#   v1.4 = base + whisper      v1.5 = base + LibreOffice      v1.6 = base + both
+# build_agent_image refuses any other tag instead of baking the whisper layer
+# under it — that used to turn `DOCKER_IMAGE=...:v1.5` on a fresh host into a
+# whisper-only image tagged v1.5, with preflight reporting OK and soffice absent.
+readonly AGENT_IMAGE_WHISPER="wildclawbench-ubuntu:v1.4"
+readonly AGENT_IMAGE_OFFICE="wildclawbench-ubuntu:v1.5"
+readonly AGENT_IMAGE_FULL="wildclawbench-ubuntu:v1.6"
+# Default = the full image, so a task with audio or office files works without
+# anyone remembering to opt in. Preflight builds it once (~20 min) when absent.
+# DOCKER_IMAGE=wildclawbench-ubuntu:v1.3 runs the bare base and builds nothing.
+readonly AGENT_IMAGE_DEFAULT="$AGENT_IMAGE_FULL"
 
 # Reads one KEY=value out of .env without sourcing it, so a malformed line
 # cannot execute and the file's credentials never enter this shell.
@@ -69,6 +79,7 @@ AGENT_IMAGE="${AGENT_IMAGE:-$AGENT_IMAGE_DEFAULT}"
 readonly AGENT_IMAGE
 export DOCKER_IMAGE="$AGENT_IMAGE"
 readonly AGENT_WHISPER_DOCKERFILE="docker/agent-whisper.Dockerfile"
+readonly AGENT_OFFICE_DOCKERFILE="docker/agent-office.Dockerfile"
 # Content ID of BASE_IMAGE, used to recover from a lost/corrupted tag table
 # without re-loading the 28GB tar. Verified identical on both production hosts
 # via `docker image inspect wildclawbench-ubuntu:v1.3 --format '{{.Id}}'`.
@@ -330,6 +341,37 @@ ensure_base_image() {
 # base (no matching platform) and try to PULL `wildclawbench-ubuntu:v1.3` from
 # Docker Hub, where it does not exist — failing with a misleading
 # "pull access denied" instead of building against the image already on disk.
+# Builds $1 (one of the AGENT_IMAGE_* tags) on top of an already-present
+# BASE_IMAGE. Returns 2 for a tag with no recipe, 1 for a failed build.
+build_agent_image() {
+    local tag="$1"
+    case "$tag" in
+        "$AGENT_IMAGE_WHISPER")
+            log::info "Recipe: ${BASE_IMAGE} + openai-whisper 'small' (${AGENT_WHISPER_DOCKERFILE}; ~10–20 min first time, torch is the slow part)"
+            docker build --platform linux/amd64 -f "$AGENT_WHISPER_DOCKERFILE" -t "$tag" .
+            ;;
+        "$AGENT_IMAGE_OFFICE")
+            log::info "Recipe: ${BASE_IMAGE} + LibreOffice (${AGENT_OFFICE_DOCKERFILE}; ~5 min)"
+            docker build --platform linux/amd64 --build-arg "BASE=${BASE_IMAGE}" \
+                -f "$AGENT_OFFICE_DOCKERFILE" -t "$tag" .
+            ;;
+        "$AGENT_IMAGE_FULL")
+            log::info "Recipe: ${AGENT_IMAGE_WHISPER} + LibreOffice (both layers, so one run gets soffice AND local transcription)"
+            if ! docker image inspect "$AGENT_IMAGE_WHISPER" >/dev/null 2>&1; then
+                build_agent_image "$AGENT_IMAGE_WHISPER" || return $?
+            fi
+            docker build --platform linux/amd64 --build-arg "BASE=${AGENT_IMAGE_WHISPER}" \
+                -f "$AGENT_OFFICE_DOCKERFILE" -t "$tag" .
+            ;;
+        *)
+            log::err "No build recipe for agent image '${tag}'."
+            log::err "  Known tags: ${BASE_IMAGE} (base), ${AGENT_IMAGE_WHISPER} (whisper), ${AGENT_IMAGE_OFFICE} (LibreOffice), ${AGENT_IMAGE_FULL} (both)."
+            log::err "  For a custom image, build or 'docker load' it yourself, then re-run."
+            return 2
+            ;;
+    esac
+}
+
 preflight_agent_image() {
     log::step 2 6 "Agent image ${AGENT_IMAGE}"
 
@@ -353,16 +395,22 @@ preflight_agent_image() {
         return 0
     fi
 
-    log::warn "Building ${AGENT_IMAGE} from ${AGENT_WHISPER_DOCKERFILE} (~10–20 min first time; torch is the slow part)"
-    log::info "This bakes openai-whisper + 'small' weights so the audio-extract skill can transcribe without a sidecar whisper route"
-    if docker build --platform linux/amd64 -f "$AGENT_WHISPER_DOCKERFILE" -t "$AGENT_IMAGE" . ; then
+    log::warn "Building ${AGENT_IMAGE} locally"
+    local build_rc=0
+    build_agent_image "$AGENT_IMAGE" || build_rc=$?
+    if (( build_rc == 0 )); then
         log::ok "Agent image built"
         return 0
     fi
+    (( build_rc == 2 )) && return 1
 
-    log::err "Agent image build failed. It needs internet (PyPI + the OpenAI weight CDN);"
+    log::err "Agent image build failed. It needs internet (PyPI + the OpenAI weight CDN / apt mirrors);"
     log::err "a machine with no egress cannot produce it. Build it manually once you have connectivity:"
-    log::err "  docker build --platform linux/amd64 -f ${AGENT_WHISPER_DOCKERFILE} -t ${AGENT_IMAGE} ."
+    if [[ "$AGENT_IMAGE" == "$AGENT_IMAGE_WHISPER" ]]; then
+        log::err "  docker build --platform linux/amd64 -f ${AGENT_WHISPER_DOCKERFILE} -t ${AGENT_IMAGE} ."
+    else
+        log::err "  DOCKER_IMAGE=${AGENT_IMAGE} bash script/run.sh --help   # see build_agent_image in script/run.sh for the recipe"
+    fi
     log::err "Or copy it from a host that has it:"
     log::err "  docker save ${AGENT_IMAGE} | gzip | ssh <host> 'gunzip | docker load'"
     return 1
@@ -756,10 +804,10 @@ attempt_docker_recovery() {
     # missing) and re-derive the whisper layer on top. The build is a no-op
     # replay of cached layers when only the tag was lost.
     if ! docker image inspect "$AGENT_IMAGE" >/dev/null 2>&1; then
-        log::warn "Agent image tag missing — restoring base and rebuilding whisper layer"
+        log::warn "Agent image tag missing — restoring base and rebuilding its layers"
         ensure_base_image || return 1
         if [[ "$AGENT_IMAGE" != "$BASE_IMAGE" ]]; then
-            docker build --platform linux/amd64 -f "$AGENT_WHISPER_DOCKERFILE" -t "$AGENT_IMAGE" . || return 1
+            build_agent_image "$AGENT_IMAGE" || return 1
         fi
     fi
 

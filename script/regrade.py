@@ -185,6 +185,13 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
     print(f"[regrade] task_id      = {task_id}", file=sys.stderr)
     print(f"[regrade] rubric       = {rubric_path} ({len(rubrics)} criteria)", file=sys.stderr)
     print(f"[regrade] results_dir  = {results_dir}", file=sys.stderr)
+    try:
+        from src.utils import judge_asr
+        _asr_ok, _asr_detail = judge_asr.status()
+        print(f"[regrade] judge ASR    = {'ready' if _asr_ok else 'UNAVAILABLE'} ({_asr_detail})",
+              file=sys.stderr)
+    except Exception:  # noqa: BLE001 - a status line must never stop a regrade
+        pass
     print(f"[regrade] transcript   = {len(transcript_text):,} chars", file=sys.stderr)
     print(f"[regrade] judge        = council", file=sys.stderr)
     print(f"[regrade] grading …", file=sys.stderr)

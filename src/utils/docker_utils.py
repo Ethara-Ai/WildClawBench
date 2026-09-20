@@ -13,7 +13,9 @@ from dotenv import load_dotenv
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-DOCKER_IMAGE  = os.environ.get("DOCKER_IMAGE",   "wildclawbench-ubuntu:v1.3")
+# v1.6 = the v1.3 base + openai-whisper + LibreOffice (script/build_agent_image.sh).
+# Set DOCKER_IMAGE=wildclawbench-ubuntu:v1.3 to run the bare base.
+DOCKER_IMAGE  = os.environ.get("DOCKER_IMAGE",   "wildclawbench-ubuntu:v1.6")
 TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE",  "/tmp_workspace")
 WORKSPACE_BASELINE_PATH = "/tmp/wildclaw_workspace_baseline.json"
 # In-container file holding the agent's current simulated-clock anchor (epoch
@@ -658,9 +660,11 @@ def require_image_present(image: str) -> None:
             )
         raise RuntimeError(
             f"Required Docker image not present locally: {image}\n"
-            f"`bash script/run.sh` provisions it during preflight: `docker load` the "
-            f"v1.3 base from Images/wildclawbench-ubuntu_v1.3.tar, then build the "
-            f"whisper layer on top via docker/agent-whisper.Dockerfile\n"
+            f"`bash script/run.sh` provisions it during preflight: it `docker load`s the "
+            f"v1.3 base from Images/wildclawbench-ubuntu_v1.3.tar and, for the opt-in "
+            f"tags, builds the layer on top (v1.4 whisper, v1.5 LibreOffice, v1.6 both — "
+            f"see build_agent_image in script/run.sh). A direct run_batch builds nothing —\n"
+            f"build it once with:  bash script/build_agent_image.sh {image}\n"
             f"or set DOCKER_IMAGE to a tag that exists.\n"
             f"(Checked with `docker image ls -q {image}` and an inspect fallback; "
             f"both came back empty.)"
@@ -1310,10 +1314,15 @@ def inject_api_connectors(
     container_skills_root: str = "/root/skills",
 ) -> None:
     """Copy <env_dir>/skills/<api>-connector dirs into the container's skills
-    root, plus API_DOCUMENTATION.md into /root/. No-op if env_dir or required
-    APIs are empty."""
-    if not env_dir or not required_apis:
+    root, plus API_DOCUMENTATION.md into /root/, plus every non-connector utility
+    skill (pdf-extract, audio-extract, video-frames, ...) and its runtime deps.
+
+    Only the connectors and the API doc are keyed by `required_apis`. The utility
+    skills are not: a task with no APIs at all (a pure audio or PDF task) still
+    gets them. No-op only when env_dir is empty/missing."""
+    if not env_dir:
         return
+    required_apis = list(required_apis or [])
     env_root = Path(env_dir)
     if not env_root.is_dir():
         return
@@ -1405,7 +1414,11 @@ def inject_api_connectors(
     _install_skill_runtime_deps(task_id, env_root)
     _verify_skill_runtime_deps(task_id)
     api_doc = env_root / "API_DOCUMENTATION.md"
-    if api_doc.is_file():
+    if not required_apis:
+        # No connector was injected, so the fleet-wide API doc would only
+        # advertise services this task's stack never starts.
+        logger.info("[%s] No required/distractor APIs — API_DOCUMENTATION.md not injected", task_id)
+    elif api_doc.is_file():
         r = subprocess.run(
             ["docker", "cp", str(api_doc), f"{task_id}:/root/API_DOCUMENTATION.md"],
             capture_output=True, text=True,

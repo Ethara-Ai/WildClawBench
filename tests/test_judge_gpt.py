@@ -744,11 +744,24 @@ class TestGptNeverTripsCouncilRaise:
 # ===========================================================================
 
 
-PNG_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
-    "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-)
+# A REAL 8x8 PNG (the preflight probe's): the old 1x1 fixture is exactly the
+# degenerate raster the vision endpoint 400s on, and is now refused on purpose.
+PNG_B64 = grading._PROBE_PNG_DATA_URI.partition(",")[2]
 PNG_DATA_URI = f"data:image/png;base64,{PNG_B64}"
+
+
+def _real_image_b64(seed: int = 0, side: int = 16, fmt: str = "PNG") -> str:
+    """A distinct, decodable image per seed. Random pixels so a large `side`
+    yields a payload that does not compress away."""
+    import io
+    import random
+    from PIL import Image
+    rnd = random.Random(seed)
+    img = Image.frombytes("RGB", (side, side),
+                          bytes(rnd.randrange(256) for _ in range(side * side * 3)))
+    buf = io.BytesIO()
+    img.save(buf, format=fmt)
+    return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
 def _approx_kb(b64: str) -> str:
@@ -783,11 +796,11 @@ class TestExtractInlineImages:
         assert images[0].label == "page.html#1"
 
     def test_placeholder_kb_approximates_the_decoded_payload_size(self):
-        blob = "A" * 4096
+        blob = _real_image_b64(side=48, fmt="JPEG")
         text, images = grading._extract_inline_images(
             f"data:image/jpeg;base64,{blob}", "shot.md"
         )
-        assert "~3.0KB" in text
+        assert f"~{_approx_kb(blob)}KB" in text
         assert images[0].mime == "image/jpeg"
 
     def test_text_without_images_is_returned_untouched(self):
@@ -808,9 +821,9 @@ class TestExtractInlineImages:
         _text, images = grading._extract_inline_images(PNG_DATA_URI, "x.md")
         assert images[0].detail == "high"
 
-    def test_detail_defaults_to_low(self):
+    def test_detail_defaults_to_auto(self):
         _text, images = grading._extract_inline_images(PNG_DATA_URI, "x.md")
-        assert images[0].detail == "low"
+        assert images[0].detail == "auto"
 
 
 class TestWrappedBase64IsLiftedWhole:
@@ -903,7 +916,7 @@ class TestGatherEvidencePayload:
         the whole evidence budget: inline it would have been cut mid-payload (or
         dropped the block outright), while the placeholder it leaves behind fits
         comfortably and the pixels ride the image parts intact."""
-        big_b64 = "Q" * 2000
+        big_b64 = _real_image_b64(side=24)
         big_uri = f"data:image/png;base64,{big_b64}"
         filler = "x" * 200
         root = _write_deliverables(
@@ -915,11 +928,13 @@ class TestGatherEvidencePayload:
         assert len(payload.text) <= budget
         assert "base64," not in payload.text
         assert big_b64[:40] not in payload.text
-        assert "[inline image page.html#1, image/png, ~1.5KB]" in payload.text
+        assert f"[inline image page.html#1, image/png, ~{_approx_kb(big_b64)}KB]" in payload.text
         assert [i.data_uri for i in payload.images] == [big_uri]
 
     def test_count_cap_attaches_eight_and_leaves_placeholders_for_the_rest(self, tmp_path):
-        body = "".join(f'<img src="{PNG_DATA_URI}">' for _ in range(10))
+        # Distinct pictures: an identical one is attached once (see the dedupe test).
+        body = "".join(
+            f'<img src="data:image/png;base64,{_real_image_b64(i)}">' for i in range(10))
         root = _write_deliverables(tmp_path, {"gallery.html": body})
         payload = grading._gather_evidence(root, "turn 1")
         assert grading._judge_max_images() == 8
@@ -936,8 +951,10 @@ class TestGatherEvidencePayload:
         assert payload.text.count("[inline image") == 1
 
     def test_byte_cap_stops_attachment_before_the_count_cap(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("KENSEI_JUDGE_MAX_IMAGE_BYTES", str(len(PNG_B64) * 2))
-        body = "".join(f'<img src="{PNG_DATA_URI}">' for _ in range(5))
+        blobs = [_real_image_b64(i) for i in range(5)]
+        monkeypatch.setenv("KENSEI_JUDGE_MAX_IMAGE_BYTES",
+                           str(len(blobs[0]) + len(blobs[1]) + 4))
+        body = "".join(f'<img src="data:image/png;base64,{b}">' for b in blobs)
         root = _write_deliverables(tmp_path, {"gallery.html": body})
         payload = grading._gather_evidence(root, "turn 1")
         assert len(payload.images) == 2
@@ -947,7 +964,7 @@ class TestGatherEvidencePayload:
         """The byte cap SKIPS an over-budget image rather than stopping: one large
         blob early in the evidence must not suppress every smaller one behind
         it."""
-        big = "Q" * 4000
+        big = _real_image_b64(side=40)
         body = (
             f'<img src="data:image/png;base64,{big}">'
             + f'<img src="{PNG_DATA_URI}">'
@@ -1248,7 +1265,7 @@ class TestImageBudgetEnvParsing:
     def test_defaults(self):
         assert grading._judge_max_images() == 8
         assert grading._judge_max_image_bytes() == 4 * 1024 * 1024
-        assert grading._judge_image_detail() == "low"
+        assert grading._judge_image_detail() == "auto"
 
     @pytest.mark.parametrize("raw", ["", "   ", "abc", "-1"])
     def test_unparseable_or_negative_falls_back_to_default(self, monkeypatch, raw):
@@ -1262,8 +1279,12 @@ class TestImageBudgetEnvParsing:
         monkeypatch.setenv("KENSEI_JUDGE_IMAGE_DETAIL", raw)
         assert grading._judge_image_detail() == raw.strip().lower()
 
-    def test_unknown_detail_tier_falls_back_to_low(self, monkeypatch):
+    def test_unknown_detail_tier_falls_back_to_the_default(self, monkeypatch):
         monkeypatch.setenv("KENSEI_JUDGE_IMAGE_DETAIL", "ultra")
+        assert grading._judge_image_detail() == "auto"
+
+    def test_low_is_still_selectable(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_JUDGE_IMAGE_DETAIL", "low")
         assert grading._judge_image_detail() == "low"
 
 

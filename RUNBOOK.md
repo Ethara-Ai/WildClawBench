@@ -142,6 +142,18 @@ If this fails, do not proceed — your install is broken.
 
 ---
 
+### 3.5 Judge audio transcription (optional, once per host)
+
+Judges accept no audio, so audio deliverables (`.wav/.mp3/.m4a/...`) are transcribed **on the host** by `src/utils/judge_asr.py` with a local sherpa-onnx model and reach the judge as text. This is host state, not repo state:
+
+```bash
+bash script/setup_judge_asr.sh          # pip deps (requirements-asr.txt) + ~480 MB model -> ~/.wcb/asr, then transcribes a sample
+bash script/setup_judge_asr.sh --check  # readiness only
+bash script/prepare.sh --judge-asr      # same, as part of bootstrap
+```
+
+Without it grading still runs, but an audio file reaches the judge as `audio transcript unavailable (audio 12.0s, ...)` and spoken-content criteria abstain. Every batch and every `script/regrade.py` prints `Judge ASR: ready (...)` or `Judge ASR: UNAVAILABLE — <reason>`, so the degraded mode is never silent. Knobs: `WCB_JUDGE_AUDIO_TRANSCRIBE=0` (off), `WCB_JUDGE_ASR_MODEL_DIR`, `WCB_JUDGE_ASR_THREADS`. This is separate from the agent's own in-container transcription (the `audio-extract` skill / whisper image).
+
 ## 4. Anatomy of a task
 
 A task lives in `input/<task_id>/`. Two shipped examples: `input/alden-croft_MB/`, `input/renata-voss/`.

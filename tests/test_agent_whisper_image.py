@@ -51,10 +51,10 @@ _TRANSCRIBE_SH = (
 )
 
 _BASE_IMAGE = "wildclawbench-ubuntu:v1.3"
-# HarnessV2: the default agent image stays the base; the whisper image is opt-in
-# via DOCKER_IMAGE=wildclawbench-ubuntu:v1.4.
+# The default agent image is v1.6 (base + whisper + LibreOffice); v1.4 is the
+# whisper-only tag and v1.3 the bare base, both selectable via DOCKER_IMAGE.
 _AGENT_IMAGE = "wildclawbench-ubuntu:v1.4"
-_DEFAULT_IMAGE = _BASE_IMAGE
+_DEFAULT_IMAGE = "wildclawbench-ubuntu:v1.6"
 _BASE_IMAGE_SHA = "88cd069e8ead5f4497093671a6d9e39e80259d75d4524f230b52ce439fcb2870"
 _MODEL_DIR = "/opt/wb_whisper_models"
 
@@ -112,8 +112,6 @@ class TestWhisperRecipeParity:
         assert link in agent_whisper_run
         assert link in harbor_whisper_run
 
-    @pytest.mark.skip(reason="HarnessV2's audio-extract/transcribe.sh uses whisper.cpp "
-                             "(whisper-cli + ggml model), not the openai-whisper model dir")
     def test_model_dir_matches_the_skill_default(self, agent_whisper_run):
         # transcribe.sh gates its local rung on this directory existing and
         # passes it as download_root; a renamed path silently disables the rung.
@@ -155,8 +153,11 @@ class TestRunShImageWiring:
     def run_sh(self) -> str:
         return _RUN_SH.read_text(encoding="utf-8")
 
-    def test_agent_image_defaults_to_the_base_image(self, run_sh):
-        assert 'readonly AGENT_IMAGE_DEFAULT="$BASE_IMAGE"' in run_sh
+    def test_agent_image_defaults_to_the_full_image(self, run_sh):
+        assert 'readonly AGENT_IMAGE_FULL="%s"' % _DEFAULT_IMAGE in run_sh
+        assert 'readonly AGENT_IMAGE_DEFAULT="$AGENT_IMAGE_FULL"' in run_sh
+        # bash reads top to bottom: the tag must exist before the default names it
+        assert run_sh.index("readonly AGENT_IMAGE_FULL=") < run_sh.index("readonly AGENT_IMAGE_DEFAULT=")
 
     def test_agent_image_is_resolved_from_the_python_side_variable(self, run_sh):
         # Preflight and run_batch have to read ONE channel. docker_utils reads
@@ -197,20 +198,21 @@ class TestRunShImageWiring:
 
     def test_preflight_builds_the_whisper_image_from_the_dockerfile(self, run_sh):
         assert 'readonly AGENT_WHISPER_DOCKERFILE="docker/agent-whisper.Dockerfile"' in run_sh
-        assert 'docker build --platform linux/amd64 -f "$AGENT_WHISPER_DOCKERFILE" -t "$AGENT_IMAGE" .' in run_sh
+        assert 'docker build --platform linux/amd64 -f "$AGENT_WHISPER_DOCKERFILE" -t "$tag" .' in run_sh
+        assert "build_agent_image() {" in run_sh
         assert "ensure_base_image() {" in run_sh
         assert "preflight_agent_image() {" in run_sh
 
     def test_preflight_acquires_base_before_building(self, run_sh):
         body = run_sh.split("preflight_agent_image() {", 1)[1].split("\n}", 1)[0]
-        assert body.index("ensure_base_image") < body.index("docker build")
+        assert body.index("ensure_base_image") < body.index("build_agent_image")
 
     def test_recovery_rebuilds_rather_than_retagging_a_built_image(self, run_sh):
         # v1.4 is built locally, so its content ID is unknown at write time and
         # a lost tag cannot be recovered by SHA the way the base can.
         body = run_sh.split("attempt_docker_recovery() {", 1)[1].split("\n}", 1)[0]
         assert "ensure_base_image" in body
-        assert "docker build" in body
+        assert 'build_agent_image "$AGENT_IMAGE"' in body
         assert "AGENT_IMAGE_SHA" not in body
 
 
@@ -299,12 +301,23 @@ class TestPreflightBehavior:
         assert "rc=0" in proc.stdout
         assert not [c for c in calls if c.startswith("build")]
 
-    def test_default_never_builds_the_whisper_layer_onto_the_base_tag(self, tmp_path):
-        proc, calls = _run_preflight(tmp_path, present_images="sha256:%s" % _BASE_IMAGE_SHA)
+    def test_base_tag_never_gets_a_layer_built_onto_it(self, tmp_path):
+        # DOCKER_IMAGE=v1.3 is "run the bare base": recover the tag, build nothing.
+        proc, calls = _run_preflight(tmp_path, present_images="sha256:%s" % _BASE_IMAGE_SHA,
+                                     docker_image=_BASE_IMAGE)
         assert "rc=0" in proc.stdout
         assert [c for c in calls if c.startswith("tag ")] == [
             "tag sha256:%s %s" % (_BASE_IMAGE_SHA, _BASE_IMAGE)]
         assert not [c for c in calls if c.startswith("build")]
+
+    def test_default_builds_both_layers_from_a_bare_base(self, tmp_path):
+        proc, calls = _run_preflight(tmp_path, present_images=_BASE_IMAGE)
+        assert "rc=0" in proc.stdout
+        builds = [c for c in calls if c.startswith("build")]
+        assert len(builds) == 2
+        assert "-f docker/agent-whisper.Dockerfile" in builds[0]
+        assert "-f docker/agent-office.Dockerfile" in builds[1]
+        assert "-t %s" % _DEFAULT_IMAGE in builds[1]
 
     def test_missing_image_builds_from_the_dockerfile(self, tmp_path):
         proc, calls = _run_preflight(tmp_path, present_images=_BASE_IMAGE,
@@ -331,6 +344,93 @@ class TestPreflightBehavior:
         combined = proc.stdout + proc.stderr
         assert "docker build --platform linux/amd64 -f docker/agent-whisper.Dockerfile" in combined
         assert "internet" in combined
+
+
+_OFFICE_IMAGE = "wildclawbench-ubuntu:v1.5"
+_FULL_IMAGE = "wildclawbench-ubuntu:v1.6"
+
+
+class TestEachTagHasExactlyOneRecipe:
+    """A tag names an image's CONTENTS, so preflight may only build a tag from
+    its own recipe. It used to bake the whisper layer under whatever non-base tag
+    was asked for: DOCKER_IMAGE=...:v1.5 on a fresh host produced a whisper-only
+    image called v1.5, preflight said OK, and soffice was still missing."""
+
+    def test_office_tag_builds_the_office_dockerfile_on_the_base(self, tmp_path):
+        proc, calls = _run_preflight(tmp_path, present_images=_BASE_IMAGE,
+                                     docker_image=_OFFICE_IMAGE)
+        assert "rc=0" in proc.stdout
+        builds = [c for c in calls if c.startswith("build")]
+        assert len(builds) == 1
+        assert "-f docker/agent-office.Dockerfile" in builds[0]
+        assert "--build-arg BASE=%s" % _BASE_IMAGE in builds[0]
+        assert "-t %s" % _OFFICE_IMAGE in builds[0]
+        assert "agent-whisper" not in builds[0]
+
+    def test_full_tag_stacks_office_on_whisper(self, tmp_path):
+        proc, calls = _run_preflight(tmp_path, present_images=_BASE_IMAGE,
+                                     docker_image=_FULL_IMAGE)
+        assert "rc=0" in proc.stdout
+        builds = [c for c in calls if c.startswith("build")]
+        assert len(builds) == 2
+        assert "-f docker/agent-whisper.Dockerfile" in builds[0]
+        assert "-t %s" % _AGENT_IMAGE in builds[0]
+        assert "-f docker/agent-office.Dockerfile" in builds[1]
+        assert "--build-arg BASE=%s" % _AGENT_IMAGE in builds[1]
+        assert "-t %s" % _FULL_IMAGE in builds[1]
+
+    def test_full_tag_reuses_an_existing_whisper_image(self, tmp_path):
+        proc, calls = _run_preflight(
+            tmp_path, present_images="%s %s" % (_BASE_IMAGE, _AGENT_IMAGE),
+            docker_image=_FULL_IMAGE)
+        assert "rc=0" in proc.stdout
+        builds = [c for c in calls if c.startswith("build")]
+        assert len(builds) == 1
+        assert "-f docker/agent-office.Dockerfile" in builds[0]
+
+    def test_unknown_tag_is_refused_not_baked(self, tmp_path):
+        proc, calls = _run_preflight(tmp_path, present_images=_BASE_IMAGE,
+                                     docker_image="wildclawbench-ubuntu:v9.9")
+        assert "rc=1" in proc.stdout
+        assert not [c for c in calls if c.startswith("build")]
+        assert "No build recipe" in proc.stdout + proc.stderr
+
+    def test_whisper_failure_stops_the_full_recipe(self, tmp_path):
+        proc, calls = _run_preflight(tmp_path, present_images=_BASE_IMAGE, build_rc="1",
+                                     docker_image=_FULL_IMAGE)
+        assert "rc=1" in proc.stdout
+        assert len([c for c in calls if c.startswith("build")]) == 1
+
+
+class TestStandaloneBuilderMatchesRunSh:
+    """script/build_agent_image.sh serves hosts that run eval/run_batch.py
+    directly (which never builds). It repeats run.sh's recipes, so pin that the
+    two agree tag by tag."""
+
+    @pytest.fixture(scope="class")
+    def builder(self):
+        return (_REPO_ROOT / "script" / "build_agent_image.sh").read_text(encoding="utf-8")
+
+    def test_same_tags(self, builder, run_sh=None):
+        run_sh = _RUN_SH.read_text(encoding="utf-8")
+        for tag in ("v1.3", "v1.4", "v1.5", "v1.6"):
+            assert "wildclawbench-ubuntu:%s" % tag in run_sh
+            assert '"${REPO}:%s"' % tag in builder
+
+    def test_same_recipes(self, builder):
+        assert 'build "$WHISPER" docker/agent-whisper.Dockerfile' in builder
+        assert 'build "$OFFICE" docker/agent-office.Dockerfile "$BASE"' in builder
+        assert 'build "$FULL" docker/agent-office.Dockerfile "$WHISPER"' in builder
+        run_sh = _RUN_SH.read_text(encoding="utf-8")
+        assert '--build-arg "BASE=${BASE_IMAGE}"' in run_sh
+        assert '--build-arg "BASE=${AGENT_IMAGE_WHISPER}"' in run_sh
+
+    def test_unknown_tag_is_refused(self, builder):
+        assert "no build recipe for" in builder
+
+    def test_missing_image_error_names_the_builder(self):
+        src = (_REPO_ROOT / "src" / "utils" / "docker_utils.py").read_text(encoding="utf-8")
+        assert "bash script/build_agent_image.sh {image}" in src
 
 
 class TestPreflightAndRunnerAgreeOnOneTag:
@@ -413,9 +513,13 @@ class TestPreflightAndRunnerAgreeOnOneTag:
             _fresh()
 
     def test_docker_utils_default_matches_run_sh(self):
-        from src.utils import docker_utils
-
-        assert docker_utils.DOCKER_IMAGE == _DEFAULT_IMAGE
+        # The CODE default, read from source: the live module value is whatever
+        # the operator's .env / shell DOCKER_IMAGE says (load_dotenv runs at
+        # import), which is an opt-in override and not what this pins.
+        src = (_REPO_ROOT / "src" / "utils" / "docker_utils.py").read_text(encoding="utf-8")
+        match = re.search(r'DOCKER_IMAGE\s*=\s*os\.environ\.get\("DOCKER_IMAGE",\s*"([^"]+)"\)', src)
+        assert match is not None
+        assert match.group(1) == _DEFAULT_IMAGE
 
     def test_config_default_matches_run_sh(self):
         from src.utils.config import Config

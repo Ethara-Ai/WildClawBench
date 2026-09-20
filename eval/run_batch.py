@@ -4590,7 +4590,18 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
                 # aborting a batch over a capability it may never use. Forcing
                 # the cap to 0 also keeps the grader consistent with what this
                 # preflight just proved the route can do.
+                # Scoped to THIS batch: eval/wcb.py runs the next task/rep in the
+                # same process, and a forced 0 left behind would make its preflight
+                # skip the image probe and grade blind without ever re-testing.
+                _prev_max_images = os.environ.get("KENSEI_JUDGE_MAX_IMAGES")
                 os.environ["KENSEI_JUDGE_MAX_IMAGES"] = "0"
+
+                def _restore_max_images(_prev=_prev_max_images):
+                    if _prev is None:
+                        os.environ.pop("KENSEI_JUDGE_MAX_IMAGES", None)
+                    else:
+                        os.environ["KENSEI_JUDGE_MAX_IMAGES"] = _prev
+                cleanups.append(_restore_max_images)
                 logger.warning(
                     "GPT-judge codex IMAGE preflight FAILED (%s) — attaching judge "
                     "images is DISABLED for this batch (KENSEI_JUDGE_MAX_IMAGES=0). "
@@ -5498,6 +5509,22 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
         logger.info("Judge council enabled via --judge-council")
     elif use_judge_council is False:
         logger.info("Judge council explicitly disabled via --no-judge-council")
+    # Judge-side audio transcription is host state (a pip package + a model dir),
+    # and it degrades silently to a duration marker. Say which one this batch gets.
+    try:
+        from src.utils import judge_asr as _judge_asr
+        _asr_ok, _asr_detail = _judge_asr.status()
+        if _asr_ok:
+            logger.info("Judge ASR: ready (%s)", _asr_detail)
+        elif _asr_detail.startswith("disabled"):
+            logger.info("Judge ASR: %s", _asr_detail)
+        else:
+            logger.warning(
+                "Judge ASR: UNAVAILABLE — %s. Audio deliverables reach the judge "
+                "as a presence/duration marker only, so spoken-content criteria "
+                "will abstain.", _asr_detail)
+    except Exception as _asr_exc:  # noqa: BLE001 - a status line must never stop a batch
+        logger.debug("Judge ASR status check failed: %s", _asr_exc)
     if gen_tests:
         logger.info("Test generation enabled (Bedrock %s, max_attempts=%d)",
                     config.bedrock_region, testgen_max_attempts)

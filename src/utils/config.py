@@ -116,7 +116,7 @@ class Config:
     # Default is the distributed v1.3 image (HarnessV2). v1.4 = v1.3 +
     # openai-whisper, opt-in via DOCKER_IMAGE; built by preflight_agent_image()
     # in script/run.sh. Keep in lockstep with AGENT_IMAGE_DEFAULT there.
-    docker_image: str = "wildclawbench-ubuntu:v1.3"
+    docker_image: str = "wildclawbench-ubuntu:v1.6"
 
     # ---- LiteLLM proxy (shared sidecar container) ----
     litellm_master_key: str = "sk-talos-litellm"
@@ -275,7 +275,7 @@ class Config:
             openrouter_api_key=s("OPENROUTER_API_KEY"),
             openrouter_base_url=s("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1"),
             brave_api_key=s("BRAVE_API_KEY", default="placeholder"),
-            docker_image=s("DOCKER_IMAGE", default="wildclawbench-ubuntu:v1.3"),
+            docker_image=s("DOCKER_IMAGE", default="wildclawbench-ubuntu:v1.6"),
             tmp_workspace=s("TMP_WORKSPACE", default="/tmp_workspace"),
             gateway_port=i("GATEWAY_PORT", 18789),
             upload_media_to_s3=b("UPLOAD_MEDIA_TO_S3", False),
