@@ -60,16 +60,17 @@ app = FastAPI(...); install_tracker(app); install_admin_plane(app, store=<name>_
 
 ## INJECTION AUTHORING (`inject/stageN/mutations.json`)
 - Silent mutations hit the live `_store` via `/admin/*`, NOT the seed files. `<name>_data.py`
-  `_coerce_*` reshapes seed columns at LOAD time (e.g. classroom lifts flat `dueDate_year/month/day`
-  into nested `dueDate:{...}`, renames snake_case -> API casing, drops originals). So the live row
-  key an op must target is often NOT the seed-file column name.
+  `_coerce_*` reshapes seed columns at LOAD time (e.g. contentful parses the flat `fields_json`
+  string into a nested `fields:{...}` object and drops the original, and square folds flat
+  `amount`+`currency` into nested `amount_money:{...}`). So the live row key an op must target is
+  often NOT the seed-file column name.
 - The REST-fuzzy op form (`service`+`path`+`body`) is STRICT about live-column names: fields with no
   matching live column are dropped and the op is flagged a `partial`/`unresolved` injection defect.
 - ROBUST form — target the live key explicitly, bypassing fuzzy resolution:
   `{"service": "<name>-api", "admin": {"op": "patch", "table": "<table>", "pk": "<id>",
   "set": {"<liveKey>": <value>}}}`. The `service` slug MUST be the canonical `<name>-api`; a bare
   `<name>` does NOT resolve and is a fatal authoring error (no auto-normalization). Required for
-  divergent (nested/renamed), document-backed (notion), and composite-pk (datadog) services.
+  divergent (nested/renamed), document-backed (plaid), and composite-pk (datadog) services.
   `src/utils/inject_validator.py` pre-flights slug + shape statically before the run.
 
 ## IMAGE BUILD

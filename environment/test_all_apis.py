@@ -24,7 +24,7 @@ Result classes per endpoint:
 
 Usage:
   python3 test_all_apis.py                      # test every environment
-  python3 test_all_apis.py --only stripe-api,github-api
+  python3 test_all_apis.py --only paypal-api,github-api
   python3 test_all_apis.py --skip salesforce-api
   python3 test_all_apis.py --dry-run            # plan only: parse collections,
                                                 # no servers booted, no requests

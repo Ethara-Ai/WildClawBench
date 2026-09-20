@@ -163,18 +163,18 @@ never treated as row data (`_INJECT_ENVELOPE_KEYS`):
 The full set is `basename(environment/*-api)`. As of this writing:
 
 ```
-airtable-api         algolia-api          amazon-seller-api    asana-api
-bigcommerce-api      box-api              confluence-api       contentful-api
-datadog-api          discord-api          docusign-api         doordash-api
-etsy-api             eventbrite-api       figma-api            github-api
-gmail-api            google-calendar-api  google-classroom-api google-drive-api
-hubspot-api          instacart-api        instagram-api        intercom-api
-jira-api             linear-api           linkedin-api         mailchimp-api
-monday-api           notion-api           openlibrary-api      openweather-api
-pagerduty-api        pinterest-api        salesforce-api       servicenow-api
-shippo-api           slack-api            spotify-api          square-api
-stripe-api           trello-api           twilio-api           typeform-api
-whatsapp-api         woocommerce-api      wordpress-api        xero-api
+activecampaign-api   alpaca-api           bamboohr-api         bigcommerce-api
+cloudflare-api       coinbase-api         confluence-api       contentful-api
+datadog-api          docusign-api         eventbrite-api       freshdesk-api
+github-api           gitlab-api           gmail-api            google-calendar-api
+greenhouse-api       gusto-api            hubspot-api          intercom-api
+jira-api             klaviyo-api          kraken-api           kubernetes-api
+linkedin-api         microsoft-teams-api  mixpanel-api         monday-api
+nasa-api             openlibrary-api      outlook-api          pagerduty-api
+paypal-api           plaid-api            posthog-api          reddit-api
+salesforce-api       segment-api          sentry-api           servicenow-api
+square-api           ticketmaster-api     trello-api           twilio-api
+twitch-api           webflow-api          whatsapp-api         woocommerce-api
 zendesk-api          zoom-api
 ```
 
@@ -248,7 +248,7 @@ else `"no-match"`. Verification samples the **first** matched row only.
 | --- | --- | --- | --- |
 | `op` | `"upsert"` | **yes** | — |
 | `table` | string | **yes** | As §4.2. |
-| `row` | object | **yes** | The complete new row, **in LIVE (post-coercion) shape** — see §7.2. For airtable-style stores nest the business columns under `"fields"`. |
+| `row` | object | **yes** | The complete new row, **in LIVE (post-coercion) shape** — see §7.2. For contentful-style stores nest the business columns under `"fields"`. |
 | `pk_field` | string | no (default `"id"`) | Which key of `row` holds the primary key. Set this when the store's declared pk is not `id` (e.g. `"Id"`, `"item_id"`, `"component_key"`). If `row[pk_field]` is absent, `pk` is `None` and read-back verification is skipped. |
 
 This is the **only** way to create a row. A bare REST `POST` with no `admin`
@@ -262,15 +262,15 @@ block resolves no existing target and is logged `unresolved`
 
 ### 4.5 `op: "doc_set"` / `"doc_merge"` / `"doc.merge"`
 
-For services whose state is a **document**, not a table (e.g. notion-api's
-`properties` = `{page_id: {prop_name: {type, value}}}`, or `workspace`).
+For services whose state is a **document**, not a table (e.g. plaid-api's
+`identity` = `{owners: {account_id: [...]}}`, or alpaca-api's flat `account`).
 
 | Key | Type | Required | Legal values |
 | --- | --- | --- | --- |
 | `op` | `"doc_set"` \| `"doc_merge"` \| `"doc.merge"` | **yes** | All three behave identically (read-modify-merge of one leaf). |
 | `document` | string | **yes** | A name passed to `_store.register_document(...)`; check `GET /admin/tables` → `documents`. Alias accepted: `doc`. |
-| `path` | array | **yes** | Ordered key path to the leaf, e.g. `["B-11", "Panel Score", "value"]`. **Must be non-empty** (`reason: "empty path"`) and **every intermediate key must already exist** (`reason: "path [...] missing at '<key>'"`) — `doc_set` cannot create intermediate nodes. Point at the **leaf you mean**: targeting `["B-11","Panel Score"]` replaces the whole `{type, value}` wrapper. |
-| `value` | any JSON | **yes** | The new leaf value. Match the leaf's existing type — e.g. keep it a **string** when the property is seeded `rich_text`; only `number`-typed properties get float-coerced by the service. |
+| `path` | array | **yes** | Ordered key path to the leaf, e.g. `["owners", "acc_chk_001"]`. **Must be non-empty** (`reason: "empty path"`) and **every intermediate key must already exist** (`reason: "path [...] missing at '<key>'"`) — `doc_set` cannot create intermediate nodes. Point at the **leaf you mean**: targeting `["owners"]` replaces every account's owner list, not one account's. |
+| `value` | any JSON | **yes** | The new leaf value. Match the leaf's existing type — the merge stores what you hand it verbatim, so a leaf the service later reads as a string must stay a string. Note the converged 50 register mostly **flat** documents (`account`, `company`, `profile`, `user`); `plaid-api`'s `identity` and `item` are the nested ones. |
 
 Mechanics: reads `GET /admin/doc/<doc>`, mutates the leaf in memory, then
 `POST /admin/doc/<doc>/merge` with `{"fields": {path[0]: <whole subtree>}}`, then
@@ -296,8 +296,8 @@ Anything else (`GET`, `PUT`, `DELETE`, or a non-POST unmatched path) →
 **`<table>` is parsed positionally** by `^/admin/data/([^/]+)/?$` and
 `^/admin/data/([^/]+)/([^/]+)/?$`. The service slug is already supplied by
 `op.service` and must **never** appear in the path. Writing
-`/admin/data/notion-api/page_properties` yields `table="notion-api"`,
-`pk="page_properties"` and a hard `400`.
+`/admin/data/monday-api/items` yields `table="monday-api"`,
+`pk="items"` and a hard `400`.
 
 Reachable admin endpoints (`environment/admin_plane.py`):
 
@@ -339,13 +339,13 @@ values from `params.field_updates`.
 Field extraction precedence in `_extract_fields`:
 
 1. `params.field_updates` (keys starting `_` dropped)
-2. `body.fields` (airtable shape)
-3. `body.properties` (notion/confluence shape, flattened to leaf scalars)
+2. `body.fields` (contentful shape)
+3. `body.properties` (confluence shape, flattened to leaf scalars)
 4. the whole `body` minus `_INJECT_ENVELOPE_KEYS` and keys starting `_`
 
 Resolution then scans candidate tables — narrowed by `_SERVICE_RESOLUTION` for
-`airtable-api` (`records_*`), `notion-api` and `confluence-api` (`pages`), and
-**every table** for all other services — matching the key against the pk or
+`confluence-api` (`pages`), and **every table** for all other services —
+matching the key against the pk or
 against key columns with fuzzy normalisation (`_`/`-` → space, lower-case,
 substring both ways).
 
@@ -393,7 +393,7 @@ Seed row: `{"id": "PAY_DOYLE_1003", "amount": "20000", "currency": "USD"}`
 Live row: `{"id": "PAY_DOYLE_1003", "amount_money": {"amount": 20000, "currency": "USD"}}`.
 → the op must set `amount_money`, with an **int** `amount`.
 
-Contrast `figma-api`, whose `_coerce_components` is
+Contrast `monday-api`, whose `_coerce_boards` is
 `[_strip_ctx(r) for r in rows]` — no renaming, so seed key `description`
 is also the live key.
 

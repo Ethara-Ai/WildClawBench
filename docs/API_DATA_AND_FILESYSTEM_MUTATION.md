@@ -92,8 +92,8 @@ Two invariants hold this whole picture together:
 
 ## 1.1 The fleet: `environment/`
 
-`environment/` contains **101 mock API services**, one directory per API named
-`<api>-api/` (e.g. `etsy-api/`, `xero-api/`, `gmail-api/`).
+`environment/` contains **50 mock API services**, one directory per API named
+`<api>-api/` (e.g. `monday-api/`, `paypal-api/`, `gmail-api/`).
 
 Each service directory carries a fixed contract:
 
@@ -169,10 +169,10 @@ single bad per-task overlay from taking down the whole shared container (which
 would also disable the admin/injection plane). Host-side importers and
 validators stay strict; only the live container is lenient.
 
-### Canonical `<name>_data.py` shape (etsy example)
+### Canonical `<name>_data.py` shape (monday example)
 
 ```python
-_store = get_store("etsy-api")
+_store = get_store("monday-api")
 _store.register("reservations",
                 primary_key="reservation_id",
                 initial_loader=lambda: [])       # born-empty table
@@ -235,10 +235,10 @@ the per-container `/admin/drift/log`, and the host-side DriftDirector's
 
 ## 1.5 `server.py` wiring order (matters)
 
-Each service's `server.py` wires the planes in a fixed order (etsy example):
+Each service's `server.py` wires the planes in a fixed order (monday example):
 
 ```python
-import etsy_data
+import monday_data
 try:
     from tracking_middleware import install_tracker
     from admin_plane import install_admin_plane
@@ -247,7 +247,7 @@ except ModuleNotFoundError:            # standalone runs: no-op stubs
 
 app = FastAPI()
 install_tracker(app)                    # FIRST
-install_admin_plane(app, store=etsy_data._store)   # THEN admin
+install_admin_plane(app, store=monday_data._store)   # THEN admin
 ```
 
 The ordering is deliberate: installing the tracker first keeps the `/admin`
