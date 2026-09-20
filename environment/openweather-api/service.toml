@@ -1,5 +1,0 @@
-[service]
-name = "openweather-api"
-port = 8035
-env_var_name = "OPENWEATHER_API_URL"
-healthcheck_path = "/health"

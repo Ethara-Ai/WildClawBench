@@ -1,5 +1,0 @@
-[service]
-name = "spotify-api"
-port = 8039
-env_var_name = "SPOTIFY_API_URL"
-healthcheck_path = "/health"

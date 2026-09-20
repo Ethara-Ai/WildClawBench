@@ -1,5 +1,0 @@
-[service]
-name = "asana-api"
-port = 8031
-env_var_name = "ASANA_API_URL"
-healthcheck_path = "/health"

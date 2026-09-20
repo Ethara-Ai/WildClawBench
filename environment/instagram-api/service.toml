@@ -1,5 +1,0 @@
-[service]
-name = "instagram-api"
-port = 8003
-env_var_name = "INSTAGRAM_API_URL"
-healthcheck_path = "/health"
