@@ -1,119 +1,55 @@
-"""Drive-API download endpoint tests for box-api and google-drive-api.
+"""RETIRED WITH ITS SERVICES: the drive-API content-download endpoint tests.
 
-Both services expose a content-download route on top of the existing metadata
-routes. Each shape differs deliberately (Box GET /content, Drive ?alt=media) to
-mirror the real vendor API surfaces. Common invariants asserted here:
+box-api and google-drive-api were the fleet's only content-download services
+(Box `GET /content`, Drive `?alt=media`) and both left in the newreq
+convergence. Every invariant this module asserted -- UTF-8 byte roundtrip,
+pypdf text extraction, 415 on an unsupported mime, 404 on a missing id, 404
+`fixture_missing` on an absent blob, 413 over `WCB_DOWNLOAD_MAX_BYTES` -- was a
+property of `_mutable_store.extract_file_content_text`, which no converged
+service calls any more. The class has no subject, so it is retired rather than
+re-pointed.
 
-  * text/markdown roundtrip preserves bytes (decode UTF-8, equality match).
-  * application/pdf returns extracted-text content (substring match against
-    the fixture's known text).
-  * 415 on unsupported mime (zip/docx/xlsx/png/google-apps proprietary).
-  * 404 on missing file_id / path / fixture-file.
-  * Optional 413 on text exceeding `WCB_DOWNLOAD_MAX_BYTES`.
-
-The autouse fixture restricts parametrization to the drive APIs so the
-otherwise-fleet-wide `api_dir` session fixture from conftest.py doesn't drag
-in every unrelated service.
+What is NOT acceptable is the way it retired itself: the module is parametrized
+by conftest's fleet-wide `api_dir` and skipped every service not in a two-name
+tuple, so losing both names turned 300 assertions into 300 silent skips that
+still read as a green suite. The tripwire below is the successor. It fails the
+moment the helper acquires a caller or a service ships a `file_blobs/`
+directory, which is exactly when these tests need to come back -- and it names
+this file so whoever trips it knows where to look.
 """
 from __future__ import annotations
 
-import os
+import re
 from pathlib import Path
 
-import pytest
+ENV_DIR = Path(__file__).resolve().parents[2] / "environment"
 
-# Skip the whole module if pypdf is not importable — it's required by
-# the production callsite for the PDF gate, and we rely on it to
-# build/inspect the fixture PDF too.
-pytest.importorskip("pypdf")
+#: The blob-download helper the departed services called. Left in
+#: `_mutable_store` on purpose when the fleet swapped (it is shared
+#: infrastructure, not per-service code), so it is callable but uncalled.
+BLOB_HELPER = "extract_file_content_text"
 
-DRIVE_APIS = ("box-api", "google-drive-api")
-
-
-@pytest.fixture(autouse=True)
-def _skip_non_drive(api_dir: Path):
-    if api_dir.name not in DRIVE_APIS:
-        pytest.skip(f"{api_dir.name} has no download endpoint")
+_HELPER_CALL = re.compile(rf"\b{BLOB_HELPER}\s*\(")
 
 
-def _get(client, api: str, file_id: str = ""):
-    """Cross-API GET shim returning a TestClient Response."""
-    if api == "box-api":
-        return client.get(f"/2.0/files/{file_id}/content")
-    if api == "google-drive-api":
-        return client.get(f"/drive/v3/files/{file_id}", params={"alt": "media"})
-    raise ValueError(api)
+def test_no_converged_service_serves_blob_downloads():
+    callers = sorted(
+        p.parent.name for p in ENV_DIR.glob("*-api/*.py")
+        if _HELPER_CALL.search(p.read_text(encoding="utf-8", errors="replace"))
+    )
+    blob_dirs = sorted(p.parent.name for p in ENV_DIR.glob("*-api/file_blobs"))
+    assert not callers and not blob_dirs, (
+        f"a converged service serves blob downloads again "
+        f"(helper callers={callers}, file_blobs dirs={blob_dirs}). "
+        f"Restore this module's download coverage for it: the retired suite is "
+        f"in git history at tests/mocks/test_drive_download.py, and the "
+        f"invariants to re-point are listed in this module's docstring."
+    )
 
 
-# Per-API fixtures — (md_id, pdf_id, unsupported_id)
-_FIXTURES = {
-    "box-api": dict(md="500007", pdf="500001", unsupported="500002",  # zip
-                    missing_id="999999", missing_fixture="500005",     # api-spec.yaml
-                    missing_fixture_blob="api-spec.yaml"),
-    "google-drive-api": dict(md="file-readme", pdf="file-arch",
-                              unsupported="folder-eng",  # vnd.google-apps.folder
-                              missing_id="nonexistent",
-                              missing_fixture=None),
-}
-
-
-def _call(client, api: str, key: str):
-    fx = _FIXTURES[api][key]
-    return _get(client, api, file_id=fx) if fx is not None else None
-
-
-def test_markdown_roundtrip_returns_text(api_dir, client):
-    r = _call(client, api_dir.name, "md")
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["mime_type"] == "text/markdown", body
-    assert isinstance(body["content"], str)
-    assert len(body["content"]) > 0
-    # The .md fixtures all open with a heading line
-    assert body["content"].lstrip().startswith("#"), body["content"][:80]
-
-
-def test_pdf_extracted_text_substring(api_dir, client):
-    r = _call(client, api_dir.name, "pdf")
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["mime_type"] == "application/pdf"
-    # Hand-crafted PDF fixture text (shared across all 3 apis)
-    assert "Brand Guidelines" in body["content"], body["content"][:200]
-
-
-def test_unsupported_mime_returns_415(api_dir, client):
-    r = _call(client, api_dir.name, "unsupported")
-    assert r.status_code == 415, r.text
-
-
-def test_missing_id_returns_404(api_dir, client):
-    r = _call(client, api_dir.name, "missing_id")
-    assert r.status_code == 404, r.text
-
-
-def test_missing_fixture_returns_404(api_dir, client):
-    """A row whose blob is absent from file_blobs/ must 404 with
-    `code='fixture_missing'`, not 500. Every seeded row now ships a blob, so
-    the blob is moved aside for the duration of the call."""
-    blob_name = _FIXTURES[api_dir.name].get("missing_fixture_blob")
-    if _FIXTURES[api_dir.name]["missing_fixture"] is None or blob_name is None:
-        pytest.skip("API has no row-without-fixture testcase")
-    blob = api_dir / "file_blobs" / blob_name
-    stashed = blob.with_suffix(blob.suffix + ".stashed")
-    blob.rename(stashed)
-    try:
-        r = _call(client, api_dir.name, "missing_fixture")
-    finally:
-        stashed.rename(blob)
-    assert r.status_code == 404, r.text
-    assert r.json().get("code") == "fixture_missing", r.text
-
-
-def test_size_cap_413(api_dir, client, monkeypatch):
-    """Set WCB_DOWNLOAD_MAX_BYTES below the smallest fixture's text size
-    and assert the same md roundtrip 413s. The cap is read at call time
-    (not module-load) so monkeypatch.setenv() takes effect."""
-    monkeypatch.setenv("WCB_DOWNLOAD_MAX_BYTES", "10")
-    r = _call(client, api_dir.name, "md")
-    assert r.status_code == 413, r.text
+def test_the_blob_helper_is_still_there_to_come_back_to():
+    """The tripwire above is only meaningful while the helper exists. If it is
+    ever deleted, this fails and the retirement note stops describing reality.
+    """
+    source = (ENV_DIR / "_mutable_store.py").read_text(encoding="utf-8")
+    assert f"def {BLOB_HELPER}(" in source
