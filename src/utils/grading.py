@@ -2485,13 +2485,101 @@ def grade_with_rubric(
     return _merge_batched_grades(rubrics, members, chunk_results)
 
 
+# ---------------------------------------------------------------------------
+# Total-judge-failure artifact (alpha 2026-09-19).
+#
+# When the judge is wholly dead the scores dict is NOT a score — it is a
+# no-signal sentinel. `_merge_batched_grades` (above) stamps
+# `error: "all rubric batches failed to grade"` when EVERY rubric chunk failed
+# and degrades each criterion to a synthetic abstain, which lands an honest
+# `rubric_weights_percentage: 0.0` in the payload. Before this gate that payload
+# went out through the normal `score.json` writer and NOTHING downstream read
+# `error`: three real alpha runs (2026-09-19) shipped 0.00% written by a dead
+# judge, byte-indistinguishable from a genuine zero reward. The distinction
+# matters — a genuine zero is signal, a dead judge is the absence of signal, and
+# averaging the latter silently deflates every rollup it touches.
+#
+# Fatality is expressed by the FILE ARTIFACT, not by an exception:
+# `grade_with_rubric`'s "never raises" contract is unchanged. A failed grade
+# writes `score.failed.json` (scores + `grading_status: "failed"`) and NO
+# `score.json`, making *absence of score.json* the single unambiguous UNGRADED
+# signal every reader already has to tolerate. The two files are mutually
+# exclusive: whichever one is written removes the other, so a judge-only regrade
+# over an existing run dir flips the verdict cleanly in both directions
+# (failed → healthy and healthy → failed) with no stale artifact left behind.
+# NO auto-retry here by explicit owner decision — this gate only classifies.
+# ---------------------------------------------------------------------------
+SCORE_FILENAME = "score.json"
+FAILED_SCORE_FILENAME = "score.failed.json"
+
+
+def _grading_failure_reason(scores: dict) -> str | None:
+    """Reason string when `scores` carries no grading signal at all, else None.
+
+    EXACTLY two shapes count as total failure:
+      1. any truthy top-level `error` — the judge/transport/parse path bailed
+         (`_error_score`, `_grading_error`, `_merge_batched_grades` all-failed);
+      2. `criteria_abstained == criteria_total` with `criteria_total > 0` — every
+         criterion degraded to an abstain, so the 0.0 numerator is vacuous even
+         when no top-level error survived the merge.
+
+    `criteria_total == 0` deliberately does NOT fire: that is the separate
+    no-rubrics path (it sets `error` anyway when it is a real failure), and
+    treating an empty rubric as a dead judge would misclassify it.
+    """
+    if not isinstance(scores, dict):
+        return None
+    error = scores.get("error")
+    if error:
+        return f"judge error: {error}"
+    try:
+        total = int(scores.get("criteria_total") or 0)
+        abstained = int(scores.get("criteria_abstained") or 0)
+    except (TypeError, ValueError):
+        return None
+    if total > 0 and abstained == total:
+        return f"all {total} criteria abstained (no judge verdict survived)"
+    return None
+
+
 def _write_score(output_dir: Path, task_id: str, scores: dict) -> None:
-    score_path = output_dir / "score.json"
-    score_path.parent.mkdir(parents=True, exist_ok=True)
-    score_path.write_text(
-        json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    reason = _grading_failure_reason(scores)
+    if reason is None:
+        score_path = output_dir / SCORE_FILENAME
+        score_path.write_text(
+            json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        # Mutual exclusion: a healthy regrade retires the failure sentinel.
+        (output_dir / FAILED_SCORE_FILENAME).unlink(missing_ok=True)
+        logger.info("[%s] Grading results written to → %s", task_id, score_path)
+        return
+
+    failed_path = output_dir / FAILED_SCORE_FILENAME
+    # `default=str` on this branch only: the failure payload absorbs whatever
+    # the dead judge left behind (exception objects, NaN-adjacent floats), and
+    # a serialization TypeError here would lose the very artifact that proves
+    # the run is ungraded. The healthy branch above keeps the strict encoder so
+    # score.json stays byte-identical to what it has always been.
+    failed_path.write_text(
+        json.dumps({**scores, "grading_status": "failed"}, indent=2,
+                   ensure_ascii=False, default=str),
+        encoding="utf-8",
     )
-    logger.info("[%s] Grading results written to → %s", task_id, score_path)
+    # Mutual exclusion: never leave a stale score.json claiming this run graded.
+    (output_dir / SCORE_FILENAME).unlink(missing_ok=True)
+    logger.error(
+        "[%s] GRADING FAILED (%s) — run is UNGRADED, no score.json written; "
+        "sentinel at → %s", task_id, reason, failed_path,
+    )
+
+
+def grading_failure_reason(scores: dict) -> str | None:
+    return _grading_failure_reason(scores)
+
+
+def write_score(output_dir: Path, task_id: str, scores: dict) -> None:
+    _write_score(output_dir, task_id, scores)
 
 
 def _error_score(output_dir: Path, task_id: str, message: str) -> dict:

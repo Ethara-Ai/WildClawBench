@@ -47,6 +47,8 @@ from src.utils.grading import (
     run_grading,
     format_scores,
     print_summary,
+    write_score as write_score_file,
+    FAILED_SCORE_FILENAME,
     print_global_summary,
     write_error_score as write_error_score_file,
 )
@@ -2835,8 +2837,13 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             if isinstance(scores, dict) and scores.get("usage"):
                 result["__judge_usage__"] = dict(scores["usage"])
             _augment_score_with_combined_rewards(scores, result)
-            (output_dir / "score.json").write_text(
-                json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
+            # Routed through grading.write_score (NOT a raw write_text) so the
+            # total-judge-failure gate applies here too: this is the exact call
+            # site that shipped the three 0.00% alpha runs (2026-09-19) after
+            # _merge_batched_grades stamped `error: all rubric batches failed to
+            # grade`. A dead judge now lands in score.failed.json and NO
+            # score.json, which is what makes the run legible as UNGRADED.
+            write_score_file(output_dir, task["task_id"], scores)
             logger.info("[%s] Rubric judged: overall=%.3f (%.2f%%) — %d/%d criteria passed, model=%s",
                         task["task_id"], scores.get("overall_score", 0.0),
                         scores.get("rubric_weights_percentage",
@@ -2870,10 +2877,9 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                 except Exception as aug_exc:
                     logger.warning("[%s] _augment_score_with_combined_rewards failed on stub: %s",
                                    task.get("task_id"), aug_exc, exc_info=True)
-                (output_dir / "score.json").write_text(
-                    json.dumps(stub, indent=2, ensure_ascii=False, default=str),
-                    encoding="utf-8",
-                )
+                # `error` is always set on this stub, so the gate always routes
+                # it to score.failed.json: a crashed judge is never a 0% score.
+                write_score_file(output_dir, task.get("task_id"), stub)
             except Exception as stub_exc:
                 # Broadened from `except OSError`: json.dumps ValueError on NaN/Inf
                 # and TypeError on non-serializable score fields must not silently
@@ -4211,7 +4217,12 @@ def run_single_task(
         # for the same reason. Fires only when nothing else wrote — no clobber.
         try:
             score_path = output_dir / "score.json"
-            if not score_path.exists():
+            # score.failed.json counts as "a grader wrote here": the grading
+            # gate removes score.json on purpose when the judge died wholly, so
+            # a bare `not score_path.exists()` test would resurrect exactly the
+            # normal-looking stub this whole mechanism exists to prevent, and
+            # the run would read as scored again (alpha 2026-09-19).
+            if not score_path.exists() and not (output_dir / FAILED_SCORE_FILENAME).exists():
                 last_resort = {
                     "overall_score": None,
                     "rubric_weights_percentage": None,
