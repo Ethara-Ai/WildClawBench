@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from ._helpers import ENV_DIR, load_app
+from ._helpers import ENV_DIR, data_module, load_app
 
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
@@ -264,63 +264,109 @@ def test_gcal_create_event_rejects_unknown_time_block_field(gcal, gcal_events_pa
 
 
 # ---------------------------------------------------------------------------
-# asana-api -- POST /tasks stored data.projects but never served it back, so a
-# caller re-reading the task saw it orphaned from its project
+# microsoft-teams-api -- the membership class asana's departed block held.
+#
+# asana's defect was a task's `projects` membership stored on create and never
+# served back, so a re-read saw the row orphaned from its parent. The converged
+# fleet's spelling of that class is `teams.member_ids`: a list-valued column
+# nobody serves directly, read only by the `_ME in member_ids` filter behind
+# GET /v1.0/me/joinedTeams. §4 of the convergence dossier calls it a clone of
+# the trello bug and predicts the shared `opt_csv_list` hoist auto-fixes it;
+# these are that prediction's pinning proof, which the hoist shipped without.
+#
+# Both seed spellings are exercised because that is where the trello bug lived:
+# a per-service `.split(";")` handles the ';'-joined string and turns a
+# JSON-array seed into garbage, and `_ME in <string>` then degrades to a
+# SUBSTRING match, so the positive half alone would pass over the defect. The
+# negative half is what makes the pair load-bearing.
+#
+# Each case writes the membership through the store -- which is what
+# POST /admin/data/{table} calls -- and restores the seed afterwards, so the
+# fleet-wide smoke suite sharing this process-global store cannot see drift.
 # ---------------------------------------------------------------------------
 
+TEAM_ENG = "19:team-eng0001@thread.tacv2"
+
+
 @pytest.fixture(scope="module")
-def asana():
-    with _client("asana-api") as c:
+def teams():
+    with _client("microsoft-teams-api") as c:
         yield c
 
 
-@pytest.fixture(scope="module")
-def asana_project(asana):
-    return asana.get("/api/1.0/projects").json()["data"][0]["gid"]
+@pytest.fixture()
+def teams_membership(teams):
+    table = data_module(teams.app, "microsoft_teams_data")._store.table("teams")
+    seeded = dict(table.get(TEAM_ENG))
+
+    def write(member_ids):
+        table.upsert({**seeded, "member_ids": member_ids})
+
+    yield write
+    table.upsert(seeded)
 
 
-def test_asana_create_task_projects_reads_back(asana, asana_project):
-    r = asana.post("/api/1.0/tasks",
-                   json={"data": {"name": "Projects regression", "projects": [asana_project]}})
-    assert r.status_code == 201, r.text
-    task = asana.get(f"/api/1.0/tasks/{r.json()['data']['gid']}").json()["data"]
-    assert [p["gid"] for p in task["projects"]] == [asana_project]
+def _joined(teams):
+    r = teams.get("/v1.0/me/joinedTeams")
+    assert r.status_code == 200, r.text
+    return [t["id"] for t in r.json()["value"]]
 
 
-def test_asana_created_task_is_listed_under_its_project(asana, asana_project):
-    r = asana.post("/api/1.0/tasks",
-                   json={"data": {"name": "Membership regression",
-                                  "projects": [asana_project]}})
-    assert r.status_code == 201, r.text
-    gid = r.json()["data"]["gid"]
-    listed = asana.get(f"/api/1.0/projects/{asana_project}/tasks").json()["data"]
-    assert gid in [t["gid"] for t in listed]
+def _seed_row(member_ids):
+    return {"id": TEAM_ENG, "display_name": "Engineering", "description": "d",
+            "visibility": "private", "is_archived": "false",
+            "web_url": "https://example.invalid/t", "member_ids": member_ids}
 
 
-def test_asana_create_task_singular_project_reads_back(asana, asana_project):
-    r = asana.post("/api/1.0/tasks",
-                   json={"data": {"name": "Singular project", "project": asana_project}})
-    assert r.status_code == 201, r.text
-    task = asana.get(f"/api/1.0/tasks/{r.json()['data']['gid']}").json()["data"]
-    assert [p["gid"] for p in task["projects"]] == [asana_project]
+@pytest.mark.parametrize("member_ids", [
+    ["user-001", "user-009"],
+    "user-001;user-009",
+])
+def test_teams_coercer_normalises_either_seed_spelling_to_a_list(teams, member_ids):
+    """Runs the LOADER, not an upsert: `opt_csv_list` lives in the coercer, so a
+    post-load store write goes in verbatim and never reaches it. A per-service
+    `.split(";")` bypass would stringify the JSON-array spelling into a single
+    junk element here, which is the trello bug in its original form."""
+    coerce = data_module(teams.app, "microsoft_teams_data")._coerce_teams
+    assert coerce([_seed_row(member_ids)])[0]["member_ids"] == [
+        "user-001", "user-009"]
 
 
-def test_asana_task_without_project_serves_empty_projects(asana):
-    r = asana.post("/api/1.0/tasks", json={"data": {"name": "No project"}})
-    assert r.status_code == 201, r.text
-    task = asana.get(f"/api/1.0/tasks/{r.json()['data']['gid']}").json()["data"]
-    assert task["projects"] == []
+@pytest.mark.parametrize("member_ids", [
+    ["user-001", "user-009"],
+    "user-001;user-009",
+])
+def test_teams_membership_survives_either_seed_spelling(teams, teams_membership,
+                                                        member_ids):
+    teams_membership(member_ids)
+    assert TEAM_ENG in _joined(teams)
 
 
-def test_asana_seed_task_serves_projects(asana):
-    task = asana.get("/api/1.0/tasks/1205000000004001").json()["data"]
-    assert [p["gid"] for p in task["projects"]] == ["1203000000002001"]
-    assert task["memberships"][0]["project"]["gid"] == "1203000000002001"
+@pytest.mark.parametrize("member_ids", [
+    ["user-002", "user-003"],
+    "user-002;user-003",
+])
+def test_teams_membership_filter_actually_reads_the_list(teams, teams_membership,
+                                                         member_ids):
+    """The negative control: drop the caller from the membership in either
+    spelling and the team must leave the joined list. Without this, a filter
+    that had degraded to a substring match over the raw column would keep the
+    positive half green."""
+    teams_membership(member_ids)
+    assert TEAM_ENG not in _joined(teams)
 
 
-def test_asana_create_task_rejects_unknown_field(asana, asana_project):
-    r = asana.post("/api/1.0/tasks",
-                   json={"data": {"name": "Typo task", "notez": "misspelled"}})
+def test_teams_seeded_membership_is_served_as_a_list_not_a_string(teams):
+    table = data_module(teams.app, "microsoft_teams_data")._store.table("teams")
+    assert table.get(TEAM_ENG)["member_ids"] == [
+        "user-001", "user-002", "user-003", "user-004"]
+
+
+def test_teams_post_channel_message_rejects_unknown_field(teams):
+    channel = teams.get(f"/v1.0/teams/{TEAM_ENG}/channels").json()["value"][0]["id"]
+    r = teams.post(f"/v1.0/teams/{TEAM_ENG}/channels/{channel}/messages",
+                   json={"body": {"contentType": "html", "content": "Typo probe"},
+                         "importnace": "high"})
     assert r.status_code == 422, r.text
 
 

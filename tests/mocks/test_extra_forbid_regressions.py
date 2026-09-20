@@ -8,10 +8,11 @@ loud behaviour in pairs: the same request, once with a typo'd key and once
 without, so a regression that re-opens a schema shows up as a 2xx on the first
 half rather than as a silent change in coverage.
 
-Two of the pairs (jira, zendesk) send the typo *nested* inside the body rather
-than at the top level. The route-contract guard only ever names a top-level body
-model, so nested shapes are the half of this class no route entry could describe
-and a forbid on the parent does not protect.
+Several pairs (jira, zendesk, klaviyo, outlook, paypal, plaid, kubernetes) send
+the typo *nested* inside the body rather than at the top level. The
+route-contract guard only ever names a top-level body model, so nested shapes
+are the half of this class no route entry could describe and a forbid on the
+parent does not protect.
 
 The second half of this module covers the 25 services that arrived in the newreq
 convergence. They came from a tree predating F6, so their bodies were either lax
@@ -40,26 +41,8 @@ def _client(api_name: str) -> TestClient:
 
 
 @pytest.fixture(scope="module")
-def slack():
-    with _client("slack-api") as c:
-        yield c
-
-
-@pytest.fixture(scope="module")
-def stripe():
-    with _client("stripe-api") as c:
-        yield c
-
-
-@pytest.fixture(scope="module")
 def jira():
     with _client("jira-api") as c:
-        yield c
-
-
-@pytest.fixture(scope="module")
-def mailchimp():
-    with _client("mailchimp-api") as c:
         yield c
 
 
@@ -75,12 +58,6 @@ def zendesk():
         yield c
 
 
-@pytest.fixture(scope="module")
-def spotify():
-    with _client("spotify-api") as c:
-        yield c
-
-
 def _unknown_key_reported(response, key: str) -> bool:
     detail = response.json().get("detail")
     if not isinstance(detail, list):
@@ -89,27 +66,6 @@ def _unknown_key_reported(response, key: str) -> bool:
 
 
 # --- POST -------------------------------------------------------------------
-
-def test_slack_post_message_rejects_typoed_key(slack):
-    good = {"channel": "C01GENERAL", "text": "forbid probe"}
-    assert slack.post("/api/chat.postMessage", json=good).status_code == 200
-
-    typo = dict(good, txet="the real text the agent meant")
-    r = slack.post("/api/chat.postMessage", json=typo)
-    assert r.status_code == 422, r.text
-    assert _unknown_key_reported(r, "txet"), r.text
-
-
-def test_stripe_create_customer_rejects_typoed_key(stripe):
-    good = {"name": "Forbid Probe", "email": "probe@example.com"}
-    assert stripe.post("/v1/customers", json=good).status_code == 201
-
-    typo = dict(good)
-    typo["emial"] = typo.pop("email")
-    r = stripe.post("/v1/customers", json=typo)
-    assert r.status_code == 422, r.text
-    assert _unknown_key_reported(r, "emial"), r.text
-
 
 def test_jira_create_issue_rejects_typo_nested_in_fields(jira):
     fields = {"summary": "forbid probe", "project": {"key": "ENG"},
@@ -120,20 +76,6 @@ def test_jira_create_issue_rejects_typo_nested_in_fields(jira):
                   json={"fields": dict(fields, sumary="the summary it meant")})
     assert r.status_code == 422, r.text
     assert _unknown_key_reported(r, "sumary"), r.text
-
-
-# --- PATCH ------------------------------------------------------------------
-
-def test_mailchimp_patch_member_rejects_typoed_key(mailchimp):
-    list_id = mailchimp.get("/3.0/lists").json()["lists"][0]["id"]
-    members = mailchimp.get(f"/3.0/lists/{list_id}/members").json()["members"]
-    route = f"/3.0/lists/{list_id}/members/{members[0]['id']}"
-
-    assert mailchimp.patch(route, json={"status": "unsubscribed"}).status_code == 200
-
-    r = mailchimp.patch(route, json={"status": "unsubscribed", "statuss": "pending"})
-    assert r.status_code == 422, r.text
-    assert _unknown_key_reported(r, "statuss"), r.text
 
 
 # --- PUT --------------------------------------------------------------------
@@ -158,15 +100,6 @@ def test_zendesk_update_ticket_rejects_typo_nested_in_ticket(zendesk):
     r = zendesk.put(route, json={"ticket": {"status": "open", "prioirty": "urgent"}})
     assert r.status_code == 422, r.text
     assert _unknown_key_reported(r, "prioirty"), r.text
-
-
-def test_spotify_start_playback_rejects_typoed_key(spotify):
-    assert spotify.put("/v1/me/player/play",
-                       json={"context_uri": "spotify:album:probe"}).status_code == 200
-
-    r = spotify.put("/v1/me/player/play", json={"context_url": "spotify:album:probe"})
-    assert r.status_code == 422, r.text
-    assert _unknown_key_reported(r, "context_url"), r.text
 
 
 # ===========================================================================
@@ -224,6 +157,12 @@ def kraken():
 @pytest.fixture(scope="module")
 def segment():
     with _client("segment-api") as c:
+        yield c
+
+
+@pytest.fixture(scope="module")
+def kubernetes():
+    with _client("kubernetes-api") as c:
         yield c
 
 
@@ -307,6 +246,18 @@ def test_plaid_transactions_get_rejects_typo_nested_in_options(plaid):
     r = plaid.post("/transactions/get", json=body({"count": 5, "ofset": 10}))
     assert r.status_code == 422, r.text
     assert _unknown_key_reported(r, "ofset"), r.text
+
+
+def test_kubernetes_scale_patch_rejects_typo_nested_in_spec(kubernetes):
+    """Carries the PATCH verb for the whole module: mailchimp's PATCH pair left
+    with the convergence and no other converged write route is a PATCH whose
+    body is a closed model. Nested, so it also re-points the nested half."""
+    route = "/apis/apps/v1/namespaces/prod/deployments/api-gateway/scale"
+    assert kubernetes.patch(route, json={"spec": {"replicas": 4}}).status_code == 200
+
+    r = kubernetes.patch(route, json={"spec": {"replicas": 4, "replcias": 9}})
+    assert r.status_code == 422, r.text
+    assert _unknown_key_reported(r, "replcias"), r.text
 
 
 def test_sentry_update_issue_rejects_typoed_key(sentry):

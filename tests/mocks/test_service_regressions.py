@@ -274,237 +274,30 @@ def test_woo_seeded_orders_still_serialize(woo):
 
 
 # ---------------------------------------------------------------------------
-# figma-api
+# RETIRED WITH THEIR SERVICES (newreq convergence)
+#
+# figma, shippo, box and notion left the fleet in the convergence, and the four
+# 667131a defect classes they pinned left with them:
+#
+#   * figma      -- seed data loaded but never surfaced on the route that owns
+#                   it (/v1/me dropping teams), and a list route missing beside
+#                   the by-id route it feeds. Same class now locked on the
+#                   arriving side by the reddit/webflow "created row is listed
+#                   back" probes and sentry's by-id read below.
+#   * shippo     -- the `{count,next,previous,results}` pagination envelope and
+#                   a by-id read that 404s an unknown id. Locked now by
+#                   test_sentry_issue_update_persists_and_unknown_ids_404.
+#   * box        -- every advertised record must have a fixture blob behind it.
+#                   No arriving service ships binary blob fixtures, so the class
+#                   has no subject on the converged fleet.
+#   * notion     -- self-referential parent_block_id coercion. The coercion
+#                   helper itself is shared (`_mutable_store`) and is covered by
+#                   the seed round-trip suite; the notion-shaped spelling of it
+#                   is gone with the service.
+#
+# The pattern stays documented in this module's header: pin the defect, write
+# through the route layer, read back through a DIFFERENT endpoint.
 # ---------------------------------------------------------------------------
-
-@pytest.fixture(scope="module")
-def figma():
-    with _client("figma-api") as c:
-        yield c
-
-
-def test_figma_get_me_surfaces_teams(figma):
-    me = figma.get("/v1/me").json()
-    assert me["teams"], "team id in team.json was never surfaced on /v1/me"
-    assert set(me["teams"][0]) == {"id", "name"}
-
-
-def test_figma_teams_route_matches_projects_route(figma):
-    teams = figma.get("/v1/teams")
-    assert teams.status_code == 200, teams.text
-    team_id = teams.json()["teams"][0]["id"]
-    assert figma.get(f"/v1/teams/{team_id}/projects").status_code == 200
-
-
-def test_figma_files_route_lists_recent_files(figma):
-    r = figma.get("/v1/files")
-    assert r.status_code == 200, r.text
-    files = r.json()["files"]
-    assert files
-    assert all({"key", "name", "last_modified"} <= set(f) for f in files)
-    assert [f["last_modified"] for f in files] == sorted(
-        (f["last_modified"] for f in files), reverse=True)
-    assert figma.get(f"/v1/files/{files[0]['key']}").status_code == 200
-
-
-# ---------------------------------------------------------------------------
-# shippo-api
-# ---------------------------------------------------------------------------
-
-@pytest.fixture(scope="module")
-def shippo():
-    with _client("shippo-api") as c:
-        yield c
-
-
-def test_shippo_list_shipments(shippo):
-    r = shippo.get("/shipments")
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert set(body) >= {"count", "next", "previous", "results"}
-    assert body["results"]
-    assert shippo.get(f"/shipments/{body['results'][0]['object_id']}").status_code == 200
-
-
-def test_shippo_list_shipments_paginates(shippo):
-    body = shippo.get("/shipments", params={"page": 1, "results": 1}).json()
-    assert len(body["results"]) == 1
-    assert body["next"] == 2 and body["previous"] is None
-
-
-def test_shippo_get_rate_by_id(shippo):
-    shipment_id = shippo.get("/shipments").json()["results"][0]["object_id"]
-    rate_id = shippo.get(f"/shipments/{shipment_id}/rates").json()["results"][0]["object_id"]
-    r = shippo.get(f"/rates/{rate_id}")
-    assert r.status_code == 200, r.text
-    assert r.json()["object_id"] == rate_id
-    assert shippo.get("/rates/rate-nope").status_code == 404
-
-
-def test_shippo_list_transactions(shippo):
-    r = shippo.get("/transactions")
-    assert r.status_code == 200, r.text
-    assert r.json()["results"]
-
-
-def test_shippo_list_addresses(shippo):
-    r = shippo.get("/addresses")
-    assert r.status_code == 200, r.text
-    results = r.json()["results"]
-    assert results
-    assert shippo.get(f"/addresses/{results[0]['object_id']}").status_code == 200
-
-
-def test_shippo_transaction_accepts_real_async_key(shippo):
-    rate_id = shippo.get("/shipments").json()["results"][0]["rates"][0]["object_id"]
-    r = shippo.post("/transactions", json={"rate": rate_id, "async": False})
-    assert r.status_code == 201, r.text
-    txn = r.json()
-    assert shippo.get(f"/transactions/{txn['object_id']}").status_code == 200
-    track = shippo.get(f"/tracks/{txn['carrier']}/{txn['tracking_number']}")
-    assert track.status_code == 200, track.text
-    assert track.json()["tracking_status"]["status"] == "PRE_TRANSIT"
-
-
-def test_shippo_address_rejects_unknown_field(shippo):
-    r = shippo.post("/addresses", json={
-        "name": "Noor Aziz", "street1": "22 Greenway Dr", "city": "Seattle",
-        "state": "WA", "zip": "98101", "country": "US", "steet2": "typo",
-    })
-    assert r.status_code == 422, r.text
-
-
-# ---------------------------------------------------------------------------
-# box-api
-# ---------------------------------------------------------------------------
-
-@pytest.fixture(scope="module")
-def box():
-    with _client("box-api") as c:
-        yield c
-
-
-def test_box_every_advertised_record_has_a_blob(box):
-    missing = _data_module(box.app, "box_data").missing_blobs()
-    assert missing == [], f"files.json advertises records with no fixture: {missing}"
-
-
-def test_box_every_advertised_record_downloads(box):
-    files = _walk_box_files(box)
-    assert len(files) == 7
-    for f in files:
-        r = box.get(f"/2.0/files/{f['id']}/content")
-        assert r.status_code in (200, 415), (f["name"], r.status_code, r.text)
-
-
-def _walk_box_files(box):
-    seen, out, queue = set(), [], ["0"]
-    while queue:
-        folder_id = queue.pop()
-        if folder_id in seen:
-            continue
-        seen.add(folder_id)
-        r = box.get(f"/2.0/folders/{folder_id}/items", params={"limit": 1000})
-        if r.status_code != 200:
-            continue
-        for e in r.json()["entries"]:
-            if e["type"] == "folder":
-                queue.append(e["id"])
-            else:
-                out.append(e)
-    return out
-
-
-def test_box_pdf_and_yaml_fixtures_extract(box):
-    arch = next(e for e in _walk_box_files(box) if e["name"] == "architecture.pdf")
-    r = box.get(f"/2.0/files/{arch['id']}/content")
-    assert r.status_code == 200, r.text
-    assert "Architecture" in r.json()["content"]
-    spec = next(e for e in _walk_box_files(box) if e["name"] == "api-spec.yaml")
-    r = box.get(f"/2.0/files/{spec['id']}/content")
-    assert r.status_code == 200, r.text
-    assert "openapi" in r.json()["content"]
-
-
-# ---------------------------------------------------------------------------
-# notion-api
-# ---------------------------------------------------------------------------
-
-@pytest.fixture(scope="module")
-def notion():
-    with _client("notion-api") as c:
-        yield c
-
-
-def _notion_store(notion):
-    return _data_module(notion.app, "notion_data")._store
-
-
-def _block_row(block_id, page_id, parent_block_id, text):
-    return {
-        "id": block_id,
-        "page_id": page_id,
-        "parent_block_id": parent_block_id,
-        "type": "paragraph",
-        "text": text,
-        "order": "99",
-        "created_time": "2026-06-01T00:00:00.000Z",
-        "last_edited_time": "2026-06-01T00:00:00.000Z",
-        "has_children": "false",
-        "checked": "",
-    }
-
-
-def test_notion_children_for_parent_equals_page_seed(notion):
-    store = _notion_store(notion)
-    page_id = "page-task-001"
-    store.table("blocks").upsert(
-        _block_row("block-realshape", page_id, page_id, "Real-Notion-shaped root block"))
-    try:
-        results = notion.get(f"/v1/blocks/{page_id}/children").json()["results"]
-        assert any(b["id"] == "block-realshape" for b in results), \
-            "root block spelled parent_block_id == page_id was invisible"
-    finally:
-        store.table("blocks").delete("block-realshape")
-
-
-def test_notion_coercer_nulls_self_referential_parent(notion):
-    store = _notion_store(notion)
-    row = store.table("blocks").upsert(
-        _block_row("block-normalised", "page-task-001", "page-task-001", "x"))
-    try:
-        assert row["parent_block_id"] is None
-    finally:
-        store.table("blocks").delete("block-normalised")
-
-
-def test_notion_children_for_page_absent_from_pages_json(notion):
-    store = _notion_store(notion)
-    store.table("blocks").upsert(
-        _block_row("block-orphan", "page-not-in-pages-json", "page-not-in-pages-json", "y"))
-    try:
-        results = notion.get("/v1/blocks/page-not-in-pages-json/children").json()["results"]
-        assert [b["id"] for b in results] == ["block-orphan"]
-    finally:
-        store.table("blocks").delete("block-orphan")
-
-
-def test_notion_nested_children_still_resolve(notion):
-    store = _notion_store(notion)
-    store.table("blocks").upsert(
-        _block_row("block-nested", "page-task-001", "block-001", "nested"))
-    try:
-        results = notion.get("/v1/blocks/block-001/children").json()["results"]
-        assert "block-nested" in [b["id"] for b in results]
-        roots = notion.get("/v1/blocks/page-task-001/children").json()["results"]
-        assert "block-nested" not in [b["id"] for b in roots]
-    finally:
-        store.table("blocks").delete("block-nested")
-
-
-def test_notion_page_update_rejects_unknown_field(notion):
-    r = notion.patch("/v1/pages/page-task-001", json={"titel": "typo"})
-    assert r.status_code == 422, r.text
 
 
 # ---------------------------------------------------------------------------

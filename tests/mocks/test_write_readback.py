@@ -1,10 +1,10 @@
 """Fleet-wide write -> read-back coverage for mock services with mutating routes.
 
-`test_service_regressions.py` pins the seven services whose write/read defects
-commit 667131a actually fixed. This suite is the standing guard for the REST of
-the mutating fleet: every spec writes through the real route layer, then reads
-the resource back through a DIFFERENT route and asserts the mutation survived
-the round trip with the right shape.
+`test_service_regressions.py` pins the services whose write/read defects commit
+667131a and the wave-2 convergence hardening actually fixed. This suite is the
+standing guard for the REST of the mutating fleet: every spec writes through the
+real route layer, then reads the resource back through a DIFFERENT route and
+asserts the mutation survived the round trip with the right shape.
 
 Read-back is the whole point. A handler that builds a response dict from its own
 request body looks correct to any test that only inspects the write response --
@@ -14,7 +14,7 @@ it is the second, independent GET that proves the row reached the store in
 Specs live in `_writeback_specs.py` and the engine that runs them in
 `_writeback.py`; add a WriteSpec there rather than another hand-rolled
 request/assert pair here. Services whose read-back is list-shaped
-(Slack's `conversations.history`) don't fit the id-addressed engine and get
+(Segment's `GET /v1/events`) don't fit the id-addressed engine and get
 explicit tests at the bottom.
 """
 from __future__ import annotations
@@ -70,100 +70,70 @@ def test_delete_is_not_served_again(clients, spec: WriteSpec):
 
 
 # ---------------------------------------------------------------------------
-# slack-api -- read-back is the channel history list, not an addressable row
+# segment-api -- read-back is the ingest event list, not an addressable row.
+#
+# Re-points slack's departed section. Segment is the converged fleet's only
+# many-writers/one-list-reader service: four mutating routes all land in the
+# same `GET /v1/events`, which is the shape the id-addressed engine above
+# cannot express. W2 already pinned `/v1/track` in
+# test_service_regressions.py; the other three are here.
+#
+# Every probe filters the read by its OWN userId rather than reading the top of
+# the list: `get_store` is a process-wide registry, so the fleet smoke suite and
+# the forbid probes ingest into this same table.
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
-def slack():
-    with TestClient(load_app(ENV_DIR / "slack-api")) as c:
+def segment():
+    with TestClient(load_app(ENV_DIR / "segment-api")) as c:
         yield c
 
 
-def _history(client, channel: str, limit: int = 5) -> list:
-    r = client.get(f"/api/conversations.history?channel={channel}&limit={limit}")
+def _events(client, user_id: str) -> list:
+    r = client.get(f"/v1/events?userId={user_id}")
     assert r.status_code == 200, r.text
-    return r.json()["messages"]
+    return r.json()["events"]
 
 
-def test_slack_post_message_lands_in_history(slack):
-    r = slack.post("/api/chat.postMessage", json={"channel": "C01ENG", "text": "WRB posted"})
-    assert r.status_code == 200 and r.json()["ok"], r.text
-    ts = r.json()["ts"]
-    top = _history(slack, "C01ENG")[0]
-    assert top["ts"] == ts and top["text"] == "WRB posted", top
+def test_segment_identify_traits_land_in_the_event_list(segment):
+    r = segment.post("/v1/identify", json={"userId": "u-wrb-identify",
+                                           "traits": {"email": "wrb@orbit-labs.com",
+                                                      "plan": "pro"}})
+    assert r.status_code == 200 and r.json()["success"], r.text
+    hit = _events(segment, "u-wrb-identify")
+    assert [e["type"] for e in hit] == ["identify"], hit
+    assert hit[0]["properties"] == {"email": "wrb@orbit-labs.com", "plan": "pro"}
 
 
-def test_slack_update_message_persists(slack):
-    ts = slack.post("/api/chat.postMessage",
-                    json={"channel": "C01ENG", "text": "WRB before"}).json()["ts"]
-    r = slack.post("/api/chat.update", json={"channel": "C01ENG", "ts": ts, "text": "WRB after"})
-    assert r.status_code == 200 and r.json()["ok"], r.text
-    hit = next(m for m in _history(slack, "C01ENG") if m["ts"] == ts)
-    assert hit["text"] == "WRB after", hit
+def test_segment_page_properties_land_in_the_event_list(segment):
+    r = segment.post("/v1/page", json={"userId": "u-wrb-page", "name": "Pricing",
+                                       "properties": {"path": "/pricing"}})
+    assert r.status_code == 200 and r.json()["success"], r.text
+    hit = _events(segment, "u-wrb-page")
+    assert [e["type"] for e in hit] == ["page"], hit
+    assert hit[0]["properties"] == {"path": "/pricing", "name": "Pricing"}
 
 
-def test_slack_reaction_persists_on_the_message(slack):
-    ts = slack.post("/api/chat.postMessage",
-                    json={"channel": "C01ENG", "text": "WRB reactable"}).json()["ts"]
-    r = slack.post("/api/reactions.add",
-                   json={"channel": "C01ENG", "timestamp": ts, "name": "tada"})
-    assert r.status_code == 200 and r.json()["ok"], r.text
-    hit = next(m for m in _history(slack, "C01ENG") if m["ts"] == ts)
-    assert [x["name"] for x in hit["reactions"]] == ["tada"], hit
-
-
-def test_slack_delete_removes_message_from_history(slack):
-    ts = slack.post("/api/chat.postMessage",
-                    json={"channel": "C01ENG", "text": "WRB doomed"}).json()["ts"]
-    r = slack.post("/api/chat.delete", json={"channel": "C01ENG", "ts": ts})
-    assert r.status_code == 200 and r.json()["ok"], r.text
-    assert all(m["ts"] != ts for m in _history(slack, "C01ENG", limit=20))
-
-
-def test_slack_conversations_create_persists(slack):
-    r = slack.post("/api/conversations.create", json={"name": "wrb-new-channel"})
-    assert r.status_code == 200 and r.json()["ok"], r.text
-    listed = [c["name"] for c in slack.get("/api/conversations.list").json()["channels"]]
-    assert "wrb-new-channel" in listed
-    channel_id = r.json()["channel"]["id"]
-    members = slack.get(f"/api/conversations.members?channel={channel_id}").json()["members"]
-    assert members == ["U01AMELIA"], members
-
-
-def test_slack_conversations_invite_persists(slack):
-    r = slack.post("/api/conversations.invite",
-                   json={"channel": "C01DEPLOY", "users": "U01NOOR"})
-    assert r.status_code == 200 and r.json()["ok"], r.text
-    members = slack.get("/api/conversations.members?channel=C01DEPLOY").json()["members"]
-    assert "U01NOOR" in members
+def test_segment_batch_ingests_every_member_not_just_the_first(segment):
+    r = segment.post("/v1/batch", json={"batch": [
+        {"type": "track", "userId": "u-wrb-batch", "event": "WRB Batch A"},
+        {"type": "track", "userId": "u-wrb-batch", "event": "WRB Batch B"},
+    ]})
+    assert r.status_code == 200 and r.json()["ingested"] == 2, r.text
+    assert [e["event"] for e in _events(segment, "u-wrb-batch")] == [
+        "WRB Batch A", "WRB Batch B"]
 
 
 # ---------------------------------------------------------------------------
-# JOIN tables keyed by a synthetic composite '_pk'. Their write paths used to
-# upsert dict literals carrying only the natural key columns, which the store
-# rejects -- the same defect 667131a fixed for shippo `tracking`.
+# RETIRED WITH THEIR SERVICES: the doordash/spotify `_pk` join-table probes.
+#
+# Their class -- a write path upserting a dict literal that carries only the
+# natural key columns, which the store rejects because the table is registered
+# under a synthetic composite key -- arrived again with paypal payouts
+# (`batch_header.payout_batch_id`, §4 of the convergence dossier, confirmed
+# live as a 500 StoreError before W2). It is pinned on the converged fleet in
+# two places, so nothing is re-derived here: the `paypal-api-payout` WriteSpec
+# above drives the create/read-back hop through the engine, and
+# test_service_regressions.test_paypal_payout_create_persists_under_its_batch_id
+# asserts the row is keyed under the batch id in the store itself.
 # ---------------------------------------------------------------------------
-
-def test_doordash_checkout_persists_order():
-    with TestClient(load_app(ENV_DIR / "doordash-api")) as c:
-        store_id = c.get("/v1/stores").json()["stores"][0]["store_id"]
-        item_id = c.get(f"/v1/stores/{store_id}/menu").json()["items"][0]["item_id"]
-        cart_id = c.post("/v1/carts", json={"store_id": store_id}).json()["cart_id"]
-        c.post(f"/v1/carts/{cart_id}/items", json={"item_id": item_id, "quantity": 1})
-        r = c.post(f"/v1/carts/{cart_id}/checkout", json={"customer_name": "WRB"})
-        assert r.status_code in (200, 201), r.text
-        order_id = r.json()["order_id"]
-        fetched = c.get(f"/v1/orders/{order_id}")
-        assert fetched.status_code == 200, fetched.text
-        assert [(i["item_id"], i["quantity"]) for i in fetched.json()["items"]] == [
-            (item_id, 1)], fetched.text
-
-
-def test_spotify_add_tracks_persists():
-    with TestClient(load_app(ENV_DIR / "spotify-api")) as c:
-        playlist_id = c.get("/v1/me/playlists").json()["items"][0]["id"]
-        uri = c.get("/v1/search?q=a&type=track").json()["tracks"]["items"][0]["uri"]
-        r = c.post(f"/v1/playlists/{playlist_id}/tracks", json={"uris": [uri]})
-        assert r.status_code in (200, 201), r.text
-        listed = c.get(f"/v1/playlists/{playlist_id}/tracks").json()
-        assert any(t["track"]["uri"] == uri for t in listed["items"])
