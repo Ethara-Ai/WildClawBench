@@ -7,7 +7,7 @@ All responses use the Cloudflare envelope:
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import cloudflare_data
@@ -64,6 +64,8 @@ def get_dns_record(zone_id: str, record_id: str):
 
 
 class DNSRecordCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     type: str
     name: str
     content: str
@@ -81,6 +83,8 @@ def create_dns_record(zone_id: str, body: DNSRecordCreateBody):
 
 
 class DNSRecordUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     type: Optional[str] = None
     name: Optional[str] = None
     content: Optional[str] = None

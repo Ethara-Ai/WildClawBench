@@ -5,7 +5,7 @@ Mirrors a subset of the Kubernetes API surface (core/v1 + apps/v1).
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 import kubernetes_data
 try:
@@ -80,10 +80,14 @@ def get_deployment(ns: str, name: str):
 
 
 class ScaleSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     replicas: int
 
 
 class ScaleBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     spec: ScaleSpec
 
 

@@ -5,9 +5,10 @@ mailbox and calendar: messages, sendMail, events, and contacts. Collections
 are wrapped as {"value": [...]} like the real Graph API.
 """
 
-from fastapi import FastAPI, Body
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from typing import Optional
+from pydantic import BaseModel, ConfigDict
+from typing import List, Optional
 
 import outlook_data
 try:
@@ -45,21 +46,48 @@ def get_message(message_id: str):
     return result
 
 
+class EmailAddress(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    address: str
+    name: Optional[str] = None
+
+
+class Recipient(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    emailAddress: EmailAddress
+
+
+class ItemBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    contentType: Optional[str] = "HTML"
+    content: str
+
+
+class Message(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str
+    body: ItemBody
+    toRecipients: List[Recipient]
+
+
+class SendMailBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: Message
+
+
 @app.post("/v1.0/me/sendMail", status_code=202)
-def send_mail(body: dict = Body(...)):
-    message = body.get("message") or {}
-    subject = message.get("subject")
-    body_obj = message.get("body") or {}
-    content = body_obj.get("content")
-    content_type = body_obj.get("contentType", "HTML")
-    recipients = [
-        r.get("emailAddress", {}).get("address")
-        for r in message.get("toRecipients", [])
-        if r.get("emailAddress", {}).get("address")
-    ]
+def send_mail(body: SendMailBody):
+    message = body.message
+    recipients = [r.emailAddress.address for r in message.toRecipients
+                  if r.emailAddress.address]
     result = outlook_data.send_mail(
-        subject=subject, content=content,
-        to_recipients=recipients, content_type=content_type,
+        subject=message.subject, content=message.body.content,
+        to_recipients=recipients, content_type=message.body.contentType or "HTML",
     )
     if isinstance(result, dict) and "error" in result:
         return JSONResponse(status_code=400, content=result)

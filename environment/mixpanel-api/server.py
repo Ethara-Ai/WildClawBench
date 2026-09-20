@@ -5,7 +5,7 @@ Implements a subset of the Mixpanel ingestion + query API surface.
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Dict, Any
 
 import mixpanel_data
@@ -32,6 +32,8 @@ def health():
 # --- Ingestion ---
 
 class TrackBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     event: str
     distinct_id: Optional[str] = None
     time: Optional[str] = None

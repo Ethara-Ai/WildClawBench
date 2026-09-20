@@ -5,7 +5,8 @@ Mirrors a subset of the Coinbase v2 API. Base path: /v2
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from typing import Optional
 
 import coinbase_data
 try:
@@ -63,8 +64,10 @@ def get_spot_price(pair: str):
 # --- Buys / Sells ---
 
 class TradeBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     amount: str
-    currency: str = None
+    currency: Optional[str] = None
 
 
 @app.post("/v2/accounts/{account_id}/buys", status_code=201)

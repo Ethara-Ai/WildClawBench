@@ -5,7 +5,7 @@ Mirrors a subset of the Greenhouse Harvest API v1. Base path: /v1
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import greenhouse_data
@@ -45,6 +45,8 @@ def get_candidate(candidate_id: str):
 
 
 class CandidateCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     first_name: str
     last_name: str
     email: Optional[str] = None
@@ -104,6 +106,8 @@ def advance_application(application_id: str):
 
 
 class RejectBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     reason: Optional[str] = None
 
 

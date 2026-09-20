@@ -5,7 +5,7 @@ Implements a subset of Reddit's public/OAuth API with Listing envelopes.
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import reddit_data
@@ -68,6 +68,8 @@ def post_comments(post_id: str):
 # --- Submit ---
 
 class SubmitBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     sr: str           # subreddit display name
     title: str
     kind: str = "self"  # "self" or "link"
@@ -94,6 +96,8 @@ def submit(body: SubmitBody):
 # --- Vote ---
 
 class VoteBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     id: str   # fullname, e.g. t3_p001 or t1_c001
     dir: int  # -1, 0, or 1
 

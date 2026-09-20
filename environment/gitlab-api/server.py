@@ -3,9 +3,9 @@
 Mirrors a subset of the GitLab REST API v4. Base path: /api/v4
 """
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import gitlab_data
@@ -70,6 +70,8 @@ def get_issue(project_id: str, issue_iid: int):
 
 
 class IssueCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str
     description: Optional[str] = ""
     assignee: Optional[str] = None
@@ -88,6 +90,8 @@ def create_issue(project_id: str, body: IssueCreateBody):
 
 
 class IssueUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: Optional[str] = None
     description: Optional[str] = None
     state_event: Optional[str] = None  # "close" or "reopen"
@@ -118,6 +122,8 @@ def list_merge_requests(project_id: str, state: Optional[str] = None):
 
 
 class MergeRequestCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str
     source_branch: str
     target_branch: Optional[str] = "main"

@@ -5,8 +5,9 @@ teams, channels, and channel messages. Collections are wrapped as
 {"value": [...]} like the real Graph API.
 """
 
-from fastapi import FastAPI, Body
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import microsoft_teams_data
@@ -67,15 +68,27 @@ def list_messages(team_id: str, channel_id: str):
     return result
 
 
+class ItemBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    contentType: Optional[str] = "html"
+    content: str
+
+
+class ChatMessageBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    body: ItemBody
+    importance: Optional[str] = "normal"
+
+
 @app.post("/v1.0/teams/{team_id}/channels/{channel_id}/messages", status_code=201)
-def send_message(team_id: str, channel_id: str, body: dict = Body(...)):
-    graph_body = body.get("body") or {}
-    content = graph_body.get("content")
-    content_type = graph_body.get("contentType", "html")
-    importance = body.get("importance", "normal")
+def send_message(team_id: str, channel_id: str, body: ChatMessageBody):
     result = microsoft_teams_data.send_message(
         team_id, channel_id,
-        content=content, content_type=content_type, importance=importance,
+        content=body.body.content,
+        content_type=body.body.contentType or "html",
+        importance=body.importance or "normal",
     )
     if isinstance(result, dict) and "error" in result:
         status = 400 if result.get("error") == "invalid request" else 404

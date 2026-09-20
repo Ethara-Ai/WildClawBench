@@ -4,8 +4,9 @@ Mirrors a subset of the ActiveCampaign API v3. Base path: /api/3
 List responses include a `meta` block with the total count.
 """
 
-from fastapi import FastAPI, Query, Body
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import activecampaign_data
@@ -51,15 +52,31 @@ def get_contact(contact_id: str):
     return result
 
 
+class ContactFields(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: str
+    firstName: Optional[str] = ""
+    lastName: Optional[str] = ""
+    phone: Optional[str] = ""
+    status: Optional[str] = "1"
+
+
+class ContactCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    contact: ContactFields
+
+
 @app.post("/api/3/contacts", status_code=201)
-def create_contact(payload: dict = Body(default={})):
-    data = payload.get("contact") or {}
+def create_contact(payload: ContactCreateBody):
+    data = payload.contact
     result = activecampaign_data.create_contact(
-        email=data.get("email"),
-        first_name=data.get("firstName", ""),
-        last_name=data.get("lastName", ""),
-        phone=data.get("phone", ""),
-        status=data.get("status", "1"),
+        email=data.email,
+        first_name=data.firstName or "",
+        last_name=data.lastName or "",
+        phone=data.phone or "",
+        status=data.status or "1",
     )
     if isinstance(result, dict) and "error" in result:
         code = 422 if result["error"] in ("validation", "duplicate") else 404

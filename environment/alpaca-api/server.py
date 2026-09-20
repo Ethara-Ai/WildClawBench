@@ -4,9 +4,9 @@ Implements a subset of the Alpaca Trading API v2 surface. Base path: /v2
 Buy orders validate buying power; sell orders validate the held position.
 """
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import alpaca_data
@@ -68,6 +68,8 @@ def get_order(order_id: str):
 
 
 class OrderCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     symbol: str
     qty: float
     side: str

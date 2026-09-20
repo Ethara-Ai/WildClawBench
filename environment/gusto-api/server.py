@@ -5,7 +5,7 @@ Mirrors a subset of the Gusto v1 payroll API. Base path: /v1
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import gusto_data
@@ -76,6 +76,8 @@ def get_payroll(payroll_id: str):
 
 
 class PayrollCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     pay_period_start: str
     pay_period_end: str
     check_date: Optional[str] = None

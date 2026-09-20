@@ -5,7 +5,7 @@ Mirrors a subset of the Sentry API. Base path: /api/0
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import sentry_data
@@ -59,6 +59,8 @@ def get_issue(org_slug: str, issue_id: str):
 
 
 class IssueUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: str  # "resolved", "ignored", or "unresolved"
 
 

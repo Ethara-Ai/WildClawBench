@@ -7,6 +7,7 @@ use Kraken's standard envelope: {"error": [], "result": {...}}.
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import kraken_data
@@ -62,6 +63,19 @@ def assets(asset: Optional[str] = Query(default=None)):
 
 # --- Private account data ---
 
+# Kraken signs every private call and the nonce rides in the request body, so a
+# real-shaped client always posts one. Accepted and ignored, like plaid's
+# client_id/secret: the mock does not authenticate, but it must not 422 a caller
+# for sending what the vendor requires. Declaring the envelope at all is what
+# lets an unrecognised key be rejected instead of silently swallowed.
+class _PrivateRequest(BaseModel):
+    nonce: Optional[str] = None
+
+
+class BalanceBody(_PrivateRequest):
+    model_config = ConfigDict(extra="forbid")
+
+
 @app.post("/0/private/Balance")
-def balance():
+def balance(body: BalanceBody = BalanceBody()):
     return kraken_data.get_balance()

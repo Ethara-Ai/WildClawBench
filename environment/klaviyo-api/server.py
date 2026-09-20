@@ -5,8 +5,9 @@ campaigns. Responses use the JSON:API envelope, e.g.
 {"data": [{"type": "profile", "id": ..., "attributes": {...}}]}.
 """
 
-from fastapi import FastAPI, Body, Query
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import klaviyo_data
@@ -45,27 +46,58 @@ def get_profile(profile_id: str):
     return result
 
 
+class ProfileLocation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    city: Optional[str] = ""
+    region: Optional[str] = ""
+    country: Optional[str] = ""
+
+
+class ProfileAttributes(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: str
+    first_name: Optional[str] = ""
+    last_name: Optional[str] = ""
+    phone_number: Optional[str] = ""
+    organization: Optional[str] = ""
+    title: Optional[str] = ""
+    location: Optional[ProfileLocation] = None
+
+
+class ProfileData(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Optional[str] = "profile"
+    attributes: ProfileAttributes
+
+
+class ProfileCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    data: ProfileData
+
+
 @app.post("/api/profiles", status_code=201)
-def create_profile(body: dict = Body(...)):
-    data = body.get("data") or {}
-    attrs = data.get("attributes") or {}
-    email = attrs.get("email")
-    if not email:
+def create_profile(body: ProfileCreateBody):
+    attrs = body.data.attributes
+    if not attrs.email:
         return JSONResponse(
             status_code=400,
             content={"error": "invalid request", "message": "data.attributes.email is required"},
         )
-    location = attrs.get("location") or {}
+    location = attrs.location or ProfileLocation()
     result = klaviyo_data.create_profile(
-        email=email,
-        first_name=attrs.get("first_name", ""),
-        last_name=attrs.get("last_name", ""),
-        phone_number=attrs.get("phone_number", ""),
-        organization=attrs.get("organization", ""),
-        title=attrs.get("title", ""),
-        city=location.get("city", ""),
-        region=location.get("region", ""),
-        country=location.get("country", ""),
+        email=attrs.email,
+        first_name=attrs.first_name or "",
+        last_name=attrs.last_name or "",
+        phone_number=attrs.phone_number or "",
+        organization=attrs.organization or "",
+        title=attrs.title or "",
+        city=location.city or "",
+        region=location.region or "",
+        country=location.country or "",
     )
     if isinstance(result, dict) and "error" in result:
         status = 409 if result.get("error") == "duplicate profile" else 400

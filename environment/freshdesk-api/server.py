@@ -4,9 +4,10 @@ Mirrors a subset of the Freshdesk v2 API: tickets (list/get/create/update),
 contacts, and agents. Routes live under /api/v2/...
 """
 
-from fastapi import FastAPI, Query, Body
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from typing import Optional
+from pydantic import BaseModel, ConfigDict
+from typing import List, Optional
 
 import freshdesk_data
 try:
@@ -50,14 +51,41 @@ def get_ticket(ticket_id: int):
     return result
 
 
+class TicketCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str
+    description: Optional[str] = None
+    status: Optional[int] = None
+    priority: Optional[int] = None
+    requester_id: Optional[int] = None
+    responder_id: Optional[int] = None
+    type: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+
+class TicketUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[int] = None
+    priority: Optional[int] = None
+    requester_id: Optional[int] = None
+    responder_id: Optional[int] = None
+    type: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+
 @app.post("/api/v2/tickets", status_code=201)
-def create_ticket(body: dict = Body(...)):
-    return freshdesk_data.create_ticket(body)
+def create_ticket(body: TicketCreate):
+    return freshdesk_data.create_ticket(body.model_dump(exclude_unset=True))
 
 
 @app.put("/api/v2/tickets/{ticket_id}")
-def update_ticket(ticket_id: int, body: dict = Body(...)):
-    result = freshdesk_data.update_ticket(ticket_id, body)
+def update_ticket(ticket_id: int, body: TicketUpdate):
+    result = freshdesk_data.update_ticket(
+        ticket_id, body.model_dump(exclude_unset=True))
     if isinstance(result, dict) and "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result

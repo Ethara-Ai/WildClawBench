@@ -6,7 +6,7 @@ Invoicing v2, Payouts v1). Amounts are Money objects with string values.
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import paypal_data
@@ -33,21 +33,29 @@ def health():
 # --- Checkout Orders ---
 
 class Amount(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     currency_code: Optional[str] = "USD"
     value: str
 
 
 class Payee(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     email_address: Optional[str] = "merchant@orbit-labs.com"
 
 
 class PurchaseUnit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     amount: Amount
     payee: Optional[Payee] = None
     description: Optional[str] = ""
 
 
 class OrderCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     intent: Optional[str] = "CAPTURE"
     purchase_units: List[PurchaseUnit]
 
@@ -83,6 +91,8 @@ def capture_order(order_id: str):
 # --- Refunds ---
 
 class RefundCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     capture_id: str
     amount: Optional[Amount] = None
     note_to_payer: Optional[str] = None
@@ -117,20 +127,28 @@ def list_invoices(status: Optional[str] = None, page_size: int = Query(20, ge=1,
 
 
 class InvoiceDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     invoice_number: Optional[str] = None
     currency_code: Optional[str] = "USD"
     note: Optional[str] = None
 
 
 class InvoiceRecipientEmail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     email_address: str
 
 
 class InvoiceRecipient(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     billing_info: InvoiceRecipientEmail
 
 
 class InvoiceCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     detail: Optional[InvoiceDetail] = None
     primary_recipients: Optional[List[InvoiceRecipient]] = None
     amount: Optional[Amount] = None
@@ -155,16 +173,22 @@ def create_invoice(body: InvoiceCreateBody):
 # --- Payouts ---
 
 class PayoutSenderHeader(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     sender_batch_id: Optional[str] = None
     email_subject: Optional[str] = None
 
 
 class PayoutItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     amount: Amount
     receiver: Optional[str] = None
 
 
 class PayoutCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     sender_batch_header: Optional[PayoutSenderHeader] = None
     items: List[PayoutItem]
 

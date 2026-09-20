@@ -4,9 +4,9 @@ Mirrors a subset of PostHog: the capture endpoint, project events / persons /
 feature flags read APIs, and the /decide flag-evaluation endpoint.
 """
 
-from fastapi import FastAPI, Query, Body
-from fastapi.responses import JSONResponse
-from typing import Optional
+from fastapi import FastAPI, Query
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Any, Dict, Optional
 
 import posthog_data
 try:
@@ -29,18 +29,44 @@ def health():
     return {"status": "ok"}
 
 
+# The project token every PostHog SDK sends on the ingestion plane. Accepted and
+# ignored, like plaid's client_id/secret: declaring it on a base keeps a
+# real-shaped SDK payload out of the 422 path without pretending the mock
+# authenticates.
+class _TokenedRequest(BaseModel):
+    api_key: Optional[str] = None
+
+
 # --- Capture (write) ---
 
+class CaptureBody(_TokenedRequest):
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: Optional[int] = None
+    distinct_id: str
+    event: Optional[str] = None
+    timestamp: Optional[str] = None
+    properties: Optional[Dict[str, Any]] = Field(default=None)
+
+
 @app.post("/capture")
-def capture(body: dict = Body(...)):
-    return posthog_data.capture(body)
+def capture(body: CaptureBody):
+    return posthog_data.capture(body.model_dump(exclude_unset=True))
 
 
 # --- Decide (flag evaluation) ---
 
+class DecideBody(_TokenedRequest):
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: Optional[int] = None
+    distinct_id: str
+    groups: Optional[Dict[str, Any]] = None
+
+
 @app.post("/decide")
-def decide(body: dict = Body(...)):
-    return posthog_data.decide(body)
+def decide(body: DecideBody):
+    return posthog_data.decide(body.model_dump(exclude_unset=True))
 
 
 # --- Project reads ---

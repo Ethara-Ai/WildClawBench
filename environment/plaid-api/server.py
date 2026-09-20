@@ -7,7 +7,7 @@ ignores). Pagination on /transactions/get uses count + offset under `options`.
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import plaid_data
@@ -41,10 +41,14 @@ class _BaseRequest(BaseModel):
 
 
 class AccountsOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     account_ids: Optional[List[str]] = None
 
 
 class AccountsGetBody(_BaseRequest):
+    model_config = ConfigDict(extra="forbid")
+
     options: Optional[AccountsOptions] = None
 
 
@@ -61,12 +65,16 @@ def accounts_balance_get(body: AccountsGetBody):
 
 
 class TransactionsOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     account_ids: Optional[List[str]] = None
     count: Optional[int] = 100
     offset: Optional[int] = 0
 
 
 class TransactionsGetBody(_BaseRequest):
+    model_config = ConfigDict(extra="forbid")
+
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     options: Optional[TransactionsOptions] = None
@@ -85,6 +93,8 @@ def transactions_get(body: TransactionsGetBody):
 
 
 class InstitutionGetByIdBody(_BaseRequest):
+    model_config = ConfigDict(extra="forbid")
+
     institution_id: str
     country_codes: Optional[List[str]] = None
 
@@ -98,6 +108,8 @@ def institutions_get_by_id(body: InstitutionGetByIdBody):
 
 
 class IdentityGetBody(_BaseRequest):
+    model_config = ConfigDict(extra="forbid")
+
     options: Optional[AccountsOptions] = None
 
 

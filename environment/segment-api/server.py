@@ -5,7 +5,6 @@ plus read-only convenience endpoints for events, sources, and destinations.
 """
 
 from fastapi import FastAPI, Query, Body
-from fastapi.responses import JSONResponse
 from typing import Optional
 
 import segment_data
@@ -30,6 +29,20 @@ def health():
 
 
 # --- Tracking API (writes) ---
+#
+# FIDELITY EXCEPTION -- these four bodies stay bare mappings while the rest of
+# the arriving fleet moved to extra="forbid". The Tracking API is accept-anything
+# by contract, not by our laxity: Segment's own writeKey-authentication example
+# posts a top-level "email" key to /v1/track that appears nowhere in the Track
+# field table on the same page, and the only 400s that page documents are the
+# 32 KB / 500 KB size ceilings and malformed JSON
+# (https://www.twilio.com/docs/segment/connections/sources/catalog/libraries/server/http-api).
+# Forbidding here would reject payloads the vendor answers 200 to. Unknown keys
+# are not lost either way: _ingest() reads the spec fields it knows and the rest
+# were never persisted by real Segment on this plane. These routes are WARN-tier
+# UNTYPED_BODY in script/check_route_contracts.py -- read, not silenced, and
+# deliberately NOT allowlisted.
+
 
 @app.post("/v1/track")
 def track(body: dict = Body(...)):

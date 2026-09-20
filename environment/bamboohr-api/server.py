@@ -6,7 +6,7 @@ The {company} path segment is accepted but not validated against seed data.
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import bamboohr_data
@@ -56,6 +56,8 @@ def get_employee(company: str, employee_id: str):
 
 
 class EmployeeCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     firstName: str
     lastName: str
     workEmail: Optional[str] = None
@@ -83,6 +85,8 @@ def list_time_off_requests(company: str, status: Optional[str] = None,
 
 
 class TimeOffCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     employeeId: str
     type: Optional[str] = "Vacation"
     start: str
@@ -103,6 +107,8 @@ def create_time_off_request(company: str, body: TimeOffCreate):
 
 
 class TimeOffStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: str
 
 
