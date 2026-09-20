@@ -382,6 +382,89 @@ class OpenClawAgent(BaseAgent):
     # would misread healthy long calls as wedges.
     _STALL_FLOOR_S = 600.0
 
+    # Second liveness signal, written per chunk instead of per completed
+    # request: src/utils/litellm_heartbeat_callback.py (sidecar lane) and
+    # src/utils/claude_oauth/stream_tee.py (OAuth bridge lane) bump a file's
+    # mtime at request start and as chunks flow. Rows alone cannot tell a
+    # healthy 20-minute streaming call from a wedge — cite: alpha 2026-09-19,
+    # 3 healthy 1P reps killed at 600s+poll; koji's row landed 3min AFTER the
+    # kill, i.e. the request had never stopped moving.
+    #
+    # The bridge cannot see the attempt's run key (the sidecar replaces the
+    # client bearer with the bridge secret before the request reaches it), so
+    # its lane is ONE file shared by everything on that bridge. With a single
+    # run per bridge — the OAuth norm — that is per-run; under fan-out a
+    # sibling's chunks can hold this run's stall clock open, which degrades a
+    # wedge from "stalled+retried" to "killed at the turn deadline" rather than
+    # to a hang. WCB_STALL_HEARTBEAT_SHARED_LANE=0 drops the lane entirely.
+    # Name kept byte-stable with stream_tee.HEARTBEAT_LANE_BRIDGE.
+    _HEARTBEAT_LANE_BRIDGE = "lane-bridge"
+
+    # Poll cadence of the stall loop. Was 15s, which bought nothing: the
+    # verdict needs stall_s of SILENCE (>= 600s floor), so the only thing the
+    # cadence changes is worst-case detection latency = threshold + one poll,
+    # and at 15s it billed 40 file reads per silent minute per run for that.
+    _STALL_POLL_DEFAULT_S = 90.0
+
+    @staticmethod
+    def _stall_poll_seconds() -> float:
+        try:
+            poll_s = float(os.environ.get("WCB_STALL_POLL_SECONDS", "") or 0)
+        except ValueError:
+            return OpenClawAgent._STALL_POLL_DEFAULT_S
+        if poll_s <= 0:
+            return OpenClawAgent._STALL_POLL_DEFAULT_S
+        return poll_s
+
+    @staticmethod
+    def _heartbeat_name(run_key: str) -> str:
+        """Filename the sidecar lane writes for this run key.
+
+        Byte-identical to litellm_heartbeat_callback.safe_name — that module is
+        standalone inside the sidecar image and cannot import this one, so the
+        two are pinned against each other by
+        tests/test_stall_guard_heartbeat.py rather than by shared code."""
+        return "".join(
+            ch if (ch.isalnum() or ch in "._-") else "_" for ch in run_key
+        )[:200]
+
+    def _heartbeat_dir(self) -> str:
+        """Host directory the heartbeat files land in, or "" when unknown.
+
+        Derived from the usage log the guard already reads, so the sidecar's
+        `/var/litellm_usage` bind mount carries both with no second path to
+        configure. WCB_HEARTBEAT_HOST_DIR overrides."""
+        override = os.environ.get("WCB_HEARTBEAT_HOST_DIR", "").strip()
+        if override:
+            return override
+        if not self.litellm_usage_log:
+            return ""
+        return os.path.join(os.path.dirname(self.litellm_usage_log), "heartbeats")
+
+    def _heartbeat_mtime(self, run_key: str) -> float:
+        """Newest heartbeat mtime for this attempt, or 0.0 when there is none.
+
+        0.0 is the load-bearing value: a run whose sidecar predates the
+        heartbeat module, whose call never streamed, or whose heartbeat dir was
+        never mounted returns 0.0 on every poll, so the "it advanced" test below
+        is permanently false and the guard behaves EXACTLY as it did before this
+        signal existed. No heartbeat can ever make the guard stricter."""
+        directory = self._heartbeat_dir()
+        if not directory or not run_key:
+            return 0.0
+        names = [self._heartbeat_name(run_key)]
+        if os.environ.get("WCB_STALL_HEARTBEAT_SHARED_LANE", "1").strip() != "0":
+            names.append(self._HEARTBEAT_LANE_BRIDGE)
+        newest = 0.0
+        for name in names:
+            try:
+                mtime = os.stat(os.path.join(directory, name)).st_mtime
+            except OSError:
+                continue
+            if mtime > newest:
+                newest = mtime
+        return newest
+
     @staticmethod
     def _terminate_agent_invocations(task_id: str) -> None:
         """Kill the IN-CONTAINER `openclaw agent` CLI processes. Killing the
@@ -542,11 +625,21 @@ class OpenClawAgent(BaseAgent):
 
         `deadline` is the TURN's wall-clock budget shared across retry
         attempts (a stalled+retried turn never exceeds one turn budget).
-        Stall detection (WCB_TURN_STALL_SECONDS>0, run-key tagging live): the
-        run's tagged sidecar rows are the liveness signal — success AND failure
-        rows both count as progress (either proves the in-flight request
-        completed). No new row for the stall window while the invocation is
-        still running = a silently dead in-flight request."""
+        Stall detection (WCB_TURN_STALL_SECONDS>0, run-key tagging live) reads
+        TWO liveness signals and treats them as an OR:
+
+          * tagged sidecar rows — success AND failure both count (either proves
+            the in-flight request completed). Completion-time only.
+          * the run's heartbeat mtime — bumped at request start and per chunk,
+            so a request that is still streaming proves itself alive while it
+            is still in flight. This is the half that was missing: rows alone
+            killed three healthy 1P reps at 600s+poll (cite: alpha 2026-09-19;
+            koji's row landed 3min after the kill).
+
+        Silence on BOTH for the stall window, while the invocation is still
+        running, = a silently dead in-flight request. Thresholds, the 600s
+        floor and the single retry are unchanged; a run with no heartbeat file
+        behaves exactly as it did before (see _heartbeat_mtime)."""
         stall_s = self._stall_seconds()
         run_key = self._run_keys.get(spec.task_id, "")
         guarded = (stall_s > 0 and run_key and self.litellm_usage_log
@@ -557,20 +650,27 @@ class OpenClawAgent(BaseAgent):
                 return "ok"
             except subprocess.TimeoutExpired:
                 return "timeout"
+        poll_s = self._stall_poll_seconds()
         seen = self._count_run_key_rows(run_key)
+        beat = self._heartbeat_mtime(run_key)
         last_progress = time.time()
         while True:
             remaining = deadline - time.time()
             if remaining <= 0:
                 return "timeout"
             try:
-                agent_proc.wait(timeout=min(15.0, remaining))
+                agent_proc.wait(timeout=min(poll_s, remaining))
                 return "ok"
             except subprocess.TimeoutExpired:
                 pass
             n = self._count_run_key_rows(run_key)
-            if n != seen:
+            b = self._heartbeat_mtime(run_key)
+            # Strictly-greater on the mtime, never "nonzero": a heartbeat that
+            # stopped advancing is silence, and the file it left behind must
+            # not read as progress forever.
+            if n != seen or b > beat:
                 seen = n
+                beat = b
                 last_progress = time.time()
             elif time.time() - last_progress > stall_s:
                 return "stalled"

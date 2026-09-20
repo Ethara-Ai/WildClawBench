@@ -442,17 +442,22 @@ class TestSonnetAndCallbacks:
         doc = _parse(sidecar.build_litellm_config_yaml(bedrock_arn="arn:x"))
         assert "callbacks" not in doc["litellm_settings"]
 
-    def test_usage_callback_only(self):
+    def test_usage_callback_brings_the_stall_heartbeat_with_it(self):
+        # The stall-guard heartbeat is registered in lockstep with the usage
+        # callback and NOT with the stream display tap: the guard reads rows
+        # OR heartbeats, and rows alone killed three healthy 1P reps at
+        # 600s+poll (alpha 2026-09-19).
         doc = _parse(
             sidecar.build_litellm_config_yaml(bedrock_arn="arn:x", enable_usage_callback=True)
         )
         assert doc["litellm_settings"]["callbacks"] == [
-            "litellm_usage_callback.proxy_handler_instance"
+            "litellm_usage_callback.proxy_handler_instance",
+            "litellm_heartbeat_callback.heartbeat_instance",
         ]
 
     def test_all_three_callbacks_ordered(self):
-        # Order is load-bearing: usage, then headroom (pre-call compressor),
-        # then oauth usage. Pins the append sequence.
+        # Order is load-bearing: usage (+ its heartbeat sibling), then headroom
+        # (pre-call compressor), then oauth usage. Pins the append sequence.
         doc = _parse(
             sidecar.build_litellm_config_yaml(
                 bedrock_arn="arn:x",
@@ -463,9 +468,30 @@ class TestSonnetAndCallbacks:
         )
         assert doc["litellm_settings"]["callbacks"] == [
             "litellm_usage_callback.proxy_handler_instance",
+            "litellm_heartbeat_callback.heartbeat_instance",
             "litellm_headroom_callback.headroom_callback_instance",
             "litellm_usage_oauth_callback.oauth_usage_callback_instance",
         ]
+
+    def test_heartbeat_is_not_gated_on_the_stream_display_flag(self):
+        # D6/R6 decoupling: turning the operator's live-token display OFF must
+        # not take the liveness heartbeat with it, and turning it ON must not
+        # be required to get one.
+        on = _parse(
+            sidecar.build_litellm_config_yaml(
+                bedrock_arn="arn:x", enable_usage_callback=True,
+                enable_stream_callback=True,
+            )
+        )["litellm_settings"]["callbacks"]
+        off = _parse(
+            sidecar.build_litellm_config_yaml(
+                bedrock_arn="arn:x", enable_usage_callback=True,
+            )
+        )["litellm_settings"]["callbacks"]
+        assert "litellm_heartbeat_callback.heartbeat_instance" in on
+        assert "litellm_heartbeat_callback.heartbeat_instance" in off
+        assert "litellm_stream_callback.stream_handler_instance" in on
+        assert "litellm_stream_callback.stream_handler_instance" not in off
 
     def test_headroom_and_oauth_callback_without_usage(self):
         doc = _parse(

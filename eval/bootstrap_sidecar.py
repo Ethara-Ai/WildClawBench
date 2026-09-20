@@ -80,6 +80,7 @@ from src.utils.litellm_sidecar import (  # noqa: E402
     build_litellm_config_yaml,
     create_network,
     ensure_litellm_headroom_image,
+    heartbeat_host_dir,
     overflow_guard_enabled,
     pull_litellm_image,
     start_bridge,
@@ -249,6 +250,21 @@ def main() -> int:
             _log(f"warning: chmod failed on stream log dir/file ({exc})")
         stream_log_dir_str = str(stream_log_dir)
 
+    # Usage dir is resolved HERE, above the cc-bridge start, purely so the
+    # stall-guard heartbeat dir (its subdirectory) can be mounted into the
+    # bridge at container start — the bridge is the only real-time token tap on
+    # the OAuth path, so without the mount a healthy long OAuth turn still
+    # looks dead to the guard (cite: alpha 2026-09-19 — 3 healthy 1P reps
+    # killed at 600s+poll; koji's row landed 3min post-kill). The usage log
+    # file itself is still created below with the sidecar's other sinks.
+    usage_dir = config.work_dir / f"litellm-usage-shared-{suffix}"
+    usage_dir.mkdir(parents=True, exist_ok=True)
+    heartbeat_dir_str = heartbeat_host_dir(str(usage_dir))
+    # Published so the direct `python3 eval/run_batch.py` path (which starts its
+    # own bridge before it resolves a usage dir) can pick the same directory up.
+    if heartbeat_dir_str:
+        os.environ.setdefault("WCB_HEARTBEAT_HOST_DIR", heartbeat_dir_str)
+
     if use_oauth:
         pool_paths = [p.strip() for p in config.cc_account_pool.split(":") if p.strip()]
         pool_dirs = {os.path.dirname(os.path.abspath(p)) for p in pool_paths if os.path.isfile(p)}
@@ -281,6 +297,9 @@ def main() -> int:
                     # Real-time tee sink (docs/STREAMING_PLAN.md §3.2); empty
                     # when streaming off → tee inert, bridge unchanged.
                     stream_log_host_dir=stream_log_dir_str,
+                    # Stall-guard liveness sink — always on, never the display
+                    # feed above and never a usage sink (m0130).
+                    heartbeat_host_dir=heartbeat_dir_str,
                 )
             except Exception as exc:
                 _log(f"start_bridge failed: {exc}")
@@ -336,8 +355,6 @@ def main() -> int:
     callback_src = (
         Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_usage_callback.py"
     )
-    usage_dir = config.work_dir / f"litellm-usage-shared-{suffix}"
-    usage_dir.mkdir(parents=True, exist_ok=True)
     usage_log_path = usage_dir / "usage.jsonl"
     usage_log_path.touch(exist_ok=True)
     # S-003 hardening: same owner-only modes as eval/run_batch.py:1631-1639.

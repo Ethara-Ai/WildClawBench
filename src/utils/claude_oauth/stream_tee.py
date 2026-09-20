@@ -15,8 +15,12 @@ HARD RULES:
   * FAIL-OPEN (R2). Every public method swallows every exception and
     self-disables; a broken tee can never affect a client response.
   * INERT unless ``WCB_CC_STREAM_LOG_PATH`` is set (start_bridge sets it
-    only when the batch runs with --stream; R6 batch-scoped gate).
-  * Sink separation (m0130): writes ONLY to WCB_CC_STREAM_LOG_PATH.
+    only when the batch runs with --stream; R6 batch-scoped gate). This gate
+    covers the DISPLAY feed only — the liveness heartbeat below is deliberately
+    outside it.
+  * Sink separation (m0130): the display feed writes ONLY to
+    WCB_CC_STREAM_LOG_PATH; the heartbeat writes ONLY under WCB_HEARTBEAT_DIR.
+    Neither ever touches a usage sink.
 
 This file ships inside the bridge image automatically (docker/cc-bridge
 Dockerfile does ``COPY src/utils/claude_oauth /app/claude_oauth``).
@@ -40,6 +44,98 @@ _capped = False
 
 def _feed_path() -> str:
     return os.environ.get("WCB_CC_STREAM_LOG_PATH", "").strip()
+
+
+# ---------------------------------------------------------------- heartbeat
+# Liveness signal for the host-side turn-stall guard (runner.py
+# _turn_wait_outcome). The guard's only other evidence is COMPLETION-time usage
+# rows, so a healthy long streaming turn looks identical to a wedged one and
+# gets killed at the threshold.
+#
+#   cite: alpha 2026-09-19 — 3 healthy 1P reps killed at 600s+poll; koji's row
+#   landed 3 min post-kill.
+#
+# On the OAuth path this tee is the ONLY place chunks exist in real time (with
+# buffer-and-retry on, the sidecar behind the bridge sees one end-of-turn
+# burst), so the heartbeat has to be written from here.
+#
+# ALWAYS-ON: the touches below run BEFORE the ``_enabled`` display check, so
+# they happen whether or not the batch asked for --stream. Nothing about the
+# D6/R6 display gate changes.
+#
+# KEY SCHEME — documented compromise. The sidecar lane names its heartbeat file
+# after the attempt's ``wcb::<task_id>::<uuid4>`` run key. The bridge CANNOT:
+# the run key rides the client bearer into the sidecar, and the sidecar's
+# anthropic route replaces it with the bridge secret before the request reaches
+# us (litellm_sidecar.py extra_headers ``x-wcb-bridge-secret``). The stable
+# per-request identity available here is therefore the bridge's own credential,
+# i.e. one lane file for the whole bridge. Consequences, stated plainly:
+#   * With one run per bridge (the OAuth norm) this is exactly per-run.
+#   * Under fan-out every task on the bridge shares the lane, so one task's
+#     chunks can hold a sibling's stall clock open. The sibling is still bounded
+#     by the TURN deadline (it degrades to "timeout", not to "hangs forever"),
+#     and the runner can drop the lane entirely with
+#     WCB_STALL_HEARTBEAT_SHARED_LANE=0.
+# Kept byte-stable with OpenClawAgent._HEARTBEAT_LANE_BRIDGE; pinned by
+# tests/test_stall_guard_heartbeat.py.
+HEARTBEAT_LANE_BRIDGE = "lane-bridge"
+
+_HEARTBEAT_MIN_INTERVAL_DEFAULT_S = 1.0
+_hb_last = 0.0
+_hb_disabled = False
+
+
+def _heartbeat_dir() -> str:
+    """Container path of the heartbeat dir, or "" when unmounted.
+
+    No default on purpose: unlike the sidecar (whose /var/litellm_usage mount is
+    a fixed contract) the bridge only gets this dir when start_bridge mounts it,
+    and a guessed path would have the bridge creating stray directories in its
+    own filesystem that no host ever reads.
+    """
+    return os.environ.get("WCB_HEARTBEAT_DIR", "").strip()
+
+
+def _heartbeat_min_interval() -> float:
+    raw = os.environ.get("WCB_HEARTBEAT_MIN_INTERVAL_S", "").strip()
+    if not raw:
+        return _HEARTBEAT_MIN_INTERVAL_DEFAULT_S
+    try:
+        v = float(raw)
+    except ValueError:
+        return _HEARTBEAT_MIN_INTERVAL_DEFAULT_S
+    return v if v >= 0 else _HEARTBEAT_MIN_INTERVAL_DEFAULT_S
+
+
+def touch_heartbeat() -> None:
+    """Bump the bridge lane's mtime. Never raises, never delays a chunk."""
+    global _hb_last, _hb_disabled
+    if _hb_disabled:
+        return
+    directory = _heartbeat_dir()
+    if not directory:
+        return
+    now = time.time()
+    gap = _heartbeat_min_interval()
+    if gap and (now - _hb_last) < gap:
+        return
+    try:
+        path = os.path.join(directory, HEARTBEAT_LANE_BRIDGE)
+        try:
+            os.utime(path, None)
+        except OSError:
+            # First touch (or the dir vanished): create, then set the mtime
+            # explicitly — reopening an existing file in append mode without
+            # writing does not move mtime on every filesystem.
+            os.makedirs(directory, exist_ok=True)
+            with open(path, "a", encoding="utf-8"):
+                pass
+            os.utime(path, None)
+        _hb_last = now
+    except Exception:  # noqa: BLE001 - liveness must never affect a response
+        # Self-disable for the process (R2). Nothing is logged per failure: this
+        # runs per chunk and a noisy sink is its own outage.
+        _hb_disabled = True
 
 
 def _max_bytes() -> int:
@@ -84,6 +180,10 @@ class StreamTee:
     """
 
     def __init__(self, source: str = "agent", model: str = "") -> None:
+        # Request-start heartbeat: one tee is built per inbound bridge request,
+        # so this is the "request start" touch the stall guard needs before a
+        # single byte has arrived from upstream.
+        touch_heartbeat()
         self._enabled = bool(_feed_path())
         self._source = source
         self._model = model
@@ -136,6 +236,7 @@ class StreamTee:
 
     def attempt_started(self) -> None:
         """Mark the start of an upstream attempt (idempotent per attempt)."""
+        touch_heartbeat()
         if not self._enabled:
             return
         try:
@@ -150,6 +251,10 @@ class StreamTee:
         carry buffer, so a ``data:`` line split across chunks still parses on
         the frame boundary (same rolling technique the bridge itself uses for
         its message_stop detection)."""
+        # Per-chunk heartbeat FIRST: this must tick even when the display feed
+        # is off, which is the normal case (the batch only sets
+        # WCB_CC_STREAM_LOG_PATH under --stream).
+        touch_heartbeat()
         if not self._enabled:
             return
         try:
@@ -180,6 +285,12 @@ class StreamTee:
         """Buffered mode re-issue: the partial turn the feed saw is void.
         Emit an error marker (the renderer closes/replaces the partial turn)
         and reset so the next attempt re-emits message_start."""
+        # A retry means bytes STOPPED; the heartbeat legitimately goes quiet
+        # until the reissued attempt's attempt_started() re-arms it. Touching
+        # here keeps the gap to the re-issue backoff rather than the whole
+        # dead read, which is the honest reading of "the bridge is still
+        # working on this request".
+        touch_heartbeat()
         if not self._enabled:
             return
         try:

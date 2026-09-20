@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -230,3 +231,139 @@ def test_buffered_retry_emits_error_then_fresh_start(monkeypatch, bridge_mod):
     assert events.index("error") < len(events) - 1
     post = events[events.index("error") + 1:]
     assert post[0] == "message_start" and post[-1] == "message_stop"
+
+
+# ------------------------------------------ stall-guard liveness heartbeat
+#
+# The guard's other signal is COMPLETION-time usage rows, so a healthy long
+# turn is indistinguishable from a wedge (cite: alpha 2026-09-19 — 3 healthy
+# 1P reps killed at 600s+poll; koji's row landed 3min post-kill). On the OAuth
+# path this tee is the ONLY place chunks exist in real time, so the heartbeat
+# has to be written here — and it must NOT ride the display gate.
+
+
+@pytest.fixture()
+def hb_mod(monkeypatch, tmp_path):
+    """stream_tee with the heartbeat dir mounted and the DISPLAY FEED OFF.
+
+    That combination is the production default (the batch only sets
+    WCB_CC_STREAM_LOG_PATH under --stream), so it is the configuration the
+    heartbeat has to work in."""
+    monkeypatch.delenv("WCB_CC_STREAM_LOG_PATH", raising=False)
+    hb_dir = tmp_path / "heartbeats"
+    monkeypatch.setenv("WCB_HEARTBEAT_DIR", str(hb_dir))
+    monkeypatch.setenv("WCB_HEARTBEAT_MIN_INTERVAL_S", "0")
+    import src.utils.claude_oauth.stream_tee as mod
+    mod = importlib.reload(mod)
+    mod._TEST_HB_DIR = hb_dir
+    return mod
+
+
+def _lane(mod) -> Path:
+    return Path(mod._TEST_HB_DIR) / mod.HEARTBEAT_LANE_BRIDGE
+
+
+def test_heartbeat_beats_without_the_display_feed(hb_mod):
+    tee = hb_mod.StreamTee()
+    assert _lane(hb_mod).exists(), "request start must beat before any chunk"
+    assert tee._enabled is False, "display feed must stay off"
+
+
+def test_chunk_advances_heartbeat_mtime(hb_mod):
+    tee = hb_mod.StreamTee()
+    tee.attempt_started()
+    path = _lane(hb_mod)
+    stale = path.stat().st_mtime - 100.0
+    os.utime(path, (stale, stale))
+    tee.feed(F_HEL)
+    assert path.stat().st_mtime > stale
+
+
+def test_heartbeat_keeps_ticking_across_an_internal_retry(hb_mod):
+    tee = hb_mod.StreamTee()
+    tee.attempt_started()
+    tee.feed(F_START + F_HEL)
+    path = _lane(hb_mod)
+    stale = path.stat().st_mtime - 100.0
+    os.utime(path, (stale, stale))
+    tee.retrying(1)
+    assert path.stat().st_mtime > stale
+    stale2 = path.stat().st_mtime - 100.0
+    os.utime(path, (stale2, stale2))
+    tee.attempt_started()  # reissued attempt re-arms the clock
+    assert path.stat().st_mtime > stale2
+
+
+def test_heartbeat_writes_nothing_into_the_display_sink(tee_mod, monkeypatch, tmp_path):
+    """m0130: the heartbeat is a THIRD sink, never the stream feed."""
+    hb_dir = tmp_path / "hb"
+    monkeypatch.setenv("WCB_HEARTBEAT_DIR", str(hb_dir))
+    monkeypatch.setenv("WCB_HEARTBEAT_MIN_INTERVAL_S", "0")
+    mod = importlib.reload(tee_mod)
+    tee = mod.StreamTee()
+    tee.attempt_started()
+    tee.feed(F_HEL)
+    assert sorted(p.name for p in hb_dir.iterdir()) == [mod.HEARTBEAT_LANE_BRIDGE]
+    assert (hb_dir / mod.HEARTBEAT_LANE_BRIDGE).read_bytes() == b""
+    assert [r["delta"] for r in _rows(Path(tee_mod._TEST_FEED)) if r["event"] == "delta"] == ["Hel"]
+
+
+def test_heartbeat_inert_without_a_mounted_dir(monkeypatch, tmp_path):
+    monkeypatch.delenv("WCB_HEARTBEAT_DIR", raising=False)
+    monkeypatch.delenv("WCB_CC_STREAM_LOG_PATH", raising=False)
+    import src.utils.claude_oauth.stream_tee as mod
+    mod = importlib.reload(mod)
+    tee = mod.StreamTee()
+    tee.attempt_started()
+    tee.feed(F_HEL)
+    tee.retrying(1)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_broken_heartbeat_sink_never_raises_and_self_disables(monkeypatch, tmp_path):
+    monkeypatch.setenv("WCB_HEARTBEAT_DIR", str(tmp_path / "hb"))
+    monkeypatch.setenv("WCB_HEARTBEAT_MIN_INTERVAL_S", "0")
+    import src.utils.claude_oauth.stream_tee as mod
+    mod = importlib.reload(mod)
+
+    def _boom(*a, **k):
+        raise OSError("read-only filesystem")
+
+    monkeypatch.setattr(mod.os, "utime", _boom)
+    monkeypatch.setattr(mod.os, "makedirs", _boom)
+    tee = mod.StreamTee()          # must not raise
+    tee.attempt_started()
+    tee.feed(F_HEL)
+    tee.finish()
+    assert mod._hb_disabled is True
+
+
+def test_heartbeat_throttle_collapses_a_chunk_storm(monkeypatch, tmp_path):
+    monkeypatch.setenv("WCB_HEARTBEAT_DIR", str(tmp_path / "hb"))
+    monkeypatch.setenv("WCB_HEARTBEAT_MIN_INTERVAL_S", "600")
+    import src.utils.claude_oauth.stream_tee as mod
+    mod = importlib.reload(mod)
+    tee = mod.StreamTee()
+    path = tmp_path / "hb" / mod.HEARTBEAT_LANE_BRIDGE
+    stale = path.stat().st_mtime - 100.0
+    os.utime(path, (stale, stale))
+    for _ in range(50):
+        tee.feed(F_HEL)
+    assert path.stat().st_mtime == stale
+
+
+def test_buffered_bridge_path_beats_per_chunk(monkeypatch, bridge_mod, tmp_path):
+    """End-to-end on the real buffered loop: chunks in, heartbeat mtime out,
+    client bytes untouched (R5)."""
+    hb_dir = tmp_path / "hb"
+    monkeypatch.setenv("WCB_HEARTBEAT_DIR", str(hb_dir))
+    monkeypatch.setenv("WCB_HEARTBEAT_MIN_INTERVAL_S", "0")
+    import src.utils.claude_oauth.stream_tee as tee_mod
+    importlib.reload(tee_mod)
+    bridge = importlib.reload(bridge_mod)
+    full = [F_START, F_HEL, F_LO, F_STOP]
+    _install_fake_httpx(monkeypatch, bridge, _FakeUpstream([list(full)]))
+    body = asyncio.run(_client_bytes(bridge))
+    assert body == b"".join(full)
+    lane = hb_dir / tee_mod.HEARTBEAT_LANE_BRIDGE
+    assert lane.exists() and lane.read_bytes() == b""

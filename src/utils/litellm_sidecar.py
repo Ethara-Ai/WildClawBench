@@ -47,6 +47,21 @@ AUTH_MODE_MASTER_KEY = "master_key"
 RUN_KEY_AUTH_MODULE = "litellm_run_key_auth"
 RUN_KEY_AUTH_HOOK = f"{RUN_KEY_AUTH_MODULE}.user_api_key_auth"
 
+# Liveness heartbeat for the host-side turn-stall guard. Mounted beside
+# config.yaml like the auth hook, and registered from the yaml whenever the
+# usage callback is — the guard reads usage rows and heartbeats together, so
+# one exists exactly where the other does.
+HEARTBEAT_CALLBACK_MODULE = "litellm_heartbeat_callback"
+HEARTBEAT_CALLBACK_HOOK = f"{HEARTBEAT_CALLBACK_MODULE}.heartbeat_instance"
+# Subdirectory of the EXISTING /var/litellm_usage bind mount, so the heartbeat
+# is visible host-side exactly like usage.jsonl with no second mount to forget.
+# A sibling file, never the usage log itself — sink separation (m0130).
+HEARTBEAT_DIR_CONTAINER = "/var/litellm_usage/heartbeats"
+# Where the cc-bridge container sees the same host dir. Its own mount: the
+# bridge has no /var/litellm_usage (it is not a LiteLLM proxy and must never be
+# able to write a usage sink).
+HEARTBEAT_DIR_BRIDGE = "/var/wcb_heartbeat"
+
 
 def _switch_on(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
@@ -89,6 +104,29 @@ def run_key_auth_enforced() -> bool:
 def run_key_auth_module_path() -> str:
     return os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         f"{RUN_KEY_AUTH_MODULE}.py")
+
+
+def heartbeat_callback_module_path() -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        f"{HEARTBEAT_CALLBACK_MODULE}.py")
+
+
+def heartbeat_host_dir(usage_log_host_dir: str = "") -> str:
+    """Host directory the heartbeat files land in, or "" when there is none.
+
+    Derived from the usage-log mount rather than plumbed through every caller:
+    both sidecar entry points (eval/run_batch.py and the bash bootstrap's
+    eval/bootstrap_sidecar.py) already compute that directory, and the host-side
+    reader derives the same path from `litellm_usage_log`
+    (OpenClawAgent._heartbeat_dir), so nothing has to agree on a new argument.
+    WCB_HEARTBEAT_HOST_DIR overrides for deployments that split the two.
+    """
+    override = os.environ.get("WCB_HEARTBEAT_HOST_DIR", "").strip()
+    if override:
+        return override
+    if not usage_log_host_dir:
+        return ""
+    return os.path.join(usage_log_host_dir, "heartbeats")
 
 
 def sidecar_probe_bearer(master_key: str) -> str:
@@ -610,6 +648,18 @@ def build_litellm_config_yaml(
     _cbs: list[str] = []
     if enable_usage_callback:
         _cbs.append("litellm_usage_callback.proxy_handler_instance")
+        # Liveness heartbeat, registered in lockstep with the usage callback
+        # and NOT with the stream display tap below. The turn-stall guard reads
+        # usage rows (completion-time) OR heartbeat mtimes (per chunk); rows
+        # alone make a healthy 20-minute streaming call indistinguishable from
+        # a wedged one (cite: alpha 2026-09-19 — 3 healthy 1P reps killed at
+        # 600s+poll; koji's row landed 3min post-kill). Deliberately NOT gated
+        # on enable_stream_callback: that flag is the operator's live-token
+        # DISPLAY, single-run-only by run.sh's D6 rule, while the guard runs on
+        # every run. The pair is exact: where there is no usage callback there
+        # is no /var/litellm_usage mount, no host-visible heartbeat dir, and
+        # the guard is inert anyway (it requires litellm_usage_log).
+        _cbs.append(HEARTBEAT_CALLBACK_HOOK)
     if enable_headroom_callback:
         _cbs.append("litellm_headroom_callback.headroom_callback_instance")
     if enable_oauth_usage_callback:
@@ -936,7 +986,26 @@ def start_litellm(
             "-v", f"{usage_callback_host_path}:/app/litellm_usage_callback.py:ro",
             "-v", f"{usage_log_host_dir}:/var/litellm_usage",
             *build_env_args([("LITELLM_USAGE_LOG_PATH", "/var/litellm_usage/usage.jsonl")]),
+            # Heartbeat sink: a SUBDIRECTORY of the usage mount, so it rides
+            # the same bind mount host-side and needs no second -v. The usage
+            # log itself is never written by the heartbeat module (m0130).
+            *build_env_args([("WCB_HEARTBEAT_DIR", HEARTBEAT_DIR_CONTAINER)]),
         ]
+        # Pre-create host-side with the same owner-only mode the usage dir gets
+        # (S-003): the sidecar runs as the host UID, and a dir it has to mkdir
+        # itself inside a root-owned mount is the one failure mode that would
+        # silently disable the heartbeat half of the stall guard.
+        _hb_host = heartbeat_host_dir(usage_log_host_dir)
+        if _hb_host:
+            try:
+                os.makedirs(_hb_host, exist_ok=True)
+                os.chmod(_hb_host, 0o700)
+            except OSError as exc:
+                logger.warning(
+                    "[%s] could not prepare heartbeat dir %s (%s); the stall "
+                    "guard falls back to usage-row counting only",
+                    container_name, _hb_host, exc,
+                )
     if oauth_usage_callback_host_path and usage_log_host_dir:
         callback_args += [
             "-v", f"{oauth_usage_callback_host_path}:/app/litellm_usage_oauth_callback.py:ro",
@@ -1018,6 +1087,16 @@ def start_litellm(
             f"{run_key_auth_module_path()}:/app/{RUN_KEY_AUTH_MODULE}.py:ro",
         ]
 
+    # Same reasoning as the auth hook above: resolved beside the config instead
+    # of plumbed through a caller argument, and mounted UNCONDITIONALLY. The
+    # yaml names this module whenever the usage callback is on, and a proxy
+    # that boots into a config naming a module that is not there fails closed
+    # on every request — so the mount must never be the conditional half.
+    heartbeat_args: list[str] = [
+        "-v",
+        f"{heartbeat_callback_module_path()}:/app/{HEARTBEAT_CALLBACK_MODULE}.py:ro",
+    ]
+
     image_to_run = _validate_docker_token("litellm image", image_to_run)
     cmd = [
         "docker", "run", "-d",
@@ -1025,6 +1104,7 @@ def start_litellm(
         "--network", network,
         *env_args,
         *auth_args,
+        *heartbeat_args,
         *callback_args,
         *headroom_args,
         *stream_args,
@@ -1203,6 +1283,7 @@ def start_bridge(
     account_pool_spec: str = "",
     skip_system_prefix: bool = False,
     stream_log_host_dir: str = "",
+    heartbeat_host_dir: str = "",
 ) -> None:
     from src.utils.docker_utils import (
         build_env_args,
@@ -1282,6 +1363,31 @@ def start_bridge(
             [("WCB_CC_STREAM_LOG_PATH", "/var/wcb_stream/stream.jsonl")]
         )
 
+    # Liveness heartbeat sink for the turn-stall guard (stream_tee.touch_heartbeat).
+    # SEPARATE from the display feed above and from every usage sink: with
+    # buffer-and-retry on, the bridge is the only place an OAuth turn's chunks
+    # exist in real time, so without this a healthy long OAuth turn keeps
+    # looking dead to the guard (cite: alpha 2026-09-19 — 3 healthy 1P reps
+    # killed at 600s+poll; koji's row landed 3min post-kill).
+    #
+    # The dir is passed by the caller that also owns the sidecar's usage dir
+    # (eval/bootstrap_sidecar.py). The env fallback covers the direct
+    # `python3 eval/run_batch.py` path, where the bridge is started BEFORE the
+    # usage dir is resolved; unset there ⇒ no mount ⇒ the tee's heartbeat stays
+    # inert and the guard falls back to usage rows exactly as it does today.
+    heartbeat_mount: list[str] = []
+    _hb_host = heartbeat_host_dir or os.environ.get("WCB_HEARTBEAT_HOST_DIR", "").strip()
+    if _hb_host:
+        try:
+            os.makedirs(_hb_host, exist_ok=True)
+        except OSError as exc:
+            logger.warning("could not prepare bridge heartbeat dir %s (%s); "
+                           "OAuth-lane liveness disabled", _hb_host, exc)
+            _hb_host = ""
+    if _hb_host:
+        heartbeat_mount = ["-v", f"{_hb_host}:{HEARTBEAT_DIR_BRIDGE}:rw"]
+        env_args += build_env_args([("WCB_HEARTBEAT_DIR", HEARTBEAT_DIR_BRIDGE)])
+
     # Publish the bridge on a host loopback port when WCB_CC_BRIDGE_HOST_PORT is
     # set, so the host-side Sonnet judge (grading.py runs on the host, not in the
     # sidecar network) can reach the bridge at http://127.0.0.1:<port>. Bound to
@@ -1315,6 +1421,7 @@ def start_bridge(
         *env_args,
         *dump_mount,
         *stream_mount,
+        *heartbeat_mount,
         *publish_args,
         "-v", f"{pool_host_dir}:/oauth_pool:rw",
         image,
