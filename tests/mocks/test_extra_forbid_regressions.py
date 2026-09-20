@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import pytest
 
-from ._helpers import ENV_DIR, load_app
+from ._helpers import ENV_DIR, data_module, load_app
 
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
@@ -326,6 +326,107 @@ def test_kraken_private_balance_rejects_an_unknown_key(kraken):
     r = kraken.post("/0/private/Balance", json={"noncce": "1699"})
     assert r.status_code == 422, r.text
     assert _unknown_key_reported(r, "noncce"), r.text
+
+
+# --- action routes that bound no body at all -------------------------------
+#
+# These four take no field this mock implements, so they declared no body --
+# which meant an unknown key was never PARSED, let alone dropped. Garbage got a
+# 2xx. An empty forbid envelope leaves the bodyless call working and makes
+# anything else loud. The bodyless half of each pair is the half that would
+# break if someone "simplified" the envelope back to a required model.
+#
+# Three of them act on a row whose state the action consumes -- an application
+# advances to Hired, a payroll becomes processed, a merge request becomes
+# merged -- and `get_store` is a process-wide registry, so the fleet-wide smoke
+# suite reaches the same rows first. Each reseeds its row through the store the
+# way test_service_regressions.py does, which is what POST /admin/data/{table}
+# calls, so the accepted half asserts a status rather than a suite ordering.
+
+@pytest.fixture(scope="module")
+def greenhouse():
+    with _client("greenhouse-api") as c:
+        yield c
+
+
+@pytest.fixture(scope="module")
+def gusto():
+    with _client("gusto-api") as c:
+        yield c
+
+
+def _reseed(client, module, table, row):
+    data_module(client.app, module)._store.table(table).upsert(row)
+
+
+def _application(app_id):
+    return {"id": app_id, "candidate_id": "cand-7001", "job_id": "job-3001",
+            "status": "active", "current_stage": "Application Review",
+            "applied_at": "2026-04-02T10:05:00Z",
+            "last_activity_at": "2026-04-03T09:00:00Z"}
+
+
+def test_greenhouse_advance_takes_no_body_but_rejects_one(greenhouse):
+    _reseed(greenhouse, "greenhouse_data", "applications", _application("app-forbid-1"))
+    assert greenhouse.post("/v1/applications/app-forbid-1/advance").status_code == 200
+
+    _reseed(greenhouse, "greenhouse_data", "applications", _application("app-forbid-2"))
+    assert greenhouse.post("/v1/applications/app-forbid-2/advance",
+                           json={}).status_code == 200
+
+    r = greenhouse.post("/v1/applications/app-forbid-2/advance",
+                        json={"from_stage_id": "s1"})
+    assert r.status_code == 422, r.text
+    assert _unknown_key_reported(r, "from_stage_id"), r.text
+
+
+def test_gusto_submit_payroll_takes_no_body_but_rejects_one(gusto):
+    _reseed(gusto, "gusto_data", "payrolls",
+            {"id": "pay-forbid-1", "company_id": "comp-001",
+             "pay_period_start": "2026-06-01", "pay_period_end": "2026-06-15",
+             "check_date": "2026-06-20", "processed": False, "gross_pay": 100.0,
+             "net_pay": 80.0, "employee_count": 1})
+    assert gusto.put("/v1/payrolls/pay-forbid-1/submit").status_code == 200
+
+    r = gusto.put("/v1/payrolls/pay-forbid-1/submit", json={"verison": 2})
+    assert r.status_code == 422, r.text
+    assert _unknown_key_reported(r, "verison"), r.text
+
+
+def test_paypal_capture_takes_an_empty_body_but_rejects_an_unknown_key(paypal):
+    def new_order():
+        return paypal.post("/v2/checkout/orders", json={
+            "intent": "CAPTURE",
+            "purchase_units": [{"amount": {"currency_code": "USD", "value": "5.00"}}],
+        }).json()["id"]
+
+    assert paypal.post(f"/v2/checkout/orders/{new_order()}/capture",
+                       json={}).status_code == 201
+
+    r = paypal.post(f"/v2/checkout/orders/{new_order()}/capture",
+                    json={"payment_sauce": {}})
+    assert r.status_code == 422, r.text
+    assert _unknown_key_reported(r, "payment_sauce"), r.text
+
+
+def test_gitlab_merge_takes_no_body_but_rejects_one(gitlab):
+    _reseed(gitlab, "gitlab_data", "merge_requests",
+            # ints, not strings: the loader coerces these three and the lookup
+            # compares `m["iid"] == int(mr_iid)`, so a raw upsert must match the
+            # coerced shape rather than the seed-file shape.
+            {"id": 6099, "iid": 99, "project_id": 101, "title": "Forbid probe",
+             "description": "", "state": "opened", "source_branch": "feature/probe",
+             "target_branch": "main", "author": "amelia-ortega",
+             "assignee": "jonas-pereira", "merge_status": "can_be_merged",
+             "draft": False, "created_at": "2026-05-18T11:00:00.000Z",
+             "updated_at": "2026-05-25T14:00:00.000Z", "merged_at": ""})
+    route = "/api/v4/projects/101/merge_requests/99/merge"
+
+    r = gitlab.put(route, json={"squash": True})
+    assert r.status_code == 422, r.text
+    assert _unknown_key_reported(r, "squash"), r.text
+
+    assert gitlab.put(route).status_code == 200
 
 
 # --- the fidelity exceptions, pinned AS exceptions -------------------------

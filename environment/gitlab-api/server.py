@@ -143,8 +143,17 @@ def create_merge_request(project_id: str, body: MergeRequestCreateBody):
     return result
 
 
+# An action route, not a payload route: the vendor takes no field this mock
+# implements, and binding no body at all meant an unknown key was never parsed
+# rather than rejected -- PUT /projects/{id}/merge_requests/{iid}/merge answered 200 to a body of pure garbage. The
+# empty envelope keeps the bodyless call working and makes anything else a 422,
+# which is the honest answer for a parameter the mock does not honour.
+class MergeBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
 @app.put("/api/v4/projects/{project_id}/merge_requests/{mr_iid}/merge")
-def merge_merge_request(project_id: str, mr_iid: int):
+def merge_merge_request(project_id: str, mr_iid: int, body: MergeBody = MergeBody()):
     result = gitlab_data.merge_merge_request(project_id, mr_iid)
     if "error" in result:
         status = 404 if "not found" in result["error"] else 405

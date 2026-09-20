@@ -96,8 +96,17 @@ def get_application(application_id: str):
     return result
 
 
+# An action route, not a payload route: the vendor takes no field this mock
+# implements, and binding no body at all meant an unknown key was never parsed
+# rather than rejected -- POST /v1/applications/{id}/advance answered 200 to a body of pure garbage. The
+# empty envelope keeps the bodyless call working and makes anything else a 422,
+# which is the honest answer for a parameter the mock does not honour.
+class AdvanceBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
 @app.post("/v1/applications/{application_id}/advance")
-def advance_application(application_id: str):
+def advance_application(application_id: str, body: AdvanceBody = AdvanceBody()):
     result = greenhouse_data.advance_application(application_id)
     if "error" in result:
         status = 404 if "not found" in result["error"] else 400

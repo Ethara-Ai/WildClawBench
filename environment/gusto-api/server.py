@@ -94,8 +94,17 @@ def create_payroll(company_id: str, body: PayrollCreate):
     return result
 
 
+# An action route, not a payload route: the vendor takes no field this mock
+# implements, and binding no body at all meant an unknown key was never parsed
+# rather than rejected -- PUT /v1/payrolls/{id}/submit answered 200 to a body of pure garbage. The
+# empty envelope keeps the bodyless call working and makes anything else a 422,
+# which is the honest answer for a parameter the mock does not honour.
+class SubmitBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
 @app.put("/v1/payrolls/{payroll_id}/submit")
-def submit_payroll(payroll_id: str):
+def submit_payroll(payroll_id: str, body: SubmitBody = SubmitBody()):
     result = gusto_data.submit_payroll(payroll_id)
     if "error" in result:
         status = 404 if "not found" in result["error"] else 400

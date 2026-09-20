@@ -152,9 +152,10 @@ def test_fleet_has_agent_facing_models_to_check():
     The floor tracks the fleet, and the fleet changed: the 50 services this
     number was first written against (174 agent-facing models, floor 150) are
     not today's 50. The newreq convergence swapped 25 of them out, and the 25
-    that arrived are smaller-surfaced -- the census now stands at 127 across 42
-    services, 18 of which the wave-2 hardening ADDED by replacing bare
-    ``dict = Body(...)`` mappings with real models. 120 is the same kind of
+    that arrived are smaller-surfaced -- the census now stands at 131 across 42
+    services, 22 of which the wave-2 hardening ADDED: 18 replacing bare
+    ``dict = Body(...)`` mappings, and 4 empty envelopes on action routes that
+    bound no body at all and so never parsed one. 120 is the same kind of
     floor 150 was: comfortably under the true count, far above zero, so a
     classifier that stopped matching still fails here first.
     """

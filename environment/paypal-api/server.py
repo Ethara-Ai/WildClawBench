@@ -79,8 +79,17 @@ def get_order(order_id: str):
     return result
 
 
+# An action route, not a payload route: the vendor takes no field this mock
+# implements, and binding no body at all meant an unknown key was never parsed
+# rather than rejected -- POST /v2/checkout/orders/{id}/capture answered 201 to a body of pure garbage. The
+# empty envelope keeps the bodyless call working and makes anything else a 422,
+# which is the honest answer for a parameter the mock does not honour.
+class CaptureBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
 @app.post("/v2/checkout/orders/{order_id}/capture", status_code=201)
-def capture_order(order_id: str):
+def capture_order(order_id: str, body: CaptureBody = CaptureBody()):
     result = paypal_data.capture_order(order_id)
     if "error" in result:
         status = 404 if "not found" in result["error"] else 422
