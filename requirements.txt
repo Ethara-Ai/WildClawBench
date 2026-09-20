@@ -17,6 +17,16 @@ litellm
 # requirement — it broke `pip install -r requirements.txt` on fresh boxes.
 # It is installed inside the litellm-headroom Docker image, not on the host.
 # headroom-ai>=0.24,<0.25
+# Judge-side audio transcription (src/utils/judge_asr.py): audio deliverables are
+# transcribed on the host and reach the judge as text. The packages alone are not
+# enough — the ~480 MB model is fetched by `bash script/setup_judge_asr.sh`. Every
+# import in judge_asr is guarded, so a host where one of these wheels is
+# unavailable still grades (audio then shows as a duration marker, and each run
+# logs "Judge ASR: UNAVAILABLE").
+sherpa-onnx>=1.12
+numpy>=1.26
+# Non-WAV audio (mp3/m4a/ogg/flac); PCM .wav decodes with the stdlib alone.
+av>=12
 tomli; python_version < "3.11"
 annotated-doc==0.0.4
 annotated-types==0.7.0

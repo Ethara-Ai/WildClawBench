@@ -57,7 +57,7 @@ def test_status_names_the_missing_package(monkeypatch):
     monkeypatch.setattr(importlib.util, "find_spec", lambda name: None)
     ok, detail = judge_asr.status()
     assert not ok and "sherpa-onnx not installed" in detail
-    assert "requirements-asr.txt" in detail
+    assert "requirements.txt" in detail and "setup_judge_asr.sh" in detail
 
 
 def test_status_names_the_missing_model(monkeypatch, tmp_path):

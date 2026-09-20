@@ -147,7 +147,7 @@ If this fails, do not proceed — your install is broken.
 Judges accept no audio, so audio deliverables (`.wav/.mp3/.m4a/...`) are transcribed **on the host** by `src/utils/judge_asr.py` with a local sherpa-onnx model and reach the judge as text. This is host state, not repo state:
 
 ```bash
-bash script/setup_judge_asr.sh          # pip deps (requirements-asr.txt) + ~480 MB model -> ~/.wcb/asr, then transcribes a sample
+bash script/setup_judge_asr.sh          # pip deps (sherpa-onnx/numpy/av, also in requirements.txt) + ~480 MB model -> ~/.wcb/asr, then transcribes a sample
 bash script/setup_judge_asr.sh --check  # readiness only
 bash script/prepare.sh --judge-asr      # same, as part of bootstrap
 ```

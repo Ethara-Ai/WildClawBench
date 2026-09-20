@@ -33,8 +33,10 @@ if [[ "${1:-}" == "--check" ]]; then
     exit $?
 fi
 
-echo "[judge-asr] installing python deps (requirements-asr.txt) with $PY"
-"$PY" -m pip install -q -r requirements-asr.txt || { echo "[judge-asr] pip install failed" >&2; exit 1; }
+# The ASR packages live in requirements.txt; install just those three here so this
+# script also works on a host whose full requirements were installed long ago.
+echo "[judge-asr] installing python deps (sherpa-onnx, numpy, av) with $PY"
+"$PY" -m pip install -q "sherpa-onnx>=1.12" "numpy>=1.26" "av>=12" || { echo "[judge-asr] pip install failed" >&2; exit 1; }
 
 if compgen -G "$MODEL_DIR/*.onnx" >/dev/null && [[ -f "$MODEL_DIR/tokens.txt" ]]; then
     echo "[judge-asr] model already present in $MODEL_DIR"

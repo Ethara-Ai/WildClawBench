@@ -47,7 +47,7 @@ def status() -> tuple[bool, str]:
     import importlib.util
     if importlib.util.find_spec("sherpa_onnx") is None:
         return False, ("sherpa-onnx not installed "
-                       "(pip install -r requirements-asr.txt)")
+                       "(pip install -r requirements.txt, or bash script/setup_judge_asr.sh)")
     mdir = _model_dir()
     if mdir is None:
         return False, ("no model under WCB_JUDGE_ASR_MODEL_DIR or ~/.wcb/asr "
