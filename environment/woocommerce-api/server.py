@@ -3,9 +3,10 @@
 Mirrors a subset of the WooCommerce REST API v3. Base path: /wp-json/wc/v3
 """
 
-from fastapi import FastAPI, Query, Body
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from typing import Optional
+from pydantic import BaseModel, ConfigDict
+from typing import List, Optional
 
 import woocommerce_data
 try:
@@ -73,19 +74,51 @@ def get_order(order_id: int):
     return result
 
 
+class OrderBilling(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    first_name: Optional[str] = ""
+    last_name: Optional[str] = ""
+    email: Optional[str] = ""
+
+
+class OrderLineItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    product_id: Optional[int] = 0
+    name: Optional[str] = None
+    sku: Optional[str] = None
+    quantity: Optional[int] = 1
+    price: Optional[float] = 0.0
+
+
+class OrderCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_id: Optional[int] = 0
+    status: Optional[str] = "pending"
+    currency: Optional[str] = "USD"
+    payment_method: Optional[str] = "bacs"
+    payment_method_title: Optional[str] = "Direct Bank Transfer"
+    billing: Optional[OrderBilling] = None
+    line_items: Optional[List[OrderLineItem]] = None
+    total: Optional[float] = None
+    total_tax: Optional[float] = None
+
+
 @app.post("/wp-json/wc/v3/orders", status_code=200)
-def create_order(body: Optional[dict] = Body(default=None)):
-    body = body or {}
+def create_order(body: OrderCreateBody):
     result = woocommerce_data.create_order(
-        customer_id=body.get("customer_id", 0),
-        status=body.get("status", "pending"),
-        currency=body.get("currency", "USD"),
-        payment_method=body.get("payment_method", "bacs"),
-        payment_method_title=body.get("payment_method_title", "Direct Bank Transfer"),
-        billing=body.get("billing"),
-        line_items=body.get("line_items"),
-        total=body.get("total"),
-        total_tax=body.get("total_tax"),
+        customer_id=body.customer_id,
+        status=body.status,
+        currency=body.currency,
+        payment_method=body.payment_method,
+        payment_method_title=body.payment_method_title,
+        billing=body.billing.model_dump() if body.billing else None,
+        line_items=([li.model_dump() for li in body.line_items]
+                    if body.line_items else None),
+        total=body.total,
+        total_tax=body.total_tax,
     )
     if isinstance(result, dict) and "error" in result:
         return JSONResponse(status_code=404, content=result)

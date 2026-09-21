@@ -166,6 +166,24 @@ def kubernetes():
         yield c
 
 
+@pytest.fixture(scope="module")
+def bigcommerce():
+    with _client("bigcommerce-api") as c:
+        yield c
+
+
+@pytest.fixture(scope="module")
+def woocommerce():
+    with _client("woocommerce-api") as c:
+        yield c
+
+
+@pytest.fixture(scope="module")
+def trello():
+    with _client("trello-api") as c:
+        yield c
+
+
 # --- bodies that were a bare `dict = Body(...)` ----------------------------
 
 def test_freshdesk_create_ticket_rejects_typoed_key(freshdesk):
@@ -419,6 +437,177 @@ def test_gitlab_merge_still_refuses_an_iid_that_is_not_there(gitlab):
     r = gitlab.put("/api/v4/projects/101/merge_requests/4242/merge")
 
     assert "not found" in r.text.lower(), r.text
+
+
+# --- the last two storefront creates -----------------------------------------
+#
+# These two outlived the convergence sweep because neither is a lax MODEL --
+# each was a bare `dict = Body(...)`, the shape that has no schema to tighten,
+# so the census that drove 40ea3e2 by counting models never saw them. Both
+# answered 200 to a body of pure garbage and minted an order from the
+# defaults.
+
+
+def test_bigcommerce_create_order_rejects_typoed_key(bigcommerce):
+    good = {"customer_id": 1001, "status_id": 2, "payment_method": "PayPal",
+            "billing_address": {"first_name": "Ada", "email": "ada@example.com"},
+            "products": [{"product_id": 101, "quantity": 2}]}
+    created = bigcommerce.post("/v2/orders", json=good)
+    assert created.status_code == 200, created.text
+
+    served = bigcommerce.get(f"/v2/orders/{created.json()['id']}")
+    assert served.json()["billing_address"]["email"] == "ada@example.com"
+    assert served.json()["items_total"] == 2
+
+    r = bigcommerce.post("/v2/orders", json=dict(good, custmer_id=1001))
+    assert r.status_code == 422, r.text
+    assert _unknown_key_reported(r, "custmer_id"), r.text
+
+
+def test_bigcommerce_create_order_rejects_garbage_instead_of_minting_a_default_order(
+        bigcommerce):
+    """The measured defect: garbage used to 200 with an order built from
+    nothing but the handler's own ``body.get`` defaults."""
+    before = len(bigcommerce.get("/v2/orders").json())
+
+    r = bigcommerce.post("/v2/orders", json={"zzz_not_a_field": "garbage"})
+
+    assert r.status_code == 422, r.text
+    assert len(bigcommerce.get("/v2/orders").json()) == before
+
+
+def test_bigcommerce_billing_address_forbids_a_key_the_order_cannot_carry(bigcommerce):
+    """The nested half the route-contract guard structurally cannot name: a
+    forbid on the parent never reached ``billing_address``."""
+    r = bigcommerce.post("/v2/orders", json={
+        "billing_address": {"first_name": "Ada", "phone": "555-0100"}})
+    assert r.status_code == 422, r.text
+    assert _unknown_key_reported(r, "phone"), r.text
+
+
+def test_woocommerce_create_order_rejects_typoed_key(woocommerce):
+    good = {"customer_id": 301, "status": "processing", "payment_method": "stripe",
+            "billing": {"first_name": "Noor", "email": "noor@example.com"},
+            "line_items": [{"product_id": 201, "quantity": 3}]}
+    created = woocommerce.post("/wp-json/wc/v3/orders", json=good)
+    assert created.status_code == 200, created.text
+
+    served = woocommerce.get(f"/wp-json/wc/v3/orders/{created.json()['id']}")
+    assert served.json()["billing"]["email"] == "noor@example.com"
+    assert served.json()["status"] == "processing"
+    assert len(served.json()["line_items"]) == 1
+
+    r = woocommerce.post("/wp-json/wc/v3/orders", json=dict(good, staus="processing"))
+    assert r.status_code == 422, r.text
+    assert _unknown_key_reported(r, "staus"), r.text
+
+
+def test_woocommerce_create_order_rejects_garbage(woocommerce):
+    r = woocommerce.post("/wp-json/wc/v3/orders", json={"zzz_not_a_field": "x"})
+    assert r.status_code == 422, r.text
+
+
+def test_woocommerce_line_item_meta_data_is_refused_because_nothing_honours_it(
+        woocommerce):
+    """Woo's real line_items DO take an open ``meta_data`` array, and this is
+    the one place the vendor-fidelity argument was available and declined.
+    ``_coerce_line_items`` builds each stored line from seven fixed keys and
+    reads no meta; declaring the field would answer 200 to a custom attribute
+    that is dropped on the way to the store, which is the lie 0ab05f0 refused
+    for the same reason. A 422 naming the key this mock cannot honour is the
+    honest answer, and the day the data layer carries meta_data the model gains
+    the field and this test changes with it.
+    """
+    r = woocommerce.post("/wp-json/wc/v3/orders", json={
+        "line_items": [{"product_id": 201, "quantity": 1,
+                        "meta_data": [{"key": "engraving", "value": "N.H."}]}]})
+    assert r.status_code == 422, r.text
+    assert _unknown_key_reported(r, "meta_data"), r.text
+
+
+# --- trello: the schema was real, the document was not -----------------------
+#
+# 244a468 recorded that trello's writes already read a JSON body through
+# _body_fields and merge it with the query through _pick, against the newreq
+# doc that called the body silently ignored. What that fix left standing was
+# the OPENAPI: the handlers declared no requestBody, so every generated client,
+# and the mock-api-checker with them, read three mutating routes as taking
+# query parameters only. The bodies below are the SAME models _body_fields has
+# always validated against -- nothing about request handling moved, which is
+# what the query/form halves of each pair are here to prove.
+
+
+@pytest.mark.parametrize("method,path", [
+    ("post", "/1/cards"),
+    ("put", "/1/cards/{card_id}"),
+    ("post", "/1/checklists"),
+])
+def test_trello_write_routes_declare_the_body_they_read(trello, method, path):
+    operation = trello.get("/openapi.json").json()["paths"][path][method]
+
+    schema = operation["requestBody"]["content"]["application/json"]["schema"]
+    assert schema["additionalProperties"] is False, "forbid must survive the trip"
+    assert "application/x-www-form-urlencoded" in operation["requestBody"]["content"]
+
+
+def _a_list(trello) -> str:
+    boards = trello.get("/1/members/me/boards").json()
+    return trello.get(f"/1/boards/{boards[0]['id']}/lists").json()[0]["id"]
+
+
+def test_trello_create_card_still_takes_the_query_string(trello):
+    list_id = _a_list(trello)
+
+    r = trello.post(f"/1/cards?idList={list_id}&name=from-the-query")
+
+    assert r.status_code == 200, r.text
+    assert trello.get(f"/1/cards/{r.json()['id']}").json()["name"] == "from-the-query"
+
+
+def test_trello_create_card_still_takes_a_form_body(trello):
+    """FastAPI parses only JSON, so a declared body PARAMETER would have turned
+    this into a 422. The declaration is openapi_extra for exactly this row."""
+    list_id = _a_list(trello)
+
+    r = trello.post("/1/cards", content=f"idList={list_id}&name=from-a-form",
+                    headers={"content-type": "application/x-www-form-urlencoded"})
+
+    assert r.status_code == 200, r.text
+    assert trello.get(f"/1/cards/{r.json()['id']}").json()["name"] == "from-a-form"
+
+
+def test_trello_update_card_takes_either_shape_and_serves_both_back(trello):
+    list_id = _a_list(trello)
+    card_id = trello.post("/1/cards",
+                          json={"idList": list_id, "name": "before"}).json()["id"]
+
+    assert trello.put(f"/1/cards/{card_id}?name=named-by-query").status_code == 200
+    assert trello.put(f"/1/cards/{card_id}",
+                      json={"desc": "described-by-body"}).status_code == 200
+
+    served = trello.get(f"/1/cards/{card_id}").json()
+    assert (served["name"], served["desc"]) == ("named-by-query", "described-by-body")
+
+
+def test_trello_create_card_rejects_a_typoed_body_key(trello):
+    list_id = _a_list(trello)
+
+    r = trello.post("/1/cards", json={"idList": list_id, "name": "x", "nmae": "typo"})
+
+    assert r.status_code == 422, r.text
+    assert _unknown_key_reported(r, "nmae"), r.text
+
+
+def test_trello_create_checklist_takes_either_shape(trello):
+    list_id = _a_list(trello)
+    card_id = trello.post("/1/cards",
+                          json={"idList": list_id, "name": "host"}).json()["id"]
+
+    assert trello.post(f"/1/checklists?idCard={card_id}&name=q").status_code == 200
+    assert trello.post("/1/checklists",
+                       json={"idCard": card_id, "name": "b"}).status_code == 200
+    names = {c["name"] for c in trello.get(f"/1/cards/{card_id}/checklists").json()}
+    assert {"q", "b"} <= names
 
 
 # --- the fidelity exceptions, pinned AS exceptions -------------------------

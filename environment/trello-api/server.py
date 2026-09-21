@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, ValidationError
-from typing import List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Type, Union
 
 import trello_data
 try:
@@ -77,6 +77,26 @@ async def _body_fields(request: Request, model: Type[BaseModel]) -> BaseModel:
         return model.model_validate(supplied)
     except ValidationError as exc:
         raise RequestValidationError(exc.errors())
+
+
+def _declares_body(model: Type[BaseModel]) -> Dict[str, Any]:
+    """OpenAPI ``requestBody`` for a route whose body ``_body_fields`` reads.
+
+    The schema is generated FROM the model the handler validates against, so
+    the document and the enforcement cannot drift apart. It goes on the route
+    as ``openapi_extra`` rather than as a handler parameter because a declared
+    parameter would make FastAPI parse the body itself, and FastAPI parses only
+    JSON: the form-encoded shape this module's docstring promises, and
+    ``_parse_body`` honours, would start answering 422. Declaring it here
+    changes what the route SAYS and nothing about what it does -- a query-only
+    caller sends no body and is unaffected, which is why both spellings stay
+    supported for the connector guide that teaches them.
+    """
+    schema = model.model_json_schema()
+    return {"requestBody": {"required": False, "content": {
+        "application/json": {"schema": schema},
+        _FORM_CONTENT_TYPE: {"schema": schema},
+    }}}
 
 
 def _pick(*values):
@@ -162,7 +182,8 @@ class CardCreateBody(BaseModel):
     idMembers: Optional[Union[str, List[str]]] = None
 
 
-@app.post("/1/cards", status_code=200)
+@app.post("/1/cards", status_code=200,
+          openapi_extra=_declares_body(CardCreateBody))
 async def create_card(
     request: Request,
     idList: Optional[str] = None,
@@ -198,7 +219,8 @@ class CardUpdateBody(BaseModel):
     pos: Optional[float] = None
 
 
-@app.put("/1/cards/{card_id}")
+@app.put("/1/cards/{card_id}",
+         openapi_extra=_declares_body(CardUpdateBody))
 async def update_card(
     request: Request,
     card_id: str,
@@ -249,7 +271,8 @@ class ChecklistCreateBody(BaseModel):
     name: Optional[str] = None
 
 
-@app.post("/1/checklists", status_code=200)
+@app.post("/1/checklists", status_code=200,
+          openapi_extra=_declares_body(ChecklistCreateBody))
 async def create_checklist(
     request: Request,
     idCard: Optional[str] = None,

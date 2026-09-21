@@ -4,9 +4,10 @@ Mirrors a subset of the BigCommerce APIs: Catalog/Customers (v3) and Orders
 (v2). v3 list endpoints wrap data in `{"data": [...], "meta": {...}}`.
 """
 
-from fastapi import FastAPI, Query, Body
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from typing import Optional
+from pydantic import BaseModel, ConfigDict
+from typing import List, Optional
 
 import bigcommerce_data
 try:
@@ -74,16 +75,43 @@ def get_order(order_id: int):
     return result
 
 
+class OrderBillingAddress(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    first_name: Optional[str] = ""
+    last_name: Optional[str] = ""
+    email: Optional[str] = ""
+
+
+class OrderProduct(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    product_id: Optional[int] = 0
+    quantity: Optional[int] = 1
+    price_inc_tax: Optional[float] = 0.0
+
+
+class OrderCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_id: Optional[int] = 0
+    status_id: Optional[int] = 1
+    payment_method: Optional[str] = "manual"
+    currency_code: Optional[str] = "USD"
+    billing_address: Optional[OrderBillingAddress] = None
+    products: Optional[List[OrderProduct]] = None
+
+
 @app.post("/v2/orders", status_code=200)
-def create_order(body: Optional[dict] = Body(default=None)):
-    body = body or {}
+def create_order(body: OrderCreateBody):
     result = bigcommerce_data.create_order(
-        customer_id=body.get("customer_id", 0),
-        status_id=body.get("status_id", 1),
-        payment_method=body.get("payment_method", "manual"),
-        currency_code=body.get("currency_code", "USD"),
-        billing_address=body.get("billing_address"),
-        products=body.get("products"),
+        customer_id=body.customer_id,
+        status_id=body.status_id,
+        payment_method=body.payment_method,
+        currency_code=body.currency_code,
+        billing_address=(body.billing_address.model_dump()
+                         if body.billing_address else None),
+        products=[p.model_dump() for p in body.products] if body.products else None,
     )
     if isinstance(result, dict) and "error" in result:
         return JSONResponse(status_code=404, content=result)
