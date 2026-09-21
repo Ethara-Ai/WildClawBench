@@ -491,6 +491,101 @@ _BINARY_MAX_COLLECT_BYTES = 8_000_000
 # smaller-context council members (Kimi 225 KB / GLM 175 KB).
 _EXTRACT_CHAR_CAP = 100_000
 
+# OpenClaw persona/bootstrap scaffold. `inject_persona_into_workspace`
+# (docker_utils.py:2554) docker-cp's `<task>/persona/.` onto the workspace ROOT,
+# and `collect_task_output` (:2266) mirrors that root into `workspace_full/` —
+# so the loose-root recovery pass below sweeps 7-8 files of HARNESS INPUT as if
+# the agent had written them. Measured over 96 archived runs they are 16.5% of
+# every evidence character the judge is handed (5,301,960 chars; TOOLS.md and
+# MEMORY.md alone are the two single biggest offenders corpus-wide) and 55-81 KB
+# per task — 32-47% of GLM's entire 175 KB evidence budget spent on prompt-side
+# text presented to the judge as agent output. Mirrors the canonical list in
+# src/utils/s3_artifacts._TEMPLATE_FILE_NAMES; lowercased for case-blind compare.
+_HARNESS_SCAFFOLD_NAMES = frozenset({
+    "agents.md", "agent.md", "bootstrap.md", "heartbeat.md", "identity.md",
+    "memory.md", "soul.md", "tools.md", "user.md",
+})
+# The harness's own record of what it put under the workspace without the agent
+# writing it: `{"injected_by_harness": [...], "harness_bookkeeping": [...]}`,
+# workspace-relative paths, written by collect_task_output (docker_utils.py:2275).
+_HARNESS_EXCLUDED_MANIFEST = "artifacts_excluded.json"
+# The changed-file diff the same collector materialises: every path under it IS
+# agent-produced. Its ABSENCE is the legacy signal — a run collected before the
+# diff existed has no provenance to consult.
+_AGENT_DIFF_DIR = "artifacts"
+# Sweep roots that ARE the mirrored container workspace, i.e. the one place the
+# persona scaffold is staged. `artifacts/` is deliberately NOT here: it is the
+# agent-produced diff, so everything in it is a deliverable by construction.
+_WORKSPACE_MIRROR_DIR_NAMES = ("workspace_full", "workspace")
+
+
+def _harness_excluded_rel_paths(workspace_root: Path) -> frozenset[str]:
+    """Workspace-relative paths the harness recorded as NOT agent-produced.
+
+    Read verbatim from `artifacts_excluded.json`; both lists count, because
+    `harness_bookkeeping` is where a harness-authored AGENTS.md lands when spawn
+    steering rewrote it (docker_utils.py:2476). NEVER raises: a missing or
+    malformed manifest degrades to "no record", not to a grading failure."""
+    try:
+        raw = json.loads(
+            (workspace_root / _HARNESS_EXCLUDED_MANIFEST).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return frozenset()
+    if not isinstance(raw, dict):
+        return frozenset()
+    out: set[str] = set()
+    for key in ("injected_by_harness", "harness_bookkeeping"):
+        for p in raw.get(key) or []:
+            if isinstance(p, str) and p:
+                out.add(p.lstrip("./").lower())
+    return frozenset(out)
+
+
+def _agent_produced_rel_paths(workspace_root: Path) -> frozenset[str] | None:
+    """Workspace-relative paths under the agent-produced diff tree, or None when
+    that tree does not exist (legacy run — no provenance recorded).
+
+    This is what makes the exclusion PROVENANCE-based rather than name-based: a
+    scaffold-named file the agent genuinely authored shows up in the diff, so it
+    survives, while an untouched injected copy never does."""
+    diff_root = workspace_root / _AGENT_DIFF_DIR
+    if not diff_root.is_dir():
+        return None
+    out: set[str] = set()
+    try:
+        for f in diff_root.rglob("*"):
+            if f.is_file():
+                out.add(f.relative_to(diff_root).as_posix().lower())
+    except OSError:
+        return None
+    return frozenset(out)
+
+
+def _is_harness_scaffold(
+    rel: str,
+    excluded_rel: frozenset[str],
+    agent_rel: frozenset[str] | None,
+) -> bool:
+    """True when a loose workspace-root file is harness scaffold, not deliverable.
+
+    Provenance wins over naming, in this order:
+      1. the harness NAMED it in `artifacts_excluded.json` -> excluded outright,
+         whatever it is called;
+      2. it is not scaffold-named -> kept (the loose-root pass exists to recover
+         genuine root-written deliverables and that must not regress);
+      3. it is scaffold-named AND the agent-produced diff carries the same
+         workspace-relative path -> KEPT. A run whose agent really did author
+         AGENTS.md as its deliverable is graded on it;
+      4. it is scaffold-named and there is no diff at all (legacy collection) ->
+         excluded on the canonical name list, the only signal such a run has."""
+    if rel.lower() in excluded_rel:
+        return True
+    if rel.lower() not in _HARNESS_SCAFFOLD_NAMES:
+        return False
+    if agent_rel is None:
+        return True
+    return rel.lower() not in agent_rel
+
 
 def _looks_like_deliverable(
     path: Path, root: Path, named: frozenset[str] = frozenset()
@@ -538,18 +633,39 @@ def _collect_deliverable_files(
     workspace_results: Path,
     rubric_names: frozenset[str] | None = None,
     oversized: list[tuple[str, int]] | None = None,
+    scaffold: list[str] | None = None,
 ) -> list[Path]:
     """Deliverable paths under the workspace. `rubric_names` lifts the size gate
     for the files the rubric grades by name; `oversized`, when given, receives
     `(name, size)` for every file a size gate dropped so _gather_evidence can
-    name it in the omission manifest instead of dropping it silently."""
+    name it in the omission manifest instead of dropping it silently; `scaffold`
+    likewise receives the name of every harness-injected file the loose-root
+    pass skipped, so the judge reads "excluded" rather than inferring absence."""
     files: list[Path] = []
     seen: set[Path] = set()
     # Dropped paths need their own dedup set: `seen` only grows on collection,
     # and the sibling sweep re-walks results/ under artifacts/, so a rejected
     # file would otherwise be reported once per pass.
     dropped: set[Path] = set()
+    skipped: set[str] = set()
     named = rubric_names or frozenset()
+    results_path = Path(workspace_results) if workspace_results else None
+    if results_path is None:
+        workspace_root = None
+    elif results_path.name == "results":
+        workspace_root = results_path.parent.parent
+    else:
+        workspace_root = results_path.parent
+    excluded_rel = (
+        _harness_excluded_rel_paths(workspace_root) if workspace_root else frozenset())
+    agent_rel = _agent_produced_rel_paths(workspace_root) if workspace_root else None
+
+    def _skip_scaffold(f: Path) -> bool:
+        if not _is_harness_scaffold(f.name, excluded_rel, agent_rel):
+            return False
+        if f.suffix.lower() in _ALL_DELIVERABLE_EXTS:
+            skipped.add(f.name)
+        return True
 
     def _add_sized(f: Path) -> None:
         if _looks_like_deliverable(f, f.parent, named):
@@ -563,11 +679,15 @@ def _collect_deliverable_files(
             except OSError:
                 pass
 
-    def _add_from(root: Path) -> None:
+    def _add_from(root: Path, workspace_mirror: bool = False) -> None:
         if not root.is_dir():
             return
         for f in sorted(root.rglob("*")):
             if not (f.is_file() and f not in seen):
+                continue
+            # Scaffold lives at the mirror ROOT only, so nested files are never
+            # tested: an agent writing results/MEMORY.md is still graded on it.
+            if workspace_mirror and f.parent == root and _skip_scaffold(f):
                 continue
             if _is_text_deliverable(f):
                 seen.add(f)
@@ -576,13 +696,12 @@ def _collect_deliverable_files(
                     or _is_image_deliverable(f)):
                 _add_sized(f)
 
-    if workspace_results:
-        results_path = Path(workspace_results)
-        _add_from(results_path)
+    if results_path is not None and workspace_root is not None:
+        _add_from(results_path,
+                  results_path.name in _WORKSPACE_MIRROR_DIR_NAMES)
         # Sibling sweep: workspace_full/<deliverable-name>/ written by the agent
         # outside results/ — collect_output_from_container always preserves the
         # full /tmp_workspace tree under workspace_full/ for exactly this case.
-        workspace_root = results_path.parent.parent if results_path.name == "results" else results_path.parent
         for sibling in (workspace_root / "workspace_full", workspace_root):
             if not sibling.is_dir():
                 continue
@@ -591,10 +710,17 @@ def _collect_deliverable_files(
             # Some agents save deliverables at the workspace ROOT (e.g.
             # /tmp_workspace/foo.csv) rather than in a named subdir. Recover
             # text-like deliverable files sitting directly under the sweep root,
-            # without recursing into input/scaffold subtrees.
+            # without recursing into input/scaffold subtrees. A loose file's
+            # workspace-relative path IS its name here, which is exactly the key
+            # both provenance records use.
             for f in sorted(sibling.glob("*")):
-                if f.is_file() and f not in seen:
-                    _add_sized(f)
+                if not (f.is_file() and f not in seen):
+                    continue
+                if _skip_scaffold(f):
+                    continue
+                _add_sized(f)
+        if scaffold is not None:
+            scaffold.extend(sorted(skipped))
     return files
 
 
@@ -1077,7 +1203,9 @@ def _gather_evidence(
     named = rubric_names or frozenset()
     transcript_text = _fence_evidence_text(transcript_text)
     oversized: list[tuple[str, int]] = []
-    deliverables = _collect_deliverable_files(workspace_results, named, oversized)
+    scaffold: list[str] = []
+    deliverables = _collect_deliverable_files(
+        workspace_results, named, oversized, scaffold)
     # Order so the files the rubric is actually ABOUT survive every member's
     # truncation budget: rubric-named files first, then report/flagged stems,
     # then other deliverables, then scratch subtrees — ascending size within
@@ -1138,6 +1266,10 @@ def _gather_evidence(
     # budget loop below cannot name it. Carry it into the SAME manifest with its
     # size — silently absent evidence reads to the judge as "never produced".
     size_notes = [f"{n} ({s} bytes, too large to collect)" for n, s in oversized]
+    # Harness scaffold rides the SAME manifest: silence reads to the judge as
+    # "the agent never wrote it", and a judge that infers absence from silence
+    # is exactly the hallucination the manifest exists to prevent.
+    size_notes += [f"{n} (harness scaffold, excluded)" for n in scaffold]
     base_manifest = _omission_manifest(size_notes) if size_notes else ""
     effective = _JUDGE_MAX_EVIDENCE if budget is None else budget
     # Budget deliverables and transcript SEPARATELY. The transcript marker can
