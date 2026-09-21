@@ -615,8 +615,21 @@ def _build_router(store: Store, registry: _OneShotRegistry) -> APIRouter:
     # lived in inject_inproc; both are gone, because a ladder that resolves
     # the pk before the store sees it also hides the coercion from the
     # timeline -- the op lands and no one is told it was ever mis-typed.
+    #
+    # ``{pk:path}`` rather than ``{pk}`` because a primary key is whatever the
+    # table keys on, and kubernetes keys services and deployments on the
+    # namespaced name -- "prod/api-gateway". The default converter is
+    # ``[^/]+``, so those ten rows answered 404 on every path-style admin op
+    # while the body-style upsert and /bulk reached them fine: the plane could
+    # hold the row and not address it. Percent-encoding alone does not fix it,
+    # because ASGI hands the router an already-decoded path and "%2F" is a "/"
+    # by the time matching happens. ``:path`` is ``.*``, which changes nothing
+    # for a pk with no slash in it -- the other 49 services address exactly as
+    # they did -- and it does not shadow the sibling routes either: POST owns
+    # /data/{table} and /data/{table}/bulk, and the collection GET is a
+    # separate, earlier route that this pattern's mandatory "/" cannot reach.
 
-    @router.get("/data/{table}/{pk}")
+    @router.get("/data/{table}/{pk:path}")
     def get_row(table: str, pk: str, response: Response):
         try:
             row, warnings = store.table(table).admin_get(pk)
@@ -641,7 +654,7 @@ def _build_router(store: Store, registry: _OneShotRegistry) -> APIRouter:
         _stamp(response, warnings)
         return row
 
-    @router.patch("/data/{table}/{pk}")
+    @router.patch("/data/{table}/{pk:path}")
     def patch_row(table: str, pk: str, body: _PatchIn, response: Response):
         try:
             t = store.table(table)
@@ -656,7 +669,7 @@ def _build_router(store: Store, registry: _OneShotRegistry) -> APIRouter:
         _stamp(response, warnings)
         return row
 
-    @router.delete("/data/{table}/{pk}")
+    @router.delete("/data/{table}/{pk:path}")
     def delete_row(table: str, pk: str, response: Response):
         try:
             t = store.table(table)

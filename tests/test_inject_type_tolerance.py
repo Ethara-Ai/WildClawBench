@@ -500,6 +500,150 @@ def test_a_missing_row_is_still_a_404(admin_app):
     assert client.delete("/admin/data/issues/nope").status_code == 404
 
 
+# --- a primary key that is itself a path ------------------------------------
+#
+# kubernetes keys services and deployments on the namespaced name, so ten rows
+# of the live fleet have a "/" INSIDE the key. The plane held them and could
+# not address them: the body-style upsert and /bulk reached them, and every
+# path-style route answered 404, because the default converter stops at the
+# first slash. Everything below pins both halves of the close -- the rows are
+# reachable now, and a pk with no slash in it is addressed exactly as before.
+
+
+@pytest.fixture
+def namespaced(store) -> ms.Table:
+    store.register("services", "_pk", lambda: [
+        {"_pk": "prod/api-gateway", "cluster_ip": "10.96.12.40", "port": 80},
+        {"_pk": "kube-system/kube-dns", "cluster_ip": "10.96.0.10", "port": 53},
+    ])
+    return store.table("services")
+
+
+def test_a_slash_pk_is_addressable_over_http(admin_app, namespaced):
+    client, _header = admin_app
+    got = client.get("/admin/data/services/prod%2Fapi-gateway")
+    assert got.status_code == 200
+    assert got.json()["cluster_ip"] == "10.96.12.40"
+
+    patched = client.patch("/admin/data/services/prod%2Fapi-gateway",
+                           json={"fields": {"cluster_ip": "10.43.7.77"}})
+    assert patched.status_code == 200
+    assert namespaced.get("prod/api-gateway")["cluster_ip"] == "10.43.7.77"
+
+    assert client.delete("/admin/data/services/prod%2Fapi-gateway").json() == {
+        "deleted": "prod/api-gateway"}
+    assert namespaced.get("prod/api-gateway") is None
+
+
+def test_a_slash_pk_also_answers_the_key_spelled_literally(admin_app, namespaced):
+    """ASGI hands the router an already-decoded path, so the two spellings are
+    the same request by the time it is matched. Asserting both is what stops a
+    later "just percent-encode it" from reading as a fix."""
+    client, _header = admin_app
+    assert client.get(
+        "/admin/data/services/prod/api-gateway").json()["port"] == 80
+
+
+def test_a_missing_slash_pk_is_a_404_not_a_mismatch(admin_app, namespaced):
+    client, _header = admin_app
+    assert client.get("/admin/data/services/prod/nope").status_code == 404
+    assert client.patch("/admin/data/services/staging%2Fweb",
+                        json={"fields": {"port": 1}}).status_code == 404
+
+
+def test_a_pk_with_no_slash_addresses_exactly_as_it_did(admin_app, namespaced):
+    """The converter widened; the other 49 services must not notice."""
+    client, _header = admin_app
+    assert client.get("/admin/data/issues/99").json()["title"] == "seed-a"
+    assert client.get("/admin/data/texts/a-1").json()["n"] == "7"
+    assert client.get("/admin/data/issues").json()["rows"], "collection route"
+    assert client.get("/admin/data/issues/nope").status_code == 404
+
+
+def test_the_two_lanes_spell_a_row_path_the_same_way():
+    """The encode and the decode are one contract, checked from both ends."""
+    from src.utils.inject_director import admin_row_path
+    from src.utils.inject_inproc import _ADMIN_ROW
+
+    path = admin_row_path("services", "prod/api-gateway")
+    assert path == "/admin/data/services/prod%2Fapi-gateway"
+    match = _ADMIN_ROW.match(path)
+    assert match is not None, "the in-process transport must recognise it"
+    from urllib.parse import unquote
+    assert [unquote(g) for g in match.groups()] == ["services", "prod/api-gateway"]
+
+
+def test_a_replay_of_a_slash_pk_op_lands_and_serves():
+    from src.utils.inject_director import InjectStage
+    from src.utils.inject_inproc import (LANDS_AND_SERVES, InProcessApplier,
+                                         replay_service_ops)
+
+    store = ms.Store("kubernetes-api")
+    store.register("services", "_pk", lambda: [
+        {"_pk": "prod/api-gateway", "cluster_ip": "10.96.12.40", "port": 80}])
+    module = types.ModuleType("kubernetes_data")
+    module._store = store
+    op = {"id": "sil-k8s-ip", "service": "kubernetes-api",
+          "admin": {"op": "patch", "table": "services", "pk": "prod/api-gateway",
+                    "set": {"cluster_ip": "10.43.7.77"}}}
+    with tempfile.TemporaryDirectory() as scratch:
+        applier = InProcessApplier({"kubernetes-api": module}, scratch)
+        stage = InjectStage(index=1, name="stage1", from_turn=0, to_turn=1,
+                            silent=[op])
+        verdicts = replay_service_ops(applier, "kubernetes-api", [(stage, op)])
+
+    assert [v.verdict for v in verdicts] == [LANDS_AND_SERVES]
+    assert store.table("services").get("prod/api-gateway")["cluster_ip"] == "10.43.7.77"
+
+
+class _TestClientSession:
+    """``requests``-shaped view of a TestClient: same verbs, no ``timeout``."""
+
+    def __init__(self, client):
+        self._client = client
+
+    def __getattr__(self, verb):
+        def call(url, timeout=None, **kw):
+            return getattr(self._client, verb)(url, **kw)
+        return call
+
+
+def _http_applier(client, tmp_path):
+    from src.utils.inject_director import InjectApplier
+
+    applier = InjectApplier({"kubernetes-api": "http://testserver"}, None,
+                            tmp_path / "inject_timeline.jsonl")
+    applier._session = _TestClientSession(client)
+    return applier
+
+
+def test_the_http_applier_lands_the_same_slash_pk_op(admin_app, namespaced, tmp_path):
+    """The other lane, against a real router rather than the store directly."""
+    client, _header = admin_app
+    applier = _http_applier(client, tmp_path)
+    op = {"id": "sil-k8s-ip", "service": "kubernetes-api"}
+    rec = applier._apply_admin_op("kubernetes-api", {
+        "op": "patch", "table": "services", "pk": "prod/api-gateway",
+        "set": {"cluster_ip": "10.43.7.77"}}, op, silent=True)
+
+    assert (rec["ok"], rec["status"], rec["http"]) == (True, "applied", 200)
+    assert namespaced.get("prod/api-gateway")["cluster_ip"] == "10.43.7.77"
+
+
+def test_an_authored_admin_url_carrying_the_slash_is_replayed(admin_app, namespaced,
+                                                              tmp_path):
+    client, _header = admin_app
+    applier = _http_applier(client, tmp_path)
+    rec = applier._replay_admin_rest("kubernetes-api", {
+        "id": "sil-k8s-port", "method": "PATCH",
+        "path": "/admin/data/services/prod/api-gateway",
+        "body": {"fields": {"port": 8080}}}, silent=True)
+
+    assert (rec["table"], rec["pk"]) == ("services", "prod/api-gateway")
+    assert rec["ok"] and rec["status"] == "applied"
+    assert namespaced.get("prod/api-gateway")["port"] == 8080
+
+
 # --- the injector translates the report into the timeline -------------------
 
 

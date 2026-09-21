@@ -24,6 +24,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+from urllib.parse import unquote
 
 from src.utils.inject_director import InjectApplier, InjectStage
 from src.utils.serving_shape import (is_clock_stamp, partition_expected,
@@ -63,6 +64,12 @@ WOULD_ERROR = "WOULD-ERROR"
 TABLE_MISSING = "TABLE-MISSING"
 NEEDS_RUNTIME = "NEEDS-RUNTIME"
 
+# Both halves of a row path are percent-encoded by
+# ``inject_director.admin_row_path``, so a kubernetes pk arrives here as
+# "prod%2Fapi-gateway" and still matches ``[^/]+``. Unquoting is what makes
+# this transport answer the same row the HTTP plane answers for the same URL;
+# without it the two lanes disagree and the gate calls an addressable row
+# missing.
 _ADMIN_TABLE = re.compile(r"^/admin/data/([^/]+)/?$")
 _ADMIN_ROW = re.compile(r"^/admin/data/([^/]+)/([^/]+)/?$")
 _ADMIN_DOC = re.compile(r"^/admin/doc/([^/]+)/?$")
@@ -143,8 +150,8 @@ class InProcessApplier(InjectApplier):
         try:
             row_match = _ADMIN_ROW.match(suffix)
             if row_match:
-                return store.table(row_match.group(1)).admin_get(
-                    row_match.group(2))[0]
+                return store.table(unquote(row_match.group(1))).admin_get(
+                    unquote(row_match.group(2)))[0]
             table_match = _ADMIN_TABLE.match(suffix)
             if table_match:
                 return {"rows": store.table(table_match.group(1)).rows()}

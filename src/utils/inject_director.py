@@ -66,6 +66,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+from urllib.parse import quote, unquote
 
 import requests
 
@@ -86,6 +87,19 @@ LOG = logging.getLogger("wildclaw.inject")
 # Mirrors docker_utils.TMP_WORKSPACE without importing it: this module is
 # imported by static validation paths that must not pull in the docker stack.
 _TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
+
+
+def admin_row_path(table: Any, pk: Any) -> str:
+    """Admin-plane path addressing ONE row, both segments percent-encoded.
+
+    The single place a row-addressed admin URL is spelled. Both the HTTP
+    applier and the in-process one go through it -- the director to build the
+    request, ``inject_inproc`` to read the same path back -- so the two lanes
+    cannot disagree about what a pk looks like on the wire. kubernetes is why
+    it exists: its services and deployments key on "prod/api-gateway", and an
+    unescaped slash there is a path separator, not part of the key.
+    """
+    return f"/admin/data/{quote(str(table), safe='')}/{quote(str(pk), safe='')}"
 
 
 class InjectConfigError(Exception):
@@ -1116,7 +1130,7 @@ class InjectApplier:
             return {"ok": False, "error": "no admin URL"}
         try:
             r = self._session.patch(
-                base.rstrip("/") + f"/admin/data/{table}/{pk}",
+                base.rstrip("/") + admin_row_path(table, pk),
                 json={"fields": fields},
                 headers=self._headers(), timeout=5.0,
             )
@@ -1293,7 +1307,7 @@ class InjectApplier:
         class is caught statically by preflight's bare-REST-form warning.
         Nested dict/list values stay reported-but-not-asserted.
         """
-        row = self._admin_get(api, f"/admin/data/{table}/{pk}")
+        row = self._admin_get(api, admin_row_path(table, pk))
         if not isinstance(row, dict):
             return None, False, []
         bag = _serving_row_bag(row)
@@ -1360,7 +1374,11 @@ class InjectApplier:
                                "admin_op": "rest-replay"}
         ui_values: Optional[Dict[str, Any]] = None
         m_post = re.match(r"^/admin/data/([^/]+)/?$", path) if method == "POST" else None
-        m_patch = re.match(r"^/admin/data/([^/]+)/([^/]+)/?$", path) if method == "PATCH" else None
+        # The pk half is ``(.+?)`` and not ``([^/]+)`` for the same reason the
+        # plane's route converter is ``:path``: an author writing the admin URL
+        # out by hand for a kubernetes row writes the slash the key contains.
+        # Whatever it captures is unquoted, so the encoded spelling works too.
+        m_patch = re.match(r"^/admin/data/([^/]+)/(.+?)/?$", path) if method == "PATCH" else None
         if m_post and isinstance(body.get("row"), dict):
             table, row = m_post.group(1), body["row"]
             pk_field = self._table_pk(api, table)
@@ -1379,9 +1397,9 @@ class InjectApplier:
                 if not verified:
                     self._mark_unverified(rec, orphans)
         elif m_patch:
-            table, pk = m_patch.group(1), m_patch.group(2)
+            table, pk = unquote(m_patch.group(1)), unquote(m_patch.group(2))
             fields = body.get("fields") if isinstance(body.get("fields"), dict) else dict(body)
-            row_before = self._admin_get(api, f"/admin/data/{table}/{pk}")
+            row_before = self._admin_get(api, admin_row_path(table, pk))
             known = (set(_serving_row_bag(row_before))
                      if isinstance(row_before, dict) else None)
             before = self._touched(row_before, fields)
@@ -1484,7 +1502,7 @@ class InjectApplier:
                 table = self._resolve_store_table(api, spec.get("table"))
                 pk = str(spec.get("pk"))
                 set_ = spec.get("set") or {}
-                row = self._admin_get(api, f"/admin/data/{table}/{pk}")
+                row = self._admin_get(api, admin_row_path(table, pk))
                 if not isinstance(row, dict):
                     rec.update(ok=False, status="unresolved", table=table, pk=pk,
                                reason="row not found")
@@ -1554,7 +1572,7 @@ class InjectApplier:
                 row = dict(spec.get("row") or {})
                 pk_field = spec.get("pk_field") or "id"
                 pk = row.get(pk_field)
-                existed = self._admin_get(api, f"/admin/data/{table}/{pk}") if pk else None
+                existed = self._admin_get(api, admin_row_path(table, pk)) if pk else None
                 res = self._admin_post(api, f"/admin/data/{table}", {"row": row})
                 self._drop_path_roundtrip(pk)
                 rec.update(table=table, pk=pk, ok=bool(res.get("ok")), http=res.get("status"),
@@ -1684,7 +1702,7 @@ class InjectApplier:
             return rec
         table, pk, fields, unmapped = resolved
         rec.update(table=table, pk=pk, fields=list(fields.keys()))
-        row_before = self._admin_get(api, f"/admin/data/{table}/{pk}")
+        row_before = self._admin_get(api, admin_row_path(table, pk))
         known = (set(_serving_row_bag(row_before))
                  if isinstance(row_before, dict) else None)
         before = self._touched(row_before, fields)
