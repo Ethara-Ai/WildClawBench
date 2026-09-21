@@ -601,9 +601,22 @@ def _dedup_by_content(
     return [f for i, f in enumerate(files) if i not in superseded]
 
 
+# Why a named file's CONTENTS are absent from the evidence. Closed vocabulary,
+# enumerated verbatim in judge_system.md so the judge reads "present but
+# unreadable" instead of inferring "absent" (= the agent's failure):
+#   not-extractable   unsupported binary / no transcript — we cannot read it
+#   over-budget       collected, then cut for size (collection gate or budget)
+#   harness-scaffold  harness input, not agent output
+#   duplicate-of <p>  byte-identical re-collection, content shown once at <p>
+# Images carry NO reason on purpose: a rubric-named image is ATTACHED to the
+# judge message and so IS readable (test_judge_image_note_truth.py).
+def _reason(token: str) -> str:
+    return f" [reason: {token}]"
+
+
 def _duplicate_note(pairs: list[tuple[str, str]]) -> str:
     listing = "; ".join(
-        f"{dup} (identical to {first})"
+        f"{dup} (identical to {first}){_reason(f'duplicate-of {first}')}"
         for dup, first in pairs[:_DUPLICATE_NOTE_MAX_NAMES]
     )
     extra = len(pairs) - _DUPLICATE_NOTE_MAX_NAMES
@@ -1109,11 +1122,13 @@ def _deliverable_evidence_marker(path: Path) -> str | None:
             if duration:
                 return (
                     f"\n----- DELIVERABLE: {path.name} "
-                    f"({duration}, transcript unavailable) -----\n"
+                    f"({duration}, transcript unavailable)"
+                    f"{_reason('not-extractable')} -----\n"
                 )
             return (
                 f"\n----- DELIVERABLE: {path.name} "
-                "(audio - present, transcript unavailable) -----\n"
+                "(audio - present, transcript unavailable)"
+                f"{_reason('not-extractable')} -----\n"
             )
         if _is_binary_deliverable(path):
             extracted = _extract_text_deliverable(path)
@@ -1121,7 +1136,8 @@ def _deliverable_evidence_marker(path: Path) -> str | None:
                 return f"\n----- DELIVERABLE: {path.name} (extracted text) -----\n{extracted}"
             return (
                 f"\n----- DELIVERABLE: {path.name} "
-                "(binary — present, contents not extractable) -----\n"
+                "(binary — present, contents not extractable)"
+                f"{_reason('not-extractable')} -----\n"
             )
     except Exception:
         return None
@@ -1373,11 +1389,13 @@ def _gather_evidence(
     # A file dropped by a collection size gate never became a block, so the
     # budget loop below cannot name it. Carry it into the SAME manifest with its
     # size — silently absent evidence reads to the judge as "never produced".
-    size_notes = [f"{n} ({s} bytes, too large to collect)" for n, s in oversized]
+    size_notes = [f"{n} ({s} bytes, too large to collect){_reason('over-budget')}"
+                  for n, s in oversized]
     # Harness scaffold rides the SAME manifest: silence reads to the judge as
     # "the agent never wrote it", and a judge that infers absence from silence
     # is exactly the hallucination the manifest exists to prevent.
-    size_notes += [f"{n} (harness scaffold, excluded)" for n in scaffold]
+    size_notes += [f"{n} (harness scaffold, excluded){_reason('harness-scaffold')}"
+                   for n in scaffold]
     base_manifest = _omission_manifest(size_notes) if size_notes else ""
     effective = _JUDGE_MAX_EVIDENCE if budget is None else budget
     # Budget deliverables and transcript SEPARATELY. The transcript marker can
@@ -1422,9 +1440,9 @@ def _gather_evidence(
                 half = (room - len(cut_mark)) // 2
                 kept.append(block[:half] + cut_mark + block[-(room - len(cut_mark) - half):])
                 used += room
-                omitted.append(f"{f.name} (partial)")
+                omitted.append(f"{f.name} (partial){_reason('over-budget')}")
             else:
-                omitted.append(f.name)
+                omitted.append(f"{f.name}{_reason('over-budget')}")
         tail_room = max(0, deliv_budget - used)
         note_out = (scratch_note + dup_note)[:tail_room]
         kept.append(note_out)
