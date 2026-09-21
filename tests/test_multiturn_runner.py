@@ -370,7 +370,7 @@ def test_empty_turn_retry_restores_session(monkeypatch, tmp_path):
     _turn_outcomes(monkeypatch, a, ["ok", "ok"])
     succ = iter([0, 0, 1, 1, 1])
 
-    def _rows(run_key, successes_only=False):
+    def _rows(run_key, successes_only=False, since_epoch=None):
         return next(succ) if successes_only else 0
 
     monkeypatch.setattr(a, "_count_run_key_rows", _rows)

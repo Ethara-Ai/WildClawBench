@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -349,7 +350,49 @@ class OpenClawAgent(BaseAgent):
         )
         return False
 
-    def _count_run_key_rows(self, run_key: str, successes_only: bool = False) -> int:
+    @staticmethod
+    def _row_started_epoch(row: dict) -> float | None:
+        """Epoch seconds at which a usage row's request STARTED, or None.
+
+        Reconstructed from fields the sidecar writer ALREADY emits — no new
+        field, no schema change (src/utils/litellm_usage_callback.py): "ts" is
+        stamped at write time, i.e. ~the request's end_time, and "duration_s"
+        is (end_time - start_time). So start ~ parse(ts) - duration_s.
+
+        None is the FAIL-OPEN signal: a row whose start cannot be placed in
+        time must be COUNTED by the caller, which degrades that row to the
+        pre-since_epoch behaviour. Counting can only ever make a turn look
+        ALIVE, so a parse failure can never manufacture an empty verdict — and
+        therefore can never manufacture a new abort.
+
+        Clock note: the writer stamps UTC on the HOST clock (the faketime shim
+        is agent-container-only, docker_utils._agent_clock_env), which is the
+        same clock as the time.time() baselines compared against here — the
+        same host<->sidecar comparison collect_usage's window already relies on.
+        """
+        try:
+            ts = row.get("ts")
+            if not isinstance(ts, str) or not ts:
+                return None
+            if ts.endswith("Z"):
+                # 3.9's fromisoformat predates 'Z' support; the writer emits
+                # "+00:00", but tolerate the other spelling rather than
+                # fail-open on it.
+                ts = ts[:-1] + "+00:00"
+            parsed = datetime.fromisoformat(ts)
+            if parsed.tzinfo is None:
+                # A naive stamp cannot be placed on the host clock without
+                # guessing a zone. The writer never emits one; fail open.
+                return None
+            duration = row.get("duration_s")
+            if duration is None:
+                return None
+            return parsed.timestamp() - float(duration)
+        except Exception:
+            return None
+
+    def _count_run_key_rows(self, run_key: str, successes_only: bool = False,
+                            since_epoch: float | None = None) -> int:
         # successes_only serves the EMPTY-turn check: a turn whose every request
         # fails writes only "kind": "failure" rows (aleksei 1P 2026-09-06 —
         # relay 400s on turns 14-16 counted as traffic, so three dead turns
@@ -358,6 +401,15 @@ class OpenClawAgent(BaseAgent):
         # writer formatting drift, and "preflight" probe rows would mask a
         # genuinely empty turn. The stall guard keeps counting
         # ALL rows: a fast-failing route is live, not stalled.
+        #
+        # since_epoch (successes_only only) scopes the count to rows whose
+        # request STARTED at or after that host-clock instant. Rows land
+        # asynchronously and can be MINUTES late (koji: 3 minutes), so an
+        # unscoped count credits this attempt with a row that belongs to an
+        # earlier turn — or to the previous attempt of this one, which would
+        # disarm the empty-twice abort. since_epoch=None is the pre-existing
+        # behaviour, byte for byte: the stall guard and the partial-turn check
+        # keep calling it that way.
         try:
             with open(self.litellm_usage_log, "r", encoding="utf-8") as fh:
                 if not successes_only:
@@ -367,11 +419,17 @@ class OpenClawAgent(BaseAgent):
                     if run_key not in line:
                         continue
                     try:
-                        kind = json.loads(line).get("kind")
+                        row = json.loads(line)
+                        kind = row.get("kind")
                     except ValueError:
-                        kind = None
-                    if kind == "agent":
-                        n += 1
+                        row, kind = {}, None
+                    if kind != "agent":
+                        continue
+                    if since_epoch is not None:
+                        started = self._row_started_epoch(row)
+                        if started is not None and started < since_epoch:
+                            continue
+                    n += 1
                 return n
         except OSError:
             return 0
@@ -608,6 +666,70 @@ class OpenClawAgent(BaseAgent):
             return int(os.environ.get("WCB_EMPTY_TURN_LIMIT", "2") or 0)
         except ValueError:
             return 2
+
+    # Bounded settle before an EMPTY verdict. The attempt's row count is read
+    # the instant the agent PROCESS exits, but rows are appended by the
+    # sidecar's callback AFTER the response completes, off the agent's
+    # critical path — koji's row landed 3 minutes behind its request. A
+    # healthy turn whose last row is still in flight therefore reads as zero
+    # and burns its one retry; a second such read aborts a live run. Polling a
+    # few seconds costs a healthy turn nothing (its rows are already there, so
+    # the loop is never entered) and costs a genuinely dead turn only this
+    # budget before the same verdict.
+    _EMPTY_SETTLE_POLL_S = 0.5
+    _EMPTY_SETTLE_DEFAULT_S = 15.0
+    # The retry attempt waits longer: its empty verdict ABORTS the run, so the
+    # cost of under-waiting there is the whole run, not one re-send.
+    _EMPTY_SETTLE_RETRY_DEFAULT_S = 60.0
+
+    @staticmethod
+    def _empty_settle_seconds(turn_attempt: int) -> float:
+        var, default = (
+            ("WCB_EMPTY_SETTLE_SECONDS_RETRY",
+             OpenClawAgent._EMPTY_SETTLE_RETRY_DEFAULT_S)
+            if turn_attempt > 0 else
+            ("WCB_EMPTY_SETTLE_SECONDS", OpenClawAgent._EMPTY_SETTLE_DEFAULT_S))
+        try:
+            settle_s = float(os.environ.get(var, "") or default)
+        except ValueError:
+            return default
+        return max(0.0, settle_s)
+
+    def _settled_attempt_success_rows(self, run_key: str, attempt_start: float,
+                                      turn_attempt: int, task_id: str,
+                                      turn_number: int) -> int:
+        """Attempt-scoped successful-row count, re-read until it settles."""
+        n = self._count_run_key_rows(run_key, successes_only=True,
+                                     since_epoch=attempt_start)
+        settle_s = self._empty_settle_seconds(turn_attempt)
+        # No log on disk means the sidecar lane has written nothing at all for
+        # this run (not even the route probe's preflight row), so there is
+        # nothing in flight to wait for — polling it would only add latency to
+        # a verdict that cannot change.
+        if n or settle_s <= 0 or not os.path.exists(self.litellm_usage_log or ""):
+            return n
+        deadline = time.time() + settle_s
+        # The iteration cap, not the deadline, is what makes this terminate:
+        # the deadline alone spins forever whenever time.time() cannot advance.
+        max_polls = max(1, int(settle_s / self._EMPTY_SETTLE_POLL_S))
+        polls = 0
+        while n == 0 and polls < max_polls and time.time() < deadline:
+            time.sleep(self._EMPTY_SETTLE_POLL_S)
+            polls += 1
+            n = self._count_run_key_rows(run_key, successes_only=True,
+                                         since_epoch=attempt_start)
+        if n:
+            logger.info(
+                "[%s] Agent turn %d looked EMPTY at process exit; %d "
+                "successful row(s) landed within %.1fs of settle (poll %d) — "
+                "treating the turn as alive",
+                task_id, turn_number, n, settle_s, polls)
+        else:
+            logger.warning(
+                "[%s] Agent turn %d still shows no successful LLM traffic "
+                "after %.1fs of settle (%d polls) — declaring it empty",
+                task_id, turn_number, settle_s, polls)
+        return n
 
     @staticmethod
     def _stall_seconds() -> float:
@@ -1070,8 +1192,11 @@ class OpenClawAgent(BaseAgent):
                 _run_key = self._run_keys.get(spec.task_id, "")
                 _rows_guarded = bool(_run_key and self.litellm_usage_log
                                      and self._run_key_bearer_live())
-                rows_before_turn = (self._count_run_key_rows(_run_key)
-                                    if _rows_guarded else 0)
+                # Baseline for the PARTIAL-turn check on the timeout path
+                # only (see below). The empty check no longer uses a
+                # turn-level baseline: it scopes rows to the attempt that was
+                # actually running, so a late row from an earlier turn cannot
+                # vouch for this one.
                 succ_before_turn = (
                     self._count_run_key_rows(_run_key, successes_only=True)
                     if _rows_guarded else 0)
@@ -1101,6 +1226,11 @@ class OpenClawAgent(BaseAgent):
                     session_lines = (
                         self._session_line_count(spec.task_id)
                         if _rows_guarded and turn_attempt == 0 else None)
+                    # Row floor for THIS attempt's empty check, re-stamped per
+                    # attempt: a row the previous attempt left in flight must
+                    # not vouch for the re-send, or an empty retry reads as
+                    # alive and the empty-twice abort never fires.
+                    attempt_start = time.time()
                     agent_proc = run_background(
                         spec.task_id,
                         bash_cmd=(
@@ -1126,8 +1256,12 @@ class OpenClawAgent(BaseAgent):
                         # Empty-turn handling (LLM_TIMEOUT_EVIDENCE dossier): a
                         # dead LLM route makes the invocation fast-fail its
                         # internal ladder and exit "ok" with an empty assistant
-                        # reply — turn-count complete, content-empty. Zero new
-                        # sidecar rows == the turn produced nothing. Retry the
+                        # reply — turn-count complete, content-empty. Zero
+                        # successful sidecar rows STARTED by this attempt ==
+                        # the attempt produced nothing (the count is scoped to
+                        # the attempt and allowed to settle first, because a
+                        # row still in flight is not the same thing as a row
+                        # that never existed). Retry the
                         # SAME turn once (reusing safe_msg here — re-entering
                         # the outer loop would re-fire before_turn injections
                         # and ClawMark stage mutations); a second empty means
@@ -1137,9 +1271,10 @@ class OpenClawAgent(BaseAgent):
                         # turns_duplicated stays as the "a retry fired here"
                         # marker, no longer a claim that a duplicate exists.
                         if _rows_guarded and self._empty_turn_limit() > 0:
-                            succ_now = self._count_run_key_rows(
-                                _run_key, successes_only=True)
-                            if succ_now == succ_before_turn:
+                            succ_this_attempt = self._settled_attempt_success_rows(
+                                _run_key, attempt_start, turn_attempt,
+                                spec.task_id, turn_index + 1)
+                            if succ_this_attempt == 0:
                                 turns_empty.append(turn_index)
                                 if turn_attempt == 0:
                                     logger.warning(
@@ -1159,8 +1294,6 @@ class OpenClawAgent(BaseAgent):
                                     "run_incomplete.",
                                     spec.task_id, turn_index + 1)
                                 break
-                            succ_before_turn = succ_now
-                            rows_before_turn = self._count_run_key_rows(_run_key)
                         logger.info("[%s] Agent turn %d finished",
                                     spec.task_id, turn_index + 1)
                         break
