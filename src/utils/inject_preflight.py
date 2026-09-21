@@ -42,8 +42,7 @@ from src.utils.inject_director import (
     InjectConfigError, InjectScript, NarrativeClock, resolve_stage_mtime,
 )
 from src.utils.inject_inproc import (
-    InProcessApplier, LANDS_AND_SERVES, NEEDS_RUNTIME, OpVerdict, ordered_api_ops,
-    replay_service_ops,
+    InProcessApplier, LANDS_AND_SERVES, OpVerdict, ordered_api_ops, replay_service_ops,
 )
 from src.utils.inject_validator import _resolve_fs_src, validate_inject_script
 from src.utils.mock_overlay import ENVIRONMENT_DIR, OverlayError, overlaid_data_module, overlaid_tree
@@ -311,7 +310,7 @@ def _replay_findings(script: InjectScript, task_dir: Path,
 
 
 def _finding_for(verdict: OpVerdict) -> GateFinding:
-    severity = WARN if verdict.verdict == NEEDS_RUNTIME else FATAL
+    severity = WARN if verdict.survivable else FATAL
     return GateFinding(severity, verdict.verdict,
                        f"{verdict.service} {verdict.stage}/{verdict.op_id}",
                        verdict.detail)

@@ -23,17 +23,19 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from src.utils.inject_director import InjectApplier, InjectStage
-from src.utils.serving_shape import (partition_expected, project_in_process,
-                                     project_list_surfaces, value_visible)
+from src.utils.serving_shape import (is_clock_stamp, partition_expected,
+                                     project_in_process, project_list_surfaces,
+                                     value_visible)
 
 __all__ = [
     "LANDS_AND_SERVES",
     "LANDS_BUT_INVISIBLE",
     "NEEDS_RUNTIME",
     "OpVerdict",
+    "SERVES_WITH_ORPHAN",
     "TABLE_MISSING",
     "WOULD_ERROR",
     "InProcessApplier",
@@ -41,14 +43,22 @@ __all__ = [
     "replay_service_ops",
 ]
 
-# The five things a replayed op can turn out to be. Only the first is a pass,
-# and only NEEDS-RUNTIME is survivable: it names state an op targets that the
-# seeds and the earlier stages do not carry, which is the signature of a row
-# the AGENT is expected to create before the op fires. The mid-run verifier
-# owns that case; failing it here would refuse every task whose scenario has
-# the agent build something the injection then edits.
+# The six things a replayed op can turn out to be. Only the first is a clean
+# pass, and two are survivable. NEEDS-RUNTIME names state an op targets that
+# the seeds and the earlier stages do not carry, which is the signature of a
+# row the AGENT is expected to create before the op fires; the mid-run verifier
+# owns that case, and failing it here would refuse every task whose scenario
+# has the agent build something the injection then edits.
+#
+# SERVES-WITH-ORPHAN names the other survivable shape: the op's graded payload
+# reached the agent, and a key BESIDE it -- typically a cosmetic ``updated_at``
+# stamp the author spelled in the wrong namespace -- landed where no getter
+# reads. The dead key is worth reporting and is not worth refusing a task over,
+# because the drift the rubric grades is observable either way. An op whose
+# WHOLE payload is orphaned has no such defence and stays LANDS-BUT-INVISIBLE.
 LANDS_AND_SERVES = "LANDS-AND-SERVES"
 LANDS_BUT_INVISIBLE = "LANDS-BUT-INVISIBLE"
+SERVES_WITH_ORPHAN = "SERVES-WITH-ORPHAN"
 WOULD_ERROR = "WOULD-ERROR"
 TABLE_MISSING = "TABLE-MISSING"
 NEEDS_RUNTIME = "NEEDS-RUNTIME"
@@ -77,6 +87,10 @@ class OpVerdict:
     @property
     def fatal(self) -> bool:
         return self.verdict in (LANDS_BUT_INVISIBLE, WOULD_ERROR, TABLE_MISSING)
+
+    @property
+    def survivable(self) -> bool:
+        return self.verdict in (NEEDS_RUNTIME, SERVES_WITH_ORPHAN)
 
 
 # The str-then-int pk ladder that used to sit here is gone. It mirrored a copy
@@ -211,9 +225,10 @@ class _Target:
     the op means to make true, which is what tells a redundant write apart from
     a lost one when the serving shape does not move.
 
-    The pairs are kept rather than just the values because a probe has to be
-    able to ask a read surface about the KEY a value was written to, not only
-    about the value itself.
+    The pairs are kept rather than just the values because severity depends on
+    WHICH keys failed: an op is only excused for an orphaned key when the keys
+    beside it still reach the agent, and that question cannot be asked of a bag
+    of anonymous values.
     """
 
     table: Optional[str] = None
@@ -228,6 +243,11 @@ class _Target:
     @property
     def written(self) -> Tuple[Any, ...]:
         return tuple(value for _key, value in self.payload)
+
+    def written_outside(self, orphans: Iterable[str]) -> Tuple[Any, ...]:
+        """The values written to keys that are NOT in ``orphans``."""
+        dead = {str(k) for k in orphans}
+        return tuple(v for k, v in self.payload if str(k) not in dead)
 
 
 def _target_of(op: Dict[str, Any], applier: InProcessApplier, api: str) -> _Target:
@@ -310,8 +330,12 @@ def replay_service_ops(applier: InProcessApplier, api: str,
                                  f"{type(exc).__name__}: {exc}"))
             continue
         verdict, detail = _verdict_from_record(rec)
-        if verdict == LANDS_AND_SERVES and probe:
-            verdict, detail = _judge_serving(module, target, before, rec)
+        if probe:
+            if verdict == LANDS_AND_SERVES:
+                verdict, detail = _judge_serving(module, target, before, rec)
+            elif verdict == LANDS_BUT_INVISIBLE and rec.get("orphan_fields"):
+                verdict, detail = _judge_orphan_severity(module, target, before,
+                                                         rec, detail)
         out.append(OpVerdict(op_id, stage.name, api, verdict, detail))
     return out
 
@@ -410,3 +434,39 @@ def _judge_serving(module: Any, target: _Target, before: _Observation,
     return (LANDS_BUT_INVISIBLE,
             f"{after.mechanism} serves neither the written values nor anything "
             "new — the write cannot reach the agent")
+
+
+def _judge_orphan_severity(module: Any, target: _Target, before: _Observation,
+                           rec: Dict[str, Any], reason: str) -> Tuple[str, str]:
+    """Grade an orphan-key finding by what the REST of the payload did.
+
+    An orphan is always a real defect: the key landed where no getter reads it.
+    It is not always a reason to refuse the task. Authors routinely stamp a
+    cosmetic ``updated_at`` beside the business payload and spell it in the
+    wrong namespace, and that stamp misfiling does not stop the graded drift
+    from reaching the agent.
+
+    So the payload is split the way it was written, and there are two ways to
+    earn the downgrade. Either keys survive the orphan list and are visible in
+    the post-write serving shape — visibility, not mere movement, because the
+    orphan itself can move a projection that serves its namespace wholesale —
+    or the orphans are nothing but clock stamps, in which case the op never
+    carried a value the agent reads for meaning and there is none to lose.
+    Anything else keeps the verdict: contentful's ``published_version`` encodes
+    publish state, square's ``price_amount`` is the price, and an op whose whole
+    payload is one of those reaches no one.
+    """
+    orphans = tuple(rec.get("orphan_fields") or ())
+    survivors = target.written_outside(orphans)
+    if not survivors:
+        if orphans and all(is_clock_stamp(k) for k in orphans):
+            return (SERVES_WITH_ORPHAN,
+                    f"{reason} — the payload is a clock stamp and nothing else, "
+                    "so no value the rubric grades was lost")
+        return LANDS_BUT_INVISIBLE, reason
+    after = _observe(module, target)
+    if after.row is None or not all(value_visible(v, after.row) for v in survivors):
+        return LANDS_BUT_INVISIBLE, reason
+    return (SERVES_WITH_ORPHAN,
+            f"{reason} — the rest of the payload is served via "
+            f"{after.mechanism}, so the graded drift still reaches the agent")

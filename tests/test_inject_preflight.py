@@ -208,19 +208,37 @@ def test_clean_task_passes_every_gate(fleet, tmp_path):
     assert report.ops == 1
 
 
-def test_orphan_key_upsert_is_fatal_and_names_the_op_and_keys(fleet, tmp_path):
-    """The willie linkedin shape: an upsert carrying counters no getter names."""
+def test_orphan_keys_beside_a_served_payload_are_named_without_blocking(fleet,
+                                                                        tmp_path):
+    """The willie linkedin shape: an upsert carrying counters no getter names.
+
+    The post itself arrives — id, name and tags all serve — and only the three
+    engagement counters are dropped. The dead keys have to be NAMED, because an
+    author who meant them to land needs to know they did not; refusing the task
+    over them would refuse a scenario the agent can observe in full.
+    """
     task = _task(tmp_path, ["widget-api"], [_upsert("loud_partner_post", {
         "id": "w-9", "name": "Consortium", "tags": "red",
         "like_count": "12", "comment_count": "1", "share_count": "1",
     })])
     report = gate_task(task, environment_dir=fleet)
-    assert not report.ok
-    assert _kinds(report, FATAL) == {"LANDS-BUT-INVISIBLE"}
-    finding = report.fatal[0]
+    assert report.ok, report.summary()
+    assert _kinds(report, WARN) == {"SERVES-WITH-ORPHAN"}
+    finding = report.warnings[0]
     assert "loud_partner_post" in finding.subject
     for orphan in ("like_count", "comment_count", "share_count"):
         assert orphan in finding.reason
+
+
+def test_an_upsert_whose_whole_payload_is_orphaned_is_still_fatal(fleet, tmp_path):
+    """Nothing survives the orphan list, so nothing reaches the agent."""
+    task = _task(tmp_path, ["widget-api"], [_upsert("loud_counters_only", {
+        "id": "w-9", "like_count": "12", "comment_count": "1",
+    })])
+    report = gate_task(task, environment_dir=fleet)
+    assert not report.ok
+    assert _kinds(report, FATAL) == {"LANDS-BUT-INVISIBLE"}
+    assert "loud_counters_only" in report.fatal[0].subject
 
 
 def test_write_to_an_unserved_column_is_fatal(fleet, tmp_path):

@@ -26,6 +26,7 @@ from src.utils.serving_shape import (  # noqa: E402
     find_getter,
     flatten_serving,
     getter_addresses,
+    is_clock_stamp,
     is_miss,
     list_surfaces,
     loose_eq,
@@ -522,6 +523,21 @@ def test_a_getter_that_raises_is_reported_rather_than_re_addressed():
     serving, mechanism = project_in_process(_Raising, "issues", "20200")
     assert serving is None
     assert "ValueError" in mechanism
+
+
+# --------------------------------------------------------------------------- #
+# clock stamps: bookkeeping, not scenario state
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("key", ["updated_at", "updatedAt", "last_modified",
+                                 "modified", "mtime", "date_updated"])
+def test_a_last_touched_timestamp_is_a_clock_stamp(key):
+    assert is_clock_stamp(key)
+
+
+@pytest.mark.parametrize("key", ["published_version", "price_amount", "items",
+                                 "status", "created_at", "socialDetail"])
+def test_state_bearing_keys_are_not_clock_stamps(key):
+    assert not is_clock_stamp(key)
 
 
 # --------------------------------------------------------------------------- #

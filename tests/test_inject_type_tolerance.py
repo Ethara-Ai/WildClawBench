@@ -670,3 +670,72 @@ def test_an_op_that_restates_the_baseline_is_not_an_invisible_write():
     # that produced no drift cannot have produced drift the agent cannot see.
     assert [v.verdict for v in verdicts] == [LANDS_AND_SERVES]
     assert "no-op" in verdicts[0].detail
+
+
+def _contentful_like():
+    store = ms.Store("contentful-api")
+    store.register("entries", "id", lambda: [
+        {"id": "pc-27-01", "updated_at": "2026-10-26T18:40:03+00:00",
+         "published_version": 3,
+         "fields": {"status": "in_review", "caption": "old caption"}},
+        {"id": "pc-27-02", "updated_at": "2026-10-26T18:40:03+00:00",
+         "published_version": 3,
+         "fields": {"status": "in_review", "caption": "second"}},
+    ])
+    module = types.ModuleType("contentful_data")
+
+    def get_entry(pk):
+        row = store.table("entries").get(pk)
+        if row is None:
+            return {"errors": [{"name": "notResolvable"}]}
+        return {"sys": {"id": row["id"], "updatedAt": row["updated_at"],
+                        "publishedVersion": row["published_version"]},
+                "fields": dict(row["fields"])}
+
+    module.get_entry = get_entry
+    return module, store
+
+
+def test_a_misfiled_stamp_beside_a_payload_that_serves_is_only_a_warning():
+    from src.utils.inject_inproc import SERVES_WITH_ORPHAN
+
+    module, store = _contentful_like()
+    op = {"id": "sil_pc01_ready", "service": "contentful-api",
+          "admin": {"op": "patch", "table": "entries", "pk": "pc-27-01",
+                    "set": {"status": "ready", "caption": "new caption",
+                            "updated_at": "2026-10-29T07:20:00+00:00"}}}
+    verdicts, _store = _replay_module("contentful-api", module, store, [op])
+
+    assert [v.verdict for v in verdicts] == [SERVES_WITH_ORPHAN]
+    assert not verdicts[0].fatal and verdicts[0].survivable
+    assert module.get_entry("pc-27-01")["fields"]["status"] == "ready"
+
+
+def test_a_payload_that_is_nothing_but_a_stamp_is_also_only_a_warning():
+    from src.utils.inject_inproc import SERVES_WITH_ORPHAN
+
+    module, store = _contentful_like()
+    op = {"id": "loud_pc02_touch", "service": "contentful-api",
+          "admin": {"op": "patch", "table": "entries", "pk": "pc-27-02",
+                    "set": {"updated_at": "2026-11-01T05:35:00+00:00"}}}
+    verdicts, _store = _replay_module("contentful-api", module, store, [op])
+
+    assert [v.verdict for v in verdicts] == [SERVES_WITH_ORPHAN]
+    assert "clock stamp" in verdicts[0].detail
+
+
+def test_an_orphan_carrying_the_graded_payload_stays_fatal():
+    from src.utils.inject_inproc import LANDS_BUT_INVISIBLE
+
+    module, store = _contentful_like()
+    op = {"id": "loud_malt_pv", "service": "contentful-api",
+          "admin": {"op": "patch", "table": "entries", "pk": "pc-27-01",
+                    "set": {"published_version": "7",
+                            "updated_at": "2027-01-01T02:40:00.000Z"}}}
+    verdicts, _store = _replay_module("contentful-api", module, store, [op])
+
+    # `published_version` IS the op: "this entry got republished" never happens
+    # and sys.publishedVersion never moves, so there is nothing to excuse.
+    assert [v.verdict for v in verdicts] == [LANDS_BUT_INVISIBLE]
+    assert verdicts[0].fatal
+    assert module.get_entry("pc-27-01")["sys"]["publishedVersion"] == 3

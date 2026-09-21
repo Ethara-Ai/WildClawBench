@@ -220,11 +220,23 @@ def check_current_date(value: object, window: TaskWindow | None) -> str | None:
 
 
 # --------------------------------------------------------------------------- #
-# Standard B — TRUTH.md's three sections
+# Standard B — TRUTH.md's sections
 # --------------------------------------------------------------------------- #
 
-#: The pilot-rework section set, in mandatory order.
-TRUTH_SECTIONS = ("Focal Event", "Canonical Solve Path", "Value Lock")
+#: The ground-truth skeleton, in mandatory order. The trailing five are as
+#: intentional as the leading three: ``golden_steer_flow`` emits all eight, and
+#: the fairness, noise-purity, poison-pill, grader-note and build-fingerprint
+#: sections are what a grader reads to tell a fair task from an unfair one.
+TRUTH_SECTIONS = (
+    "Focal Event",
+    "Canonical Solve Path",
+    "Value Lock",
+    "Fairness Ledger",
+    "Signal Set and Noise Purity",
+    "Poison-Pill Record",
+    "Grader Notes",
+    "BUILD_FINGERPRINT",
+)
 
 #: ``TRUTH.md`` is the standard name; the pilot shipped under the older one.
 TRUTH_FILENAMES = ("TRUTH.md", "golden_steer_flow.md")
@@ -254,7 +266,8 @@ def truth_sections(text: str) -> list[str]:
     return [_canonical_section(h) for h in _HEADING_RE.findall(text)]
 
 
-#: What each section is for, so a generated skeleton is self-explaining.
+#: What each section is for, so a generated skeleton is self-explaining. Every
+#: name in TRUTH_SECTIONS needs an entry here or the skeleton renderer raises.
 _TRUTH_PROMPTS = {
     "Focal Event": "What happens, to whom, and the in-world scope boundary that\n"
                    "separates it from the distractor material.",
@@ -262,11 +275,21 @@ _TRUTH_PROMPTS = {
                             "observation that forces each one.",
     "Value Lock": "The exact values grading pins — figures, identifiers, file\n"
                   "paths — and where each is written.",
+    "Fairness Ledger": "Every fact the solve needs, and where in the world the\n"
+                       "agent can reach it before it is graded on it.",
+    "Signal Set and Noise Purity": "Which signals carry the answer, and the\n"
+                                   "evidence that the distractors carry none of it.",
+    "Poison-Pill Record": "Each planted trap, what a taken bait looks like, and\n"
+                          "how grading tells it apart from an honest miss.",
+    "Grader Notes": "The constants grading pins and the map from each rubric\n"
+                    "criterion to the observation that settles it.",
+    "BUILD_FINGERPRINT": "The generator inputs this bundle was built from, so a\n"
+                         "rebuild can be shown to produce the same world.",
 }
 
 
 def render_truth_skeleton(task_id: str, window: TaskWindow | None = None) -> str:
-    """Render a TRUTH.md carrying exactly the three mandated sections."""
+    """Render a TRUTH.md carrying exactly the mandated sections."""
     lines = [f"# TRUTH — {task_id}", ""]
     if window is not None:
         lines += [f"Window: {window.start.isoformat()} to {window.end.isoformat()} "
@@ -277,7 +300,7 @@ def render_truth_skeleton(task_id: str, window: TaskWindow | None = None) -> str
 
 
 def check_truth_sections(text: str) -> str | None:
-    """Return an error string unless the file has exactly the 3 sections."""
+    """Return an error string unless the file has exactly the mandated sections."""
     found = truth_sections(text)
     if found == list(TRUTH_SECTIONS):
         return None

@@ -155,36 +155,62 @@ def test_resolve_current_date_keeps_the_static_default_without_a_window(tmp_path
 # Standard B — TRUTH.md carries exactly three sections
 # ======================================================================
 
-_GOOD_TRUTH = "# TRUTH\n\n## 1. Focal Event\n\nx\n\n## 2. Canonical Solve Path\n\ny\n\n## 3. Value Lock\n\nz\n"
+def _truth_doc(sections=None) -> str:
+    """A TRUTH.md carrying `sections` (the mandated skeleton by default)."""
+    names = list(ts.TRUTH_SECTIONS) if sections is None else list(sections)
+    body = "".join(f"## {i}. {name}\n\nbody\n\n"
+                   for i, name in enumerate(names, start=1))
+    return "# TRUTH\n\n" + body
+
+
+_GOOD_TRUTH = _truth_doc()
 
 
 def test_truth_sections_ignores_numbering_and_the_document_title():
     assert ts.truth_sections(_GOOD_TRUTH) == list(ts.TRUTH_SECTIONS)
 
 
-def test_truth_sections_accepts_the_shipped_qualified_first_heading():
-    text = _GOOD_TRUTH.replace("## 1. Focal Event", "## 1. Focal Event and Scope")
+def test_truth_sections_accepts_the_shipped_qualified_headings():
+    # golden_steer_flow qualifies several headings in parentheses; the
+    # canonicaliser folds a trailing qualifier, so they stay canonical.
+    text = (_GOOD_TRUTH
+            .replace("## 1. Focal Event", "## 1. Focal Event and Scope")
+            .replace("## 4. Fairness Ledger", "## 4. Fairness Ledger (feeds G18)")
+            .replace("## 7. Grader Notes",
+                     "## 7. Grader Notes (CONSTANTS + coverage map)"))
     assert ts.check_truth_sections(text) is None
 
 
-def test_check_truth_sections_accepts_the_canonical_three():
+def test_check_truth_sections_accepts_the_generators_eight_sections():
+    # The trailing five are intentional golden_steer_flow output, not drift:
+    # demanding only the leading three refused every task in the corpus.
+    assert ts.TRUTH_SECTIONS[3:] == ("Fairness Ledger", "Signal Set and Noise Purity",
+                                     "Poison-Pill Record", "Grader Notes",
+                                     "BUILD_FINGERPRINT")
     assert ts.check_truth_sections(_GOOD_TRUTH) is None
 
 
+def test_every_mandated_section_can_be_rendered():
+    # render_truth_skeleton indexes _TRUTH_PROMPTS by name, so a section added
+    # to the tuple without a prompt is a KeyError at generation time.
+    assert set(ts.TRUTH_SECTIONS) <= set(ts._TRUTH_PROMPTS)
+
+
 def test_check_truth_sections_rejects_extra_sections():
-    err = ts.check_truth_sections(_GOOD_TRUTH + "\n## 4. Grader Notes\n\nq\n")
-    assert err and "unexpected ['Grader Notes']" in err
+    err = ts.check_truth_sections(_GOOD_TRUTH + "\n## 9. Appendix\n\nq\n")
+    assert err and "unexpected ['Appendix']" in err
 
 
 def test_check_truth_sections_rejects_a_missing_section():
-    err = ts.check_truth_sections(_GOOD_TRUTH.replace("## 3. Value Lock", "").strip() + "\n")
+    err = ts.check_truth_sections(_truth_doc(
+        [s for s in ts.TRUTH_SECTIONS if s != "Value Lock"]))
     assert err and "missing ['Value Lock']" in err
 
 
 def test_check_truth_sections_rejects_reordering():
-    text = ("## Value Lock\n\nz\n\n## Focal Event\n\nx\n\n"
-            "## Canonical Solve Path\n\ny\n")
-    err = ts.check_truth_sections(text)
+    swapped = list(ts.TRUTH_SECTIONS)
+    swapped[0], swapped[2] = swapped[2], swapped[0]
+    err = ts.check_truth_sections(_truth_doc(swapped))
     assert err and "out of order" in err
 
 
@@ -307,14 +333,42 @@ def test_preflight_section6_passes_a_compliant_task(pf, tmp_path, capsys):
 
 def test_preflight_section6_fails_each_standard_independently(pf, tmp_path, capsys):
     task = _compliant_task(tmp_path, name="BAD")
-    (task / "TRUTH.md").write_text(_GOOD_TRUTH + "\n## 4. Grader Notes\n\nq\n",
+    (task / "TRUTH.md").write_text(_GOOD_TRUTH + "\n## 9. Appendix\n\nq\n",
                                    encoding="utf-8")
     (task / "prompts.txt").write_text("--- TURN T0 ---\nhi\n", encoding="utf-8")
     pf.check_task_standards(task)
     out = capsys.readouterr().out
-    assert pf._counts["FAIL"] >= 2
-    assert "unexpected ['Grader Notes']" in out
+    assert pf._counts["FAIL"] >= 1
+    assert "unexpected ['Appendix']" in out
     assert "must open with exactly" in out
+
+
+def test_a_header_nit_is_a_note_while_prompts_json_carries_the_turns(pf, tmp_path,
+                                                                    capsys):
+    # The runtime builds every turn from prompts.json and parse_prompts_file
+    # drops `#` lines, so `turns:` where the standard says `turn_count:` is a
+    # convention nit on decorative text — not a reason to refuse the bundle.
+    task = _compliant_task(tmp_path, name="HEADERNIT")
+    (task / "prompts.txt").write_text(
+        (task / "prompts.txt").read_text(encoding="utf-8")
+        .replace("# turn_count: 3", "# turns: 3"), encoding="utf-8")
+    pf.check_task_standards(task)
+    out = capsys.readouterr().out
+    assert pf._counts["FAIL"] == 0
+    assert pf._counts["WARN"] >= 1
+    assert "decorative" in out
+
+
+def test_the_same_header_nit_is_a_failure_when_prompts_txt_is_the_trajectory(
+        pf, tmp_path, capsys):
+    task = _compliant_task(tmp_path, name="TXTONLY")
+    (task / "prompts.json").unlink()
+    (task / "prompts.txt").write_text(
+        (task / "prompts.txt").read_text(encoding="utf-8")
+        .replace("# turn_count: 3", "# turns: 3"), encoding="utf-8")
+    pf.check_task_standards(task)
+    assert pf._counts["FAIL"] >= 1
+    assert "decorative" not in capsys.readouterr().out
 
 
 def test_preflight_section6_fails_a_task_with_no_window(pf, tmp_path, capsys):

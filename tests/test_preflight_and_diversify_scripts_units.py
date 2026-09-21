@@ -73,6 +73,15 @@ def pf(monkeypatch, tmp_path):
     return mod
 
 
+def _mandated_truth() -> str:
+    """A TRUTH.md carrying whatever section skeleton the standard mandates."""
+    from src.utils.task_standard import TRUTH_SECTIONS
+
+    return "# TRUTH\n\n" + "".join(
+        f"## {i}. {name}\n\nbody\n\n"
+        for i, name in enumerate(TRUTH_SECTIONS, start=1))
+
+
 def _mk_task(root: Path, *, full=True) -> Path:
     task = root / "TASK"
     task.mkdir(parents=True, exist_ok=True)
@@ -120,6 +129,72 @@ def test_pf_check_structure_pass_and_fail(pf, tmp_path, capsys):
     (part / "persona" / "SOUL.md").write_text("s", encoding="utf-8")
     pf.check_structure(part)
     assert "persona/ missing" in capsys.readouterr().out
+
+
+def test_the_generated_test_pair_is_a_note_when_neither_half_ships(pf, tmp_path,
+                                                                   capsys):
+    # The pair is opt-in: the parser reads it only whole and only when a run
+    # asks for generated tests, and a rubric-only run is the documented default.
+    task = _mk_task(tmp_path)
+    for name in pf.TEST_PAIR:
+        (task / name).unlink(missing_ok=True)
+    pf.check_structure(task)
+    assert pf._counts["FAIL"] == 0 and pf._counts["WARN"] >= 1
+    assert "rubric-only" in capsys.readouterr().out
+
+
+def test_half_the_generated_test_pair_is_still_a_failure(pf, tmp_path, capsys):
+    task = _mk_task(tmp_path)
+    (task / "test_weights.json").unlink()
+    pf.check_structure(task)
+    assert pf._counts["FAIL"] >= 1
+    assert "only ever read whole" in capsys.readouterr().out
+
+
+def test_asking_for_generated_tests_makes_the_absent_pair_a_failure(pf, tmp_path,
+                                                                    monkeypatch):
+    task = _mk_task(tmp_path)
+    for name in pf.TEST_PAIR:
+        (task / name).unlink(missing_ok=True)
+    monkeypatch.setattr(pf, "GENERATE_TESTS", True)
+    pf.check_structure(task)
+    assert pf._counts["FAIL"] >= 1
+
+
+def test_the_task_yaml_key_check_says_which_way_it_went(pf, tmp_path, capsys):
+    # The pass and fail branches printed the same sentence, so `✘ task.yaml has
+    # system_prompt` read as the opposite of what it meant.
+    task = _mk_task(tmp_path)
+    (task / "task.yaml").write_text(
+        "task_type: ops\nrequired_apis: [widget]\ndistractor_apis: []\n",
+        encoding="utf-8")
+    pf.check_task_yaml(task)
+    out = capsys.readouterr().out
+    assert "task.yaml has task_type" in out
+    assert "task.yaml lacks system_prompt" in out
+    assert "task.yaml has system_prompt" not in out
+
+
+def test_an_absent_system_prompt_does_not_block_a_run(pf, tmp_path, capsys):
+    # task_parser lists it among the tolerated metadata keys, defaults it to ""
+    # and never feeds it to the agent; it is a packaging ask, not a blocker.
+    task = _mk_task(tmp_path)
+    (task / "task.yaml").write_text(
+        "task_type: ops\nrequired_apis: [widget]\ndistractor_apis: []\n",
+        encoding="utf-8")
+    pf.check_task_yaml(task)
+    assert pf._counts["FAIL"] == 0
+    assert "Skoll" in capsys.readouterr().out
+
+
+def test_an_absent_task_type_still_blocks(pf, tmp_path, capsys):
+    task = _mk_task(tmp_path)
+    (task / "task.yaml").write_text(
+        "system_prompt: be helpful\nrequired_apis: [widget]\ndistractor_apis: []\n",
+        encoding="utf-8")
+    pf.check_task_yaml(task)
+    assert pf._counts["FAIL"] >= 1
+    assert "task.yaml lacks task_type" in capsys.readouterr().out
 
 
 def test_pf_check_task_yaml_variants(pf, tmp_path, capsys):
@@ -316,7 +391,10 @@ def test_pf_check_turns_and_grading(pf, tmp_path, capsys):
     (t3 / "test_weights.json").write_text("[]", encoding="utf-8")
     pf.check_turns_and_grading(t3)
     out = capsys.readouterr().out
-    assert "prompts.txt missing" in out and "test_outputs.py missing" in out
+    assert "prompts.txt missing" in out
+    # The generated-test pair gets ONE verdict, in section 1, because its
+    # severity depends on whether both halves are absent or only one.
+    assert "test_outputs.py" not in out
     t4 = _mk_task(tmp_path / "c", full=False)
     (t4 / "prompts.txt").write_text("--- TURN T0\n", encoding="utf-8")
     (t4 / "rubric.json").write_text("[]", encoding="utf-8")
@@ -340,9 +418,7 @@ def test_pf_main_missing_green_and_red(pf, tmp_path, capsys, monkeypatch):
         "required_apis: [widget]\ndistractor_apis: []\n"
         "window: 2026-10-06 to 2026-10-11\ntimezone: America/Chicago\n",
         encoding="utf-8")
-    (task / "TRUTH.md").write_text(
-        "# TRUTH\n\n## 1. Focal Event\n\nx\n\n## 2. Canonical Solve Path\n\ny\n"
-        "\n## 3. Value Lock\n\nz\n", encoding="utf-8")
+    (task / "TRUTH.md").write_text(_mandated_truth(), encoding="utf-8")
     (task / "prompts.txt").write_text(
         "# task_id: TASK\n# persona: Widget Tester\n# timezone: America/Chicago\n"
         "# window: 2026-10-06 to 2026-10-11 (6 days)\n# turn_count: 2\n\n"

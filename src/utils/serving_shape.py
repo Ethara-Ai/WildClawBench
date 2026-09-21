@@ -122,6 +122,25 @@ def envelope_keys(row: Mapping[str, Any]) -> Set[str]:
     return {str(k) for k in row} - {NESTED_KEY}
 
 
+#: Envelope stamps that record WHEN a row was last touched. They are service
+#: bookkeeping rather than scenario state: no rubric grades a clock, and the
+#: fleet's own update routes are built to refuse to move one they did not earn.
+#: A write whose only unreachable key is one of these has still delivered every
+#: value the agent reads for meaning, which is what separates a misfiled stamp
+#: from a lost business column (contentful's ``published_version`` encodes
+#: publish state and is NOT one of these).
+_CLOCK_STAMPS = frozenset({
+    "updatedat", "modifiedat", "changedat", "touchedat", "editedat",
+    "lastmodified", "lastupdated", "lastchanged", "lastseenat",
+    "datemodified", "dateupdated", "updated", "modified", "mtime",
+})
+
+
+def is_clock_stamp(key: Any) -> bool:
+    """True when ``key`` names a last-touched timestamp rather than state."""
+    return _fold_key(key) in _CLOCK_STAMPS
+
+
 def partition_expected(expected: Mapping[str, Any],
                        nested: bool) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Split a patch payload into ``(columns, envelope)`` for a nested row.

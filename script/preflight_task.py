@@ -37,6 +37,16 @@ DEFAULT_TASK = REPO / "input" / "IAN_001 -- Bhavik Jain"
 # verdict is the same age as the bundle it is run on.
 LEGACY = False
 
+#: ``test_outputs.py`` and ``test_weights.json`` are an opt-in PAIR. The runtime
+#: reads them only together — ``task_parser._load_provided_tests`` returns
+#: nothing unless both are present — and only when a run asks for generated
+#: tests, which is off by default because a rubric-only run is the documented
+#: norm. Their joint absence is therefore a note about how the task will be
+#: graded; HALF the pair is a genuine break, because the half that is there
+#: will never be read.
+TEST_PAIR = ("test_outputs.py", "test_weights.json")
+GENERATE_TESTS = False
+
 # OpenClaw native tools that can appear as a loud-inject `service` but are NOT
 # mock HTTP APIs (they deliver in-band to the agent, so they have no env folder).
 NATIVE_SERVICES = {"message", "cron", "nodes", "canvas", "gateway", "image",
@@ -59,6 +69,22 @@ def rec(status: str, msg: str) -> None:
     print(f"  {_ICON[status]} {msg}")
 
 
+def _test_pair_verdict(task: Path) -> tuple[str, str]:
+    """How this bundle stands against the generated-test pair."""
+    present = [n for n in TEST_PAIR if (task / n).is_file()]
+    if len(present) == len(TEST_PAIR):
+        return PASS, f"{list(TEST_PAIR)} present"
+    missing = [n for n in TEST_PAIR if n not in present]
+    if present:
+        return FAIL, (f"{missing} MISSING while {present} is present — the pair is "
+                      f"only ever read whole, so the half that is here is dead")
+    if GENERATE_TESTS:
+        return FAIL, (f"{list(TEST_PAIR)} MISSING and --generate-tests was asked "
+                      f"for — there is nothing to run")
+    return WARN, (f"{list(TEST_PAIR)} absent — this task grades rubric-only, which "
+                  f"is the default; pass --generate-tests to require them")
+
+
 def _turn_num(t) -> int | None:
     if t is None:
         return None
@@ -72,7 +98,7 @@ def _turn_num(t) -> int | None:
 def check_structure(task: Path) -> None:
     section("1. Bundle structure")
     expected = ["data", "persona", "inject", "mock_data", "prompts.txt",
-                "rubric.json", "task.yaml", "test_outputs.py", "test_weights.json"]
+                "rubric.json", "task.yaml"]
     has_json = (task / "prompts.json").is_file()
     for name in expected:
         present = (task / name).exists()
@@ -86,6 +112,7 @@ def check_structure(task: Path) -> None:
             continue
         rec(PASS if present else FAIL,
             f"{name} present" if present else f"{name} MISSING")
+    rec(*_test_pair_verdict(task))
     persona = task / "persona"
     if persona.is_dir():
         need = {"AGENTS.md", "HEARTBEAT.md", "IDENTITY.md", "MEMORY.md", "SOUL.md", "TOOLS.md", "USER.md"}
@@ -127,8 +154,16 @@ def check_task_yaml(task: Path) -> tuple[list[str], list[str]]:
     except Exception as exc:  # noqa: BLE001
         rec(WARN, f"PyYAML unavailable/parse issue ({exc}); falling back to regex")
         required, distractor = _parse_api_lists(text)
-    for key in ("task_type", "system_prompt"):
-        rec(PASS if re.search(rf"^{key}:", text, re.MULTILINE) else FAIL, f"task.yaml has {key}")
+    # An absent `system_prompt` is a delivery-packaging gap, not a run blocker:
+    # task_parser lists it among the tolerated metadata keys, defaults it to ""
+    # and never feeds it to the agent (persona bootstrap files do that).
+    for key, absent in (("task_type", FAIL), ("system_prompt", WARN)):
+        if re.search(rf"^{key}:", text, re.MULTILINE):
+            rec(PASS, f"task.yaml has {key}")
+        else:
+            rec(absent, f"task.yaml lacks {key}"
+                        + (" (tolerated by the runtime; Skoll wants it on the "
+                           "delivered bundle)" if absent is WARN else ""))
     if isinstance(distractor, str):
         # 'auto' is the documented full-catalog sentinel, not an API list
         distractor = [] if distractor.strip().lower() in ("auto", "__auto__") else [distractor]
@@ -474,6 +509,8 @@ def check_turns_and_grading(task: Path) -> None:
 
     for fn in ("rubric.json", "test_weights.json"):
         p = task / fn
+        if fn in TEST_PAIR and not p.is_file():
+            continue  # the pair's own verdict was recorded in section 1
         try:
             data = json.load(open(p, encoding="utf-8"))
             rec(PASS, f"{fn} valid JSON ({len(data)} top-level entries)")
@@ -494,8 +531,6 @@ def check_turns_and_grading(task: Path) -> None:
                 "test_outputs.py CHECKERS source task/task.py present" if has_taskpy
                 else "test_outputs.py imports CHECKERS from task/task.py which is ABSENT "
                      "(grading cannot collect checkers until task.py is supplied)")
-    else:
-        rec(FAIL, "test_outputs.py missing")
 
 
 # --------------------------------------------------------------------------- #
@@ -592,7 +627,15 @@ def _check_truth_md(task: Path, ts) -> None:
 
 
 def _check_prompt_header(task: Path, ts, window) -> None:
-    """(C) The prompt file opens with the five-line header block."""
+    """(C) The prompt file opens with the five-line header block.
+
+    The header is load-bearing only when prompts.txt IS the trajectory. Once a
+    bundle ships prompts.json the parser builds every turn from the JSON and
+    ``parse_prompts_file`` discards ``#`` lines outright, so the block is a
+    convention the delivered text carries rather than anything the run reads —
+    and ``turn_count`` is authoritatively checked on the JSON. A nit there is
+    reported, not used to refuse a runnable task.
+    """
     prompt = _first_existing(task, ts.PROMPT_FILENAMES)
     if prompt is None:
         _standard(False, "", f"none of {list(ts.PROMPT_FILENAMES)} present")
@@ -609,8 +652,13 @@ def _check_prompt_header(task: Path, ts, window) -> None:
     if not errors:
         rec(PASS, f"{prompt.name} opens with the 5-line header block")
         return
+    decorative = (task / "prompts.json").is_file()
     for err in errors:
-        _standard(False, "", f"{prompt.name}: {err}")
+        if decorative:
+            rec(WARN, f"{prompt.name}: {err} (decorative — prompts.json is what "
+                      f"the parser reads)")
+        else:
+            _standard(False, "", f"{prompt.name}: {err}")
 
 
 # --------------------------------------------------------------------------- #
@@ -655,15 +703,20 @@ def check_world_correctness(task: Path) -> None:
 
 # --------------------------------------------------------------------------- #
 def main(argv: list[str] | None = None) -> int:
-    global LEGACY
+    global LEGACY, GENERATE_TESTS
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("task", nargs="?", default=str(DEFAULT_TASK),
                     help="task bundle dir (default: IAN_001)")
     ap.add_argument("--legacy", action="store_true",
                     help="downgrade task-format-standard FAILs to WARNs, for "
                          "corpora authored before the standards landed")
+    ap.add_argument("--generate-tests", action="store_true",
+                    help=f"require {list(TEST_PAIR)}, as a run launched with "
+                         f"--generate-tests would; off by default because a "
+                         f"rubric-only run is the documented norm")
     args = ap.parse_args(sys.argv[1:] if argv is None else argv)
     LEGACY = args.legacy
+    GENERATE_TESTS = args.generate_tests
 
     task = Path(args.task).expanduser()
     if not task.is_dir():
