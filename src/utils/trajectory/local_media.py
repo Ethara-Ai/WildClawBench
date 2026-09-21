@@ -1,4 +1,4 @@
-"""Rewrite inline media in trajectory messages to file:// URLs on disk.
+"""Extract inline media from trajectory messages onto disk.
 
 Local-only replacement for `_replace_inline_media_with_s3` from
 kensei2_sandbox.py. Handles the three image storage formats produced by
@@ -7,17 +7,40 @@ OpenClaw clients:
 2. Anthropic dict source: `{type:image, source:{type:base64, media_type, data}}`
 3. String source: `data:image/...;base64,...` URI or
    `/home/node/.openclaw/...` container path
+
+The bytes are always written to `artifacts_dir/<task_id>/<uuid>.<ext>` so the
+shipped transcript stays small and operators can still eyeball what the agent
+saw. What the rewritten block's `source` *says*, however, is the
+**container/workspace path the agent actually read** — recovered from the
+tool call that produced the media — never the host path of the extracted
+artifact. A `file:///home/ec2-user/harness/.../artifacts/...` string in a
+client-shipped `output.json` is both an infra leak and a dangling reference:
+the client has no such file and no such machine.
+
+Provenance is recovered in two passes:
+
+* Pass 1 (`_collect_origin_paths`) walks every message and records each
+  `toolCall` block that carries a path-ish string argument, keyed by the tool
+  call id. The mechanism is tool-name agnostic — `read`, `write`, `edit`,
+  `image` and anything else that names a file all register the same way.
+* Pass 2 (the rewrite walk) resolves each media-bearing message back to its
+  originating path, preferring the explicit `toolCallId` linkage that OpenClaw
+  emits on `role:"toolResult"` messages and falling back to emission-order
+  adjacency (the most recent unconsumed path-bearing call) when no id is
+  present. Every media block in one result inherits that one path.
+
+When nothing resolves, `source` becomes the neutral marker
+`inline-media (extracted)`. No branch ever writes a host path into `source`.
 """
 
 from __future__ import annotations
 
 import base64
 import logging
-import os
 import re
 import uuid
 from pathlib import Path
-from typing import List, Mapping, Optional
+from typing import Dict, Iterator, List, Mapping, Optional
 
 _logger = logging.getLogger(__name__)
 
@@ -27,6 +50,16 @@ _DATA_URI_RE = re.compile(r"^data:([^;]+);base64,(.+)$", re.DOTALL)
 _CONTAINER_PATH_RE = re.compile(
     r"^/home/node/\.openclaw/(?:workspace|uploads|media)/.+"
 )
+
+# Argument keys that name a file on a tool call. Ordered by how literal the
+# key is about being a path, so `{"path": ..., "filename": ...}` prefers
+# `path`. Mirrors `_WRITE_PATH_KEYS` in multimodal_meta.py plus the keys the
+# read/image tools actually use in captured runs.
+_PATH_ARG_KEYS = ("path", "file_path", "filePath", "filename", "file", "image")
+
+# What `source` says when provenance cannot be recovered. Deliberately not a
+# path of any kind: a client reading this must not think they can open it.
+_UNKNOWN_ORIGIN = "inline-media (extracted)"
 
 _MIME_EXT_MAP = {
     "image/png": "png",
@@ -80,8 +113,120 @@ def _to_url(path: Path, base_url: Optional[str], task_id: str) -> str:
     return "file://%s" % path.resolve()
 
 
+def _source_for(
+    path: Path, base_url: Optional[str], task_id: str, origin: Optional[str]
+) -> str:
+    """Decide what the rewritten block's `source` should say.
+
+    With `base_url` set the artifact is served over HTTP and the URL is a real,
+    client-resolvable reference, so it stays. Without one we are in local mode:
+    the only honest thing to publish is where the agent read the file inside
+    its container, or the neutral marker when that is unknowable. `_to_url`'s
+    `file://` host path is never a valid answer here.
+    """
+    if base_url:
+        return _to_url(path, base_url, task_id)
+    return origin or _UNKNOWN_ORIGIN
+
+
+def _normalize_call_id(value) -> str:
+    """Strip OpenClaw's `|route-suffix` so both sides of a pair compare equal.
+
+    `sanitize_jsonl_message` splits the suffix off block-level `toolCallId`s
+    but not the message-level one, so the two ends of the same pair can
+    disagree by a suffix by the time they reach us.
+    """
+    if not isinstance(value, str):
+        return ""
+    return value.strip().split("|", 1)[0]
+
+
+def _path_argument(block: Mapping) -> Optional[str]:
+    """Return the file path a `toolCall` block names, if it names one."""
+    if not isinstance(block, Mapping) or block.get("type") != "toolCall":
+        return None
+    args = block.get("arguments")
+    if not isinstance(args, Mapping):
+        return None
+    for key in _PATH_ARG_KEYS:
+        value = args.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _iter_blocks(content) -> Iterator[dict]:
+    """Yield every dict block in a content list, recursing into nested content."""
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        yield block
+        inner = block.get("content")
+        if isinstance(inner, list):
+            yield from _iter_blocks(inner)
+
+
+def _inner_message(msg) -> Optional[dict]:
+    """Unwrap `{is_accepted, hints, message:{...}}` envelopes to the real message."""
+    if not isinstance(msg, dict):
+        return None
+    envelope = msg
+    while (
+        isinstance(envelope, dict)
+        and "message" in envelope
+        and isinstance(envelope["message"], dict)
+        and "role" not in envelope["message"]
+        and "content" not in envelope["message"]
+    ):
+        envelope = envelope["message"]
+    inner = envelope.get("message") if isinstance(envelope, dict) else None
+    return inner if isinstance(inner, dict) else None
+
+
+def _collect_origin_paths(messages: List[dict]) -> Dict[str, str]:
+    """Pass 1: map tool call id -> the container path that call named."""
+    origins: Dict[str, str] = {}
+    for msg in messages:
+        inner = _inner_message(msg)
+        if inner is None:
+            continue
+        for block in _iter_blocks(inner.get("content")):
+            path = _path_argument(block)
+            if path is None:
+                continue
+            call_id = _normalize_call_id(block.get("id"))
+            # First writer wins: a repeated id is a retry of the same call,
+            # and the original argument is the one the transcript showed.
+            if call_id and call_id not in origins:
+                origins[call_id] = path
+    return origins
+
+
+def _result_call_id(inner: Mapping) -> str:
+    """Tool call id a result message points back at, message- or block-level."""
+    call_id = _normalize_call_id(inner.get("toolCallId"))
+    if call_id:
+        return call_id
+    for block in _iter_blocks(inner.get("content")):
+        for key in ("toolCallId", "tool_use_id"):
+            call_id = _normalize_call_id(block.get(key))
+            if call_id:
+                return call_id
+    return ""
+
+
+def _has_media(content) -> bool:
+    return any(b.get("type") in _MEDIA_BLOCK_TYPES for b in _iter_blocks(content))
+
+
 def _rewrite_block(
-    block: dict, task_id: str, artifacts_root: Path, base_url: Optional[str]
+    block: dict,
+    task_id: str,
+    artifacts_root: Path,
+    base_url: Optional[str],
+    origin: Optional[str],
 ) -> None:
     if not isinstance(block, dict):
         return
@@ -100,7 +245,7 @@ def _rewrite_block(
         path = _write_bytes(artifacts_root, task_id, raw, mime)
         block.pop("data", None)
         block.pop("mimeType", None)
-        block["source"] = _to_url(path, base_url, task_id)
+        block["source"] = _source_for(path, base_url, task_id, origin)
         if mime:
             block["mimeType"] = mime
         return
@@ -115,7 +260,7 @@ def _rewrite_block(
             except (ValueError, TypeError):
                 return
             path = _write_bytes(artifacts_root, task_id, raw, mime)
-            block["source"] = _to_url(path, base_url, task_id)
+            block["source"] = _source_for(path, base_url, task_id, origin)
             if mime and not block.get("mimeType"):
                 block["mimeType"] = mime
         elif src.get("type") == "url" and isinstance(src.get("url"), str):
@@ -132,7 +277,7 @@ def _rewrite_block(
             except (ValueError, TypeError):
                 return
             path = _write_bytes(artifacts_root, task_id, raw, mime)
-            block["source"] = _to_url(path, base_url, task_id)
+            block["source"] = _source_for(path, base_url, task_id, origin)
             if mime and not block.get("mimeType"):
                 block["mimeType"] = mime
             return
@@ -144,15 +289,19 @@ def _rewrite_block(
 
 
 def _walk_content(
-    content, task_id: str, artifacts_root: Path, base_url: Optional[str]
+    content,
+    task_id: str,
+    artifacts_root: Path,
+    base_url: Optional[str],
+    origin: Optional[str],
 ) -> None:
     if isinstance(content, list):
         for block in content:
             if isinstance(block, dict):
-                _rewrite_block(block, task_id, artifacts_root, base_url)
+                _rewrite_block(block, task_id, artifacts_root, base_url, origin)
                 inner = block.get("content")
                 if isinstance(inner, list):
-                    _walk_content(inner, task_id, artifacts_root, base_url)
+                    _walk_content(inner, task_id, artifacts_root, base_url, origin)
 
 
 def replace_inline_media_with_files(
@@ -161,27 +310,52 @@ def replace_inline_media_with_files(
     artifacts_dir: Path,
     base_url: Optional[str] = None,
 ) -> List[dict]:
-    """Walk messages and rewrite any inline media to local files.
+    """Walk messages and extract any inline media to local files.
 
     `artifacts_dir` is a base directory; files are written under
-    `artifacts_dir/<task_id>/`. `base_url` overrides the URL prefix
-    (e.g. for a local HTTP server); when omitted, `file://` URLs are used.
+    `artifacts_dir/<task_id>/`. The rewritten block's `source` names the
+    container path the agent read the media from, recovered from the
+    originating tool call, or `inline-media (extracted)` when that cannot be
+    determined — never the host path of the extracted artifact. `base_url`
+    overrides this with a servable URL prefix (e.g. for a local HTTP server),
+    which is a real client-resolvable reference rather than an infra leak.
     """
     artifacts_root = Path(artifacts_dir)
+    origins = _collect_origin_paths(messages)
+
+    # Emission-order fallback state: path-bearing calls seen so far that no
+    # media result has claimed yet, oldest first.
+    pending: List[tuple] = []
+
     for msg in messages:
-        if not isinstance(msg, dict):
+        inner = _inner_message(msg)
+        if inner is None:
             continue
-        # Handle wrapped envelopes (is_accepted/hints/message)
-        envelope = msg
-        while (
-            isinstance(envelope, dict)
-            and "message" in envelope
-            and isinstance(envelope["message"], dict)
-            and "role" not in envelope["message"]
-            and "content" not in envelope["message"]
-        ):
-            envelope = envelope["message"]
-        inner = envelope.get("message") if isinstance(envelope, dict) else None
-        if isinstance(inner, dict):
-            _walk_content(inner.get("content"), task_id, artifacts_root, base_url)
+
+        content = inner.get("content")
+        for block in _iter_blocks(content):
+            path_arg = _path_argument(block)
+            if path_arg is not None:
+                pending.append((_normalize_call_id(block.get("id")), path_arg))
+
+        if not _has_media(content):
+            continue
+
+        origin: Optional[str] = None
+        call_id = _result_call_id(inner)
+        if call_id and call_id in origins:
+            # Explicit linkage: OpenClaw stamps `toolCallId` on every
+            # `role:"toolResult"` message, so this is the path in practice.
+            origin = origins[call_id]
+            for idx, (pid, _path) in enumerate(pending):
+                if pid == call_id:
+                    pending.pop(idx)
+                    break
+        elif pending and inner.get("role") not in ("user", "system"):
+            # Tool output only: user-message media is a task attachment, and
+            # binding it to the agent's last touched file would invent a
+            # provenance that never existed.
+            _pid, origin = pending.pop()
+
+        _walk_content(content, task_id, artifacts_root, base_url, origin)
     return messages
