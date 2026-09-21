@@ -39,6 +39,30 @@ def _respond(result):
     return result
 
 
+def _nothing_to_update(body):
+    """A 400 naming the writable fields, or None when the body names one.
+
+    Without this an update whose every field parsed as absent answers 200 over
+    an untouched resource, which a caller cannot tell from a successful write.
+    The refusal travels in the Cloudflare envelope rather than the bare
+    {"error": ...} the fleet's other guarded routes return, because every other
+    response on this service is enveloped. Cloudflare does not document the
+    empty-body case, so the 400 follows the fleet rule and 1004 is this mock's
+    pick from the validation-error family, not a quoted vendor code.
+    """
+    if body.model_dump(exclude_none=True):
+        return None
+    return _respond({
+        "success": False,
+        "errors": [{"code": 1004, "message": "no updatable field supplied; "
+                    "expected one of "
+                    + ", ".join(sorted(type(body).model_fields))}],
+        "messages": [],
+        "result": None,
+        "_status": 400,
+    })
+
+
 # --- Zones ---
 
 @app.get("/client/v4/zones")
@@ -95,6 +119,9 @@ class DNSRecordUpdateBody(BaseModel):
 
 @app.put("/client/v4/zones/{zone_id}/dns_records/{record_id}")
 def update_dns_record(zone_id: str, record_id: str, body: DNSRecordUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     return _respond(cloudflare_data.update_dns_record(
         zone_id, record_id, type=body.type, name=body.name, content=body.content,
         ttl=body.ttl, proxied=body.proxied, priority=body.priority,

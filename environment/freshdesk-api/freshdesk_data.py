@@ -213,9 +213,10 @@ def update_ticket(ticket_id, payload):
                     _changes[field] = int(payload[field])
             if "tags" in payload and payload["tags"] is not None:
                 _changes["tags"] = payload["tags"]
-            _changes["updated_at"] = _now_iso()
-            t.update(_changes)
-            _store_patch("tickets", t, _changes)
+            if _changes:
+                _changes["updated_at"] = _now_iso()
+                t.update(_changes)
+                _store_patch("tickets", t, _changes)
             return t
     return {"error": "ticket not found", "message": f"Ticket {ticket_id} not found"}
 

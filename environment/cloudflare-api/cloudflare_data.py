@@ -286,9 +286,10 @@ def update_dns_record(zone_id, record_id, type=None, name=None, content=None,
                 _changes["proxied"] = proxied
             if priority is not None:
                 _changes["priority"] = priority
-            _changes["modified_on"] = _now()
-            r.update(_changes)
-            _store_patch("dns", r, _changes)
+            if _changes:
+                _changes["modified_on"] = _now()
+                r.update(_changes)
+                _store_patch("dns", r, _changes)
             return _ok(_serialize_dns(r))
     return _err(f"DNS record {record_id} not found", code=81044, status=404)
 

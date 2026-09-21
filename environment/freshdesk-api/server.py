@@ -25,6 +25,21 @@ except ModuleNotFoundError as _shared_plane_err:  # standalone run without the s
 app = FastAPI(title="Freshdesk API (Mock)", version="v2")
 install_tracker(app)
 install_admin_plane(app, store=freshdesk_data._store)
+
+
+def _nothing_to_update(body):
+    """A 400 naming the writable fields, or None when the body names one.
+
+    Without this an update whose every field parsed as absent answers 200 over
+    an untouched resource, which a caller cannot tell from a successful write.
+    """
+    if body.model_dump(exclude_none=True):
+        return None
+    return JSONResponse(status_code=400, content={
+        "error": "no updatable field supplied; expected one of "
+                 + ", ".join(sorted(type(body).model_fields))})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -84,6 +99,9 @@ def create_ticket(body: TicketCreate):
 
 @app.put("/api/v2/tickets/{ticket_id}")
 def update_ticket(ticket_id: int, body: TicketUpdate):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     result = freshdesk_data.update_ticket(
         ticket_id, body.model_dump(exclude_unset=True))
     if isinstance(result, dict) and "error" in result:

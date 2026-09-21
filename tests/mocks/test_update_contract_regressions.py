@@ -9,7 +9,10 @@ Sixteen of the original twenty-one rows were pinned to services that left in the
 newreq convergence (airtable, amazon-seller, etsy, google-classroom,
 google-drive, linear, pinterest, typeform, wordpress); they are retired with
 their services. Three arriving services join the table, and three more arriving
-routes are the SAME defect still live -- see MTIME_LIARS below.
+routes carried the SAME defect -- freshdesk, cloudflare and gitlab, held here in
+MTIME_LIARS. Those three were pinned as strict xfails when W3 found them and are
+now hardened the way the original nineteen were, so the rows assert the fixed
+behaviour rather than the defect.
 
 Three things are pinned per route:
 
@@ -32,7 +35,7 @@ from __future__ import annotations
 
 import pytest
 
-from ._helpers import ENV_DIR, load_app
+from ._helpers import ENV_DIR, data_module, load_app
 
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
@@ -44,8 +47,8 @@ SENTRY_ISSUE = "/api/0/organizations/orbit-labs/issues/40001/"
 K8S_DEPLOY = "/apis/apps/v1/namespaces/prod/deployments/api-gateway"
 BAMBOO_TOR = "/api/gateway.php/orbitlabs/v1/time_off/requests/tor-5001/status"
 FRESHDESK_TICKET = "/api/v2/tickets/70001"
-CF_DNS_RECORD = ("/client/v4/zones/zone1aaaa1111bbbb2222cccc3333dddd"
-                 "/dns_records/rec0001aaaa")
+CF_ZONE = "/client/v4/zones/zone1aaaa1111bbbb2222cccc3333dddd"
+CF_DNS_RECORD = f"{CF_ZONE}/dns_records/rec0001aaaa"
 GL_ISSUE = "/api/v4/projects/101/issues/1"
 
 
@@ -85,16 +88,51 @@ CONTRACTS = [
      {"Spec": {"replicas": 3}}, {}, 422),
     ("bamboohr-api", "PUT", BAMBOO_TOR,
      {"Status": "approved"}, {}, 422),
+
+    # The three W3 mtime-liars. These reach the contract through a route guard
+    # rather than a required field, which is the mechanism the original
+    # nineteen got -- their bodies are all-Optional, so nothing but the guard
+    # can tell an empty body from a partial one.
+    ("freshdesk-api", "PUT", FRESHDESK_TICKET,
+     {"Status": 3}, {}, 400),
+    ("cloudflare-api", "PUT", CF_DNS_RECORD,
+     {"Content": "203.0.113.88"}, {}, 400),
+    ("gitlab-api", "PUT", GL_ISSUE,
+     {"Title": "wrong case"}, {}, 400),
 ]
 
 CONTRACT_IDS = [f"{api}-{method}-{path}" for api, method, path, _, _, _ in CONTRACTS]
 
-#: (api, METHOD, path, read path, the served timestamp's dotted path)
+#: The three W3 mtime-liars, with everything needed to stand a throwaway row up
+#: and drag its timestamp into the past first -- see `_pinned_row`.
+#: (api, data module, store table, create path, create body, dotted id in the
+#:  create response, the dotted value the URL wants, read/write path template,
+#:  the served timestamp's dotted path, a past stamp in that service's own
+#:  format, an update that lands, where it lands, the value it lands)
 MTIME_LIARS = [
-    ("freshdesk-api", "PUT", FRESHDESK_TICKET, FRESHDESK_TICKET, "updated_at"),
-    ("cloudflare-api", "PUT", CF_DNS_RECORD, CF_DNS_RECORD, "result.modified_on"),
-    ("gitlab-api", "PUT", GL_ISSUE, GL_ISSUE, "updated_at"),
+    ("freshdesk-api", "freshdesk_data", "tickets",
+     "/api/v2/tickets",
+     {"subject": "Contract fixture", "description": "seed body", "priority": 1},
+     "id", "id", "/api/v2/tickets/{id}",
+     "updated_at", "2026-01-05T09:00:00Z",
+     {"priority": 4}, "priority", 4),
+    ("cloudflare-api", "cloudflare_data", "dns",
+     f"{CF_ZONE}/dns_records",
+     {"type": "A", "name": "mtime.orbit-labs.com", "content": "203.0.113.10",
+      "ttl": 300, "proxied": False},
+     "result.id", "result.id", CF_ZONE + "/dns_records/{id}",
+     "result.modified_on", "2026-01-05T09:00:00.000000Z",
+     {"content": "203.0.113.88"}, "result.content", "203.0.113.88"),
+    ("gitlab-api", "gitlab_data", "issues",
+     "/api/v4/projects/101/issues",
+     {"title": "Contract fixture", "description": "seed body"},
+     "id", "iid", "/api/v4/projects/101/issues/{id}",
+     "updated_at", "2026-01-05T09:00:00.000Z",
+     {"title": "Contract fixture renamed"}, "title", "Contract fixture renamed"),
 ]
+
+MTIME_PARAMS = ("api,module,table,create_path,create_body,pk_at,path_at,"
+                "read_tmpl,stamp,pinned,writes,at,value")
 
 
 @pytest.fixture(scope="module")
@@ -209,27 +247,81 @@ def _dig(body, dotted):
     return body
 
 
-@pytest.mark.xfail(
-    reason="W3 finding, NOT fixed in this wave: these three arriving update "
-           "routes are the nineteen mtime-liars' defect class, alive on the "
-           "converged fleet. Their bodies are all-Optional forbid models, so an "
-           "empty {} parses, reaches the data layer, writes nothing, and still "
-           "moves the served timestamp -- the resource reads as freshly written "
-           "when no field landed. W2's F6 pass closed the unknown-key axis on "
-           "these models and did not touch the empty-body axis. Service-side "
-           "fix (a route guard naming what the body can act on, as the 21 "
-           "hardened routes got) is deliberately out of W3's scope.",
-    strict=True)
-@pytest.mark.parametrize("api,method,path,read,stamp", MTIME_LIARS,
+def _pinned_row(clients, api, module, table, create_path, create_body, pk_at,
+                path_at, read_tmpl, stamp, pinned):
+    """Create a throwaway row and drag its timestamp into the past.
+
+    Both hazards this file already records are live on these three routes at
+    once. `_now()` has second resolution, so a row created and re-read inside
+    the same second cannot tell a spurious bump from no bump -- which is why
+    the contentful and github cases above assert against seed rows. But the
+    fleet smoke sweep DELETEs seed rows, and cloudflare's DNS record is the one
+    resource of these three that has a DELETE route to be swept by, so a seed
+    row is not available either. Writing the stamp back to a fixed past value
+    settles both: the row is this test's own, and the bump is unambiguous.
+    """
+    client = clients[api]
+    created = client.post(create_path, json=create_body)
+    assert created.status_code in (200, 201), created.text
+    body = created.json()
+    table_ = data_module(client.app, module)._store.table(table)
+    assert table_.patch(_dig(body, pk_at),
+                        {stamp.rsplit(".", 1)[-1]: pinned}) is not None
+    return client, read_tmpl.format(id=_dig(body, path_at))
+
+
+@pytest.mark.parametrize(MTIME_PARAMS, MTIME_LIARS,
                          ids=[c[0] for c in MTIME_LIARS])
 def test_arriving_update_does_not_touch_its_timestamp_on_an_empty_body(
-        clients, api, method, path, read, stamp):
-    client = clients[api]
+        clients, api, module, table, create_path, create_body, pk_at, path_at,
+        read_tmpl, stamp, pinned, writes, at, value):
+    """The W3 pin, inverted: an update naming nothing writable must leave the
+    resource byte-identical, timestamp included."""
+    client, read = _pinned_row(clients, api, module, table, create_path,
+                               create_body, pk_at, path_at, read_tmpl, stamp,
+                               pinned)
     before = client.get(read)
     assert before.status_code == 200, before.text
-    was = _dig(before.json(), stamp)
-    client.request(method, path, json={})
-    assert _dig(client.get(read).json(), stamp) == was
+    assert _dig(before.json(), stamp) == pinned
+    client.put(read, json={})
+    after = client.get(read)
+    assert _dig(after.json(), stamp) == pinned
+    assert after.json() == before.json()
+
+
+@pytest.mark.parametrize(MTIME_PARAMS, MTIME_LIARS,
+                         ids=[c[0] for c in MTIME_LIARS])
+def test_arriving_update_still_moves_its_timestamp_when_a_field_lands(
+        clients, api, module, table, create_path, create_body, pk_at, path_at,
+        read_tmpl, stamp, pinned, writes, at, value):
+    """The other half of the lock: refusing the empty body must not have cost
+    these routes the bump a real write is supposed to produce."""
+    client, read = _pinned_row(clients, api, module, table, create_path,
+                               create_body, pk_at, path_at, read_tmpl, stamp,
+                               pinned)
+    r = client.put(read, json=writes)
+    assert r.status_code == 200, r.text
+    after = client.get(read)
+    assert _dig(after.json(), at) == value
+    assert _dig(after.json(), stamp) != pinned
+
+
+def test_gitlab_put_restating_the_same_state_does_not_move_updated_at(clients):
+    """gitlab's second mtime lie, found sweeping the three services' other
+    mutating routes. `state_event` is a declared field, so the route guard
+    passes it through; only the data layer can tell that reopening an already
+    open issue collects no change. Same shape as the github case above."""
+    gl = clients["gitlab-api"]
+    before = gl.get(GL_ISSUE)
+    if before.status_code != 200:
+        pytest.skip("seed issue already removed by the fleet smoke sweep")
+    seeded = before.json()
+    restate = "close" if seeded["state"] == "closed" else "reopen"
+    r = gl.put(GL_ISSUE, json={"state_event": restate})
+    assert r.status_code == 200, r.text
+    after = gl.get(GL_ISSUE).json()
+    assert after["state"] == seeded["state"]
+    assert after["updated_at"] == seeded["updated_at"]
 
 
 def test_github_patch_applies_title_and_state_and_keeps_body(clients):

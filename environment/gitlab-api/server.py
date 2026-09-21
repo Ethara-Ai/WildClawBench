@@ -24,6 +24,21 @@ except ModuleNotFoundError as _shared_plane_err:  # standalone run without the s
 app = FastAPI(title="GitLab API (Mock)", version="v4")
 install_tracker(app)
 install_admin_plane(app, store=gitlab_data._store)
+
+
+def _nothing_to_update(body):
+    """A 400 naming the writable fields, or None when the body names one.
+
+    Without this an update whose every field parsed as absent answers 200 over
+    an untouched resource, which a caller cannot tell from a successful write.
+    """
+    if body.model_dump(exclude_none=True):
+        return None
+    return JSONResponse(status_code=400, content={
+        "error": "no updatable field supplied; expected one of "
+                 + ", ".join(sorted(type(body).model_fields))})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -101,6 +116,9 @@ class IssueUpdateBody(BaseModel):
 
 @app.put("/api/v4/projects/{project_id}/issues/{issue_iid}")
 def update_issue(project_id: str, issue_iid: int, body: IssueUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     result = gitlab_data.update_issue(
         project_id, issue_iid,
         title=body.title, description=body.description,

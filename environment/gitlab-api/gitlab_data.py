@@ -299,9 +299,10 @@ def update_issue(project_id, issue_iid, title=None, description=None,
                 _proj_changes = {"open_issues_count": project["open_issues_count"] + 1}
                 project.update(_proj_changes)
                 _store_patch("projects", project, _proj_changes)
-            _changes["updated_at"] = _now()
-            i.update(_changes)
-            _store_patch("issues", i, _changes)
+            if _changes:
+                _changes["updated_at"] = _now()
+                i.update(_changes)
+                _store_patch("issues", i, _changes)
             return i
     return {"error": f"Issue {issue_iid} not found in project {project_id}"}
 
