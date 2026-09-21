@@ -172,3 +172,145 @@ def test_grade_council_positional_fallback_for_index_less_verdicts(monkeypatch):
     ])
     assert [c["satisfied"] for c in out["criteria"]] == [True, False]
     assert [c["resolved_by"] for c in out["criteria"]] == ["unanimous"] * 2
+
+
+# ---------------------------------------------------------------------------
+# F1c — a number in the judge's PREAMBLE must not open a verdict match
+#
+# _VERDICT_RE's echo group is non-greedy under DOTALL, so the FIRST "<digits>. "
+# anywhere in the response used to anchor verdict 1 and swallow the real one:
+# the parser bound the preamble prose as criterion 1's echo, the F1b canary saw
+# a criterion that was not criterion 1, and criterion 1 abstained. Two shapes
+# were observed across 930 archived judge responses — a mid-line number (285
+# responses) and a markdown-numbered findings list before <judgment> (138).
+# ---------------------------------------------------------------------------
+
+
+_JUDGED = "\n".join(_block(i, f"criterion {i} text", "Yes") for i in range(1, 5))
+
+
+def _wrapped(preamble: str) -> str:
+    return f"{preamble}\n\n<judgment>\n{_JUDGED}\n</judgment>"
+
+
+@pytest.mark.parametrize(
+    "preamble",
+    [
+        # V2 re-parse phantoms, verbatim shapes: currency tail, decimal tail,
+        # reference number, and an IN-RANGE value that silently re-bound
+        # verdict 1's SATISFIED onto criterion 32 (a -5 penalty).
+        "The invoice totals \u20bd149,500. net of VAT, which the agent copied.",
+        "The spreadsheet cell reads 1,480.00. The agent then rounded it.",
+        "Order reference INV-4419. was present in the packet.",
+        "Across the run the agent touched 33. Files were listed below.",
+    ],
+    ids=["currency_149500", "decimal_00", "reference_4419", "in_range_33"],
+)
+def test_midline_number_in_preamble_cannot_open_a_verdict(preamble):
+    v = grading._parse_verdict_text(f"{preamble}\n\n{_JUDGED}", 4)
+    assert [x["index"] for x in v] == [0, 1, 2, 3]
+    assert v[0]["echo"] == "criterion 1 text"
+    assert v[0]["rationale"] == "r1"
+
+
+def test_numbered_preamble_list_before_judgment_does_not_steal_verdict_one():
+    """The koji_holder shape: a markdown findings list at LINE START, then the
+    real verdicts inside <judgment>. Reproduced from a real archived response
+    (avalon_pierce run_7), where criterion 1 (weight 5.0) abstained because its
+    echo was the preamble, scoring 0.268 against the 0.45 canary threshold."""
+    preamble = (
+        "**Key findings from the output files:**\n"
+        "\n"
+        "1. **bench_run_packet.pdf** - The agent produced this file but its "
+        "contents are not extractable.\n"
+        "\n"
+        "2. Earlier versions marked FE-118 ES as \"RELEASE.\"\n"
+        "\n"
+        "3. The agent never wrote to `item-0022`."
+    )
+    v = grading._parse_verdict_text(_wrapped(preamble), 4)
+    assert [x["index"] for x in v] == [0, 1, 2, 3]
+    # The real verdict 1, not the PDF bullet.
+    assert v[0]["echo"] == "criterion 1 text"
+    assert v[0]["rationale"] == "r1"
+    assert "bench_run_packet" not in v[0]["echo"]
+    # And the canary that fired in production now passes.
+    ok, ratio = grading._echo_matches_criterion(v[0]["echo"], "criterion 1 text")
+    assert ok and ratio == 1.0
+
+
+def test_numbered_preamble_does_not_abstain_criterion_one(monkeypatch, caplog):
+    """End to end: the preamble shape must cost no criterion a vote."""
+    rubrics = [{"criterion": f"criterion {i} text", "weight": 5.0} for i in range(1, 5)]
+    preamble = "1. **packet.pdf** - contents are not extractable.\n\n2. notes.md present."
+    v = grading._parse_verdict_text(_wrapped(preamble), 4)
+    with caplog.at_level("WARNING"):
+        out = _grade(monkeypatch, rubrics, [
+            _ok(_SONNET, "sonnet", v),
+            _ok(_GLM, "glm", list(v)),
+        ])
+    assert out["abstention_flags"] == []
+    assert [c["votes"] for c in out["criteria"]] == ["Yes/Yes"] * 4
+    assert "echo mismatch" not in caplog.text
+
+
+def test_midline_number_inside_a_rationale_does_not_split_the_verdict():
+    resp = "\n".join([
+        "1. criterion 1 text [[RATIONALE: the agent paid 1480. The next "
+        "criterion is unrelated]] [[SATISFIED: Yes]] [[TRUNCATION_AFFECTED: No]]",
+        _block(2, "criterion 2 text", "No"),
+    ])
+    v = grading._parse_verdict_text(resp, 2)
+    assert [x["index"] for x in v] == [0, 1]
+    assert v[0]["rationale"] == "the agent paid 1480. The next criterion is unrelated"
+    assert v[1]["satisfied"] is False
+
+
+def test_indented_verdicts_still_match():
+    resp = "\n".join("   " + _block(i, f"c{i}", "Yes") for i in range(1, 4))
+    v = grading._parse_verdict_text(resp, 3)
+    assert [x["index"] for x in v] == [0, 1, 2]
+    assert [x["echo"] for x in v] == ["c1", "c2", "c3"]
+
+
+# ---------------------------------------------------------------------------
+# F1c part 2 — <judgment> scoping, and its non-lossy fallbacks
+# ---------------------------------------------------------------------------
+
+
+def test_verdicts_emitted_outside_the_tags_still_parse():
+    """Fallback: an empty scoped region must never lose a verdict list."""
+    resp = f"{_JUDGED}\n<judgment>\nsee above\n</judgment>"
+    v = grading._parse_verdict_text(resp, 4)
+    assert [x["index"] for x in v] == [0, 1, 2, 3]
+    assert v[0]["echo"] == "criterion 1 text"
+
+
+def test_unclosed_judgment_tag_keeps_the_partial_list():
+    """A smaller-context judge truncated mid-list: the close tag never arrives,
+    so the region runs to end of text and partial coverage is preserved."""
+    resp = "1. **packet.pdf** - not extractable.\n\n<judgment>\n" + "\n".join(
+        _block(i, f"criterion {i} text", "Yes") for i in (1, 2)
+    )
+    v = grading._parse_verdict_text(resp, 4)
+    assert [x["index"] for x in v] == [0, 1]
+    assert v[0]["echo"] == "criterion 1 text"
+
+
+def test_trailing_duplicate_blocks_after_the_close_tag_are_ignored():
+    """A judge that recaps some verdicts AFTER </judgment> used to have those
+    recaps parsed as duplicate ordinals; scoping drops them at the source."""
+    resp = _wrapped("preamble prose") + "\n\nRecap:\n" + _block(1, "recap", "No")
+    v = grading._parse_verdict_text(resp, 4)
+    assert [x["index"] for x in v] == [0, 1, 2, 3]
+    assert v[0]["satisfied"] is True
+    assert v[0]["echo"] == "criterion 1 text"
+
+
+def test_judgment_region_helper_fallbacks():
+    assert grading._judgment_region("no tags here") == "no tags here"
+    assert grading._judgment_region("a <judgment>\nx\n</judgment> b").strip() == "x"
+    assert grading._judgment_region("a <judgment>\nx").strip() == "x"
+    # Empty block -> whole text, so the caller can still find a bare list.
+    whole = "1. c [[RATIONALE: r]] [[SATISFIED: Yes]]\n<judgment></judgment>"
+    assert grading._judgment_region(whole) == whole

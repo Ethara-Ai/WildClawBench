@@ -1553,7 +1553,7 @@ def _call_judge_bedrock(
         raise
 
 
-# Parser for the Yes/No verdict format mandated by _judge_system_prompt. Five
+# Parser for the Yes/No verdict format mandated by _judge_system_prompt. Six
 # load-bearing properties: (1) DOTALL so rationale text can span newlines,
 # (2) the leading 'N.' anchor disambiguates each verdict block when judges
 # emit Markdown-style bold/italic markers around the criterion sentence,
@@ -1573,13 +1573,50 @@ def _call_judge_bedrock(
 # the corresponding criterion in the list including its list number", so it is
 # an independent witness of which criterion the judge believed it was grading.
 # GROUP ORDER IS LOAD-BEARING: (ordinal, echo, rationale, satisfied, truncation).
+# (6) F1c — the ordinal only matches at LINE START (MULTILINE + `^[ \t]*`). The
+# ordinal group used to match anywhere, so any "<digits>. " inside the judge's
+# free-text preamble opened a match and DOTALL's non-greedy echo then swallowed
+# the real verdict 1. Measured over 930 archived judge responses: 285 carried a
+# mid-line number (currency "₽149,500. net", a decimal tail "1,480.00. The", a
+# reference "INV-4419. was") that hijacked verdict 1. Out-of-range phantoms made
+# criterion 0 abstain; an IN-RANGE phantom silently re-bound verdict 1's
+# SATISFIED onto another criterion. judge_system.md:21's mandated format writes
+# every verdict's number at line start, so nothing legitimate is lost; leading
+# indentation is tolerated for judges that indent the list.
 _VERDICT_RE = re.compile(
-    r"(\d+)\.\s(.*?)"
+    r"^[ \t]*(\d+)\.\s(.*?)"
     r"\[\[\s*RATIONALE:\s*(.*?)\s*\]\]\s*"
     r"\[\[\s*SATISFIED:\s*(Yes|No)\s*\]\]"
     r"(?:\s*\[\[\s*TRUNCATION_AFFECTED:\s*(Yes|No)\s*\]\])?",
-    re.DOTALL | re.IGNORECASE,
+    re.DOTALL | re.IGNORECASE | re.MULTILINE,
 )
+
+# F1c part 2. The line anchor alone is NOT sufficient: a judge that opens with a
+# markdown-numbered findings list ("1. **packet.pdf** - contents not
+# extractable") puts its preamble numbers at line start too, and that shape
+# hijacked verdict 1 in 138 of the same 930 archived responses. judge_system.md:19
+# ("Your answer should consist solely of a numbered list of evaluated criteria
+# enclosed between <judgment> and </judgment> tags") makes everything outside the
+# tags non-verdict by contract, so scanning is restricted to inside them.
+# Fallbacks keep this strictly non-lossy: no open tag -> whole text; an open tag
+# with no close (output truncated mid-list, the routine smaller-context case) ->
+# open tag to end; and if the scoped region yields no verdicts at all the caller
+# re-scans the whole text, so a judge that emits verdicts outside the tags is no
+# worse off than before. All 930 archived responses carried both tags and none
+# lost a single verdict under this scoping.
+_JUDGMENT_OPEN_RE = re.compile(r"<\s*judgment\s*>", re.IGNORECASE)
+_JUDGMENT_CLOSE_RE = re.compile(r"<\s*/\s*judgment\s*>", re.IGNORECASE)
+
+
+def _judgment_region(response: str) -> str:
+    opened = _JUDGMENT_OPEN_RE.search(response)
+    if not opened:
+        return response
+    tail = response[opened.end():]
+    closed = _JUDGMENT_CLOSE_RE.search(tail)
+    inner = tail[:closed.start()] if closed else tail
+    return inner if inner.strip() else response
+
 
 # Longest criterion echo retained per verdict (F1b). Rubric criteria are single
 # sentences; 600 chars is far past the longest real one and stops a pathological
@@ -1598,8 +1635,13 @@ def _parse_verdict_text(response: str, n_criteria: int) -> list[dict]:
             f"rubric problem; check the raw judge response for stop_reason"
         )
     # Tolerate judges that wrap the entire block in <judgment>...</judgment> or
-    # emit it bare; either way the verdict items themselves are what we match.
-    matches = _VERDICT_RE.findall(response)
+    # emit it bare; the tagged region is preferred (F1c) and the whole response
+    # is the fallback, so the verdict items themselves are what we match either
+    # way — a judge that emits its list outside the tags still parses.
+    region = _judgment_region(response)
+    matches = _VERDICT_RE.findall(region)
+    if not matches and region != response:
+        matches = _VERDICT_RE.findall(response)
     # Partial-coverage contract per user m1543: smaller-context judges
     # (Kimi K2.5 = 256k input, GLM 5 = 200k input) truncate output before
     # reaching all rubric items on long rubrics (Sonnet 4.6 = 1M handles 69+
