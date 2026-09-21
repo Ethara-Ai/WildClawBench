@@ -310,6 +310,73 @@ def test_woo_seeded_orders_still_serialize(woo):
     assert all("line_items" in o for o in orders)
 
 
+def test_woo_product_route_survives_an_admin_merged_string_amount(woo):
+    # The admin plane shallow-merges a raw value without re-running the
+    # column's coercer, so an injected "39.00" reaches a serializer that had
+    # formatted the float it loaded. The route the agent is told to call has to
+    # answer: a 500 here is worse than a dropped write, it breaks the read.
+    products = _data_module(woo.app, "woocommerce_data")._store.table("products")
+    pid = products.rows()[0]["id"]
+    before = products.admin_get(str(pid))[0]
+    products.admin_patch(str(pid), {"on_sale": "true", "sale_price": "39.00",
+                                    "price": "39.00"})
+    try:
+        r = woo.get(f"/wp-json/wc/v3/products/{pid}")
+        assert r.status_code == 200, r.text
+        served = r.json()
+        assert served["price"] == "39.00"
+        assert served["sale_price"] == "39.00"
+    finally:
+        products.admin_patch(str(pid), {k: before[k] for k in
+                                        ("on_sale", "sale_price", "price")})
+
+
+def test_woo_product_route_survives_a_null_amount(woo):
+    products = _data_module(woo.app, "woocommerce_data")._store.table("products")
+    pid = products.rows()[0]["id"]
+    before = products.admin_get(str(pid))[0]
+    products.admin_patch(str(pid), {"price": None})
+    try:
+        assert woo.get(f"/wp-json/wc/v3/products/{pid}").status_code == 200
+    finally:
+        products.admin_patch(str(pid), {"price": before["price"]})
+
+
+# ---------------------------------------------------------------------------
+# square-api
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def square():
+    with _client("square-api") as c:
+        yield c
+
+
+def test_square_catalog_never_serves_a_consumed_seed_column(square):
+    # _coerce_catalog eats `price_amount`/`name`/`currency` at LOAD time and
+    # replaces the row with the vendor shape, so a later write of one of them
+    # is a dead key. Served beside the canonical price_money it contradicts, it
+    # hands the agent a catalog that disagrees with itself.
+    catalog = _data_module(square.app, "square_data")._store.table("catalog")
+    obj_id = catalog.rows()[0]["id"]
+    catalog.admin_patch(obj_id, {"price_amount": "749", "name": "Ghost Item"})
+
+    served = next(o for o in square.get("/v2/catalog/list").json()["objects"]
+                  if o["id"] == obj_id)
+    assert "price_amount" not in served
+    assert "name" not in served
+    assert set(served) <= {"type", "id", "item_data"}
+    # the write still landed; it is simply where nothing reads it
+    assert catalog.admin_get(obj_id)[0]["price_amount"] == "749"
+
+
+def test_square_catalog_still_serves_the_canonical_price(square):
+    served = square.get("/v2/catalog/list").json()["objects"]
+    assert served
+    money = served[0]["item_data"]["variations"][0]["item_variation_data"]["price_money"]
+    assert isinstance(money["amount"], int) and money["currency"]
+
+
 # ---------------------------------------------------------------------------
 # RETIRED WITH THEIR SERVICES (newreq convergence)
 #

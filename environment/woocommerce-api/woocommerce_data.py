@@ -86,6 +86,17 @@ def _to_float(v):
         return 0.0
 
 
+def _amount(v):
+    """A money string for the wire, whatever type the store ended up holding.
+
+    Every amount is loaded through ``opt_float``, but the admin plane merges a
+    raw value without re-running the column's coercer, so a single injected
+    ``"39.00"`` is enough to hand ``format`` a str and turn the product detail
+    route into a 500. A route the agent is told to call has to answer.
+    """
+    return f"{_to_float(v):.2f}"
+
+
 # ---------------------------------------------------------------------------
 # Load + coerce
 # ---------------------------------------------------------------------------
@@ -193,9 +204,9 @@ def _serialize_product(p):
         "sku": p["sku"],
         "type": p["type"],
         "status": p["status"],
-        "price": f"{p['price']:.2f}",
-        "regular_price": f"{p['regular_price']:.2f}",
-        "sale_price": (f"{p['sale_price']:.2f}" if p["sale_price"] else ""),
+        "price": _amount(p["price"]),
+        "regular_price": _amount(p["regular_price"]),
+        "sale_price": (_amount(p["sale_price"]) if p["sale_price"] else ""),
         "on_sale": p["on_sale"],
         "stock_quantity": p["stock_quantity"],
         "stock_status": p["stock_status"],
@@ -228,9 +239,9 @@ def _serialize_order(o):
         "customer_id": o["customer_id"],
         "status": o["status"],
         "currency": o["currency"],
-        "total": f"{o['total']:.2f}",
-        "subtotal": f"{o['subtotal']:.2f}",
-        "total_tax": f"{o['total_tax']:.2f}",
+        "total": _amount(o["total"]),
+        "subtotal": _amount(o["subtotal"]),
+        "total_tax": _amount(o["total_tax"]),
         "payment_method": o["payment_method"],
         "payment_method_title": o["payment_method_title"],
         "billing": {
@@ -245,8 +256,8 @@ def _serialize_order(o):
                 "sku": li["sku"],
                 "quantity": li["quantity"],
                 "price": li["price"],
-                "subtotal": f"{li['subtotal']:.2f}",
-                "total": f"{li['total']:.2f}",
+                "subtotal": _amount(li["subtotal"]),
+                "total": _amount(li["total"]),
             }
             for li in o.get("line_items", [])
         ],

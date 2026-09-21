@@ -315,12 +315,26 @@ def create_customer(given_name=None, family_name=None, email_address=None,
 # Catalog
 # ---------------------------------------------------------------------------
 
+#: The catalog object as Square publishes it. ``_coerce_catalog`` consumes the
+#: seed columns (``name``, ``price_amount``, ``currency``, ...) at LOAD time and
+#: replaces the row with this shape, so a loaded row holds these three keys and
+#: nothing reads the seed columns again. Anything else found on the row is a
+#: dead key, and a dead key served next to the canonical ``price_money`` it
+#: disagrees with is worse than no answer: the agent is handed a catalog that
+#: contradicts itself. The response carries the published shape, nothing more.
+_CATALOG_FIELDS = ("type", "id", "item_data")
+
+
+def _serialize_catalog_object(obj):
+    return {k: obj[k] for k in _CATALOG_FIELDS if k in obj}
+
+
 def list_catalog(types=None):
     objects = list(_catalog_rows())
     if types:
         wanted = {t.strip().upper() for t in types.split(",")}
         objects = [o for o in objects if o["type"] in wanted]
-    return {"objects": objects}
+    return {"objects": [_serialize_catalog_object(o) for o in objects]}
 
 
 # ---------------------------------------------------------------------------
