@@ -960,6 +960,125 @@ def _pdf_page_attachments(path: Path, room: int) -> list[dict]:
     return out
 
 
+# Office deliverables whose media parts we enumerate, and the zip prefixes each
+# format stores them under. A .docx/.pptx/.xlsx IS a zip of XML plus binary
+# parts, which is how _extract_text_deliverable already reads their text; the
+# chart a criterion asks about is a PNG part in that same archive, invisible to
+# every text extraction we have.
+_OOXML_MEDIA_EXTS = {".docx", ".pptx", ".xlsx"}
+_OOXML_MEDIA_PREFIXES = ("word/media/", "ppt/media/", "xl/media/")
+# Deliverables that REFERENCE their images instead of embedding them. The file
+# the criterion grades is the page; the image it shows is a sibling the
+# deliverable sweep collects separately (or not at all, when the rubric names
+# only the page).
+_LINKED_MEDIA_EXTS = {".html", ".htm", ".md", ".markdown"}
+_HTML_IMG_SRC_RE = re.compile(
+    r"""<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
+_MD_IMG_RE = re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s>]+)")
+
+
+def _is_within(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _ooxml_media_attachments(path: Path, room: int) -> list[dict]:
+    """Embedded image parts of an OOXML deliverable, named
+    `report.docx#media/image1.png`.
+
+    Same zipfile walk the text extraction uses, same 3.5MB per-image ceiling,
+    same `parent#part` naming as _pdf_page_attachments' `file.pdf#pageN`.
+    NEVER raises: a corrupt archive yields whatever it yielded before failing."""
+    if room <= 0:
+        return []
+    import base64
+
+    out: list[dict] = []
+    try:
+        with zipfile.ZipFile(path) as z:
+            for part in sorted(z.namelist()):
+                if len(out) >= room:
+                    break
+                if not part.startswith(_OOXML_MEDIA_PREFIXES):
+                    continue
+                media = _IMAGE_MEDIA_TYPES.get(Path(part).suffix.lower())
+                if media is None:
+                    continue
+                if z.getinfo(part).file_size > _IMAGE_ATTACH_MAX_BYTES:
+                    continue
+                out.append({
+                    "name": f"{path.name}#{part.split('/', 1)[1]}",
+                    "media_type": media,
+                    "b64": base64.b64encode(z.read(part)).decode("ascii"),
+                })
+    except Exception:
+        return out
+    return out
+
+
+def _linked_image_attachments(path: Path, root: Path, room: int) -> list[dict]:
+    """Images an .html/.md deliverable points at with a RELATIVE reference that
+    resolves to a real file inside the agent's own output tree, named
+    `index.html#assets/chart.png`.
+
+    Only such references qualify. An `http(s)://` or protocol-relative URL, an
+    inline `data:` payload and an absolute filesystem path are all refused
+    outright, and the resolved target must still land under `root` — `..`
+    chains and symlinks are collapsed by resolve() first, so that single test
+    covers traversal and symlink escape together. The judge payload is built
+    from agent-authored text; a reference in it is a request, not a permission.
+    NEVER raises."""
+    if room <= 0:
+        return []
+    import base64
+
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        base = path.parent.resolve()
+        top = root.resolve()
+    except OSError:
+        return []
+    refs: list[str] = []
+    for pattern in (_HTML_IMG_SRC_RE, _MD_IMG_RE):
+        refs.extend(pattern.findall(text))
+
+    out: list[dict] = []
+    seen: set[Path] = set()
+    for raw in refs:
+        if len(out) >= room:
+            break
+        ref = raw.strip()
+        if (not ref or ref.startswith("//") or ":" in ref.split("/", 1)[0]
+                or Path(ref).is_absolute()):
+            continue
+        media = _IMAGE_MEDIA_TYPES.get(Path(ref).suffix.lower())
+        if media is None:
+            continue
+        try:
+            target = (base / ref).resolve()
+            if target in seen or not target.is_file():
+                continue
+            if not _is_within(target, top):
+                continue
+            if target.stat().st_size > _IMAGE_ATTACH_MAX_BYTES:
+                continue
+            data = target.read_bytes()
+        except OSError:
+            continue
+        seen.add(target)
+        label = (target.relative_to(base) if _is_within(target, base)
+                 else target.relative_to(top)).as_posix()
+        out.append({
+            "name": f"{path.name}#{label}",
+            "media_type": media,
+            "b64": base64.b64encode(data).decode("ascii"),
+        })
+    return out
+
+
 def _collect_image_attachments(
     workspace_results: Path,
     chunk_names: frozenset[str],
@@ -968,7 +1087,12 @@ def _collect_image_attachments(
     names. Chunk-scoped so each judge call pays only for the pixels its own
     criteria need (rubric-named files; caps: 8 images, 3.5MB each - Anthropic
     rejects ~5MB, Bedrock converse allows 20/request). Named PDFs contribute
-    per-page renders (`file.pdf#pageN`) for their image-bearing pages.
+    per-page renders (`file.pdf#pageN`) for their image-bearing pages; named
+    Office files their embedded media (`report.docx#media/image1.png`); named
+    HTML/Markdown pages the images they reference relatively from inside the
+    output tree (`index.html#assets/chart.png`). The parent deliverable must be
+    rubric-named in every case, so the chunk scoping, the caps and the
+    vision-member routing are the ones that were already here.
     Oversized or unnamed images keep the dimension-only marker semantics."""
     if not chunk_names or not _judge_attach_images_enabled():
         return []
@@ -1000,6 +1124,19 @@ def _collect_image_attachments(
                 continue
             seen_names.add(name)
             out.extend(pages)
+        elif f.suffix.lower() in _OOXML_MEDIA_EXTS:
+            parts = _ooxml_media_attachments(f, cap - len(out))
+            if not parts:
+                continue
+            seen_names.add(name)
+            out.extend(parts)
+        elif f.suffix.lower() in _LINKED_MEDIA_EXTS:
+            linked = _linked_image_attachments(
+                f, workspace_results, cap - len(out))
+            if not linked:
+                continue
+            seen_names.add(name)
+            out.extend(linked)
         else:
             continue
         if len(out) >= cap:
