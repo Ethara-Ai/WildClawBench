@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -518,6 +519,101 @@ _AGENT_DIFF_DIR = "artifacts"
 # agent-produced diff, so everything in it is a deliverable by construction.
 _WORKSPACE_MIRROR_DIR_NAMES = ("workspace_full", "workspace")
 
+# `artifacts/` is a COPY of the workspace deliverables, so the recursive
+# artifacts sweep and the workspace_full sibling sweep reach most files at two
+# distinct paths. `seen` dedups by Path, not by content, so both copies used to
+# be pasted verbatim: 12,352,924 chars = 38.6% of all judge evidence across 96
+# archived runs (median run 29.4%, p90 46.0%), and 77.5% of that mass sits on
+# files the rubric grades BY NAME — evidence the budget then truncates because
+# its own second copy is standing in the queue ahead of it.
+#
+# Keyed on (basename, sha256), not sha256 alone: two DIFFERENT deliverables that
+# happen to share content keep their own headers, because a criterion naming
+# either one must still find it under its own name. Same name + different bytes
+# are genuinely different files and both survive.
+_CONTENT_HASH_MAX_BYTES = 8_000_000
+_CONTENT_HASH_CHUNK = 1 << 20
+_DUPLICATE_NOTE_MAX_NAMES = 40
+
+
+def _content_digest(path: Path) -> str | None:
+    """Streaming sha256, or None when the file is unreadable or above the
+    ceiling. The audio gate admits 50 MB files and agents write GB-scale logs,
+    so the hash reads in fixed chunks and simply declines to dedup anything too
+    big rather than pulling it into memory to save a paste."""
+    try:
+        if path.stat().st_size > _CONTENT_HASH_MAX_BYTES:
+            return None
+        h = hashlib.sha256()
+        with path.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(_CONTENT_HASH_CHUNK), b""):
+                h.update(chunk)
+    except OSError:
+        return None
+    return h.hexdigest()
+
+
+def _evidence_display_path(path: Path, root: Path | None) -> str:
+    if root is not None:
+        try:
+            return path.relative_to(root).as_posix()
+        except ValueError:
+            pass
+    return path.name
+
+
+def _dedup_by_content(
+    files: list[Path],
+    root: Path | None,
+    duplicates: list[tuple[str, str]] | None,
+) -> list[Path]:
+    """Drop byte-identical re-collections of the same filename, keeping the
+    first, and record `(duplicate, original)` display paths for the caller.
+
+    Collection order already expresses the preference the judge wants — the
+    chosen evidence dir, then workspace_full's deliverable subdirs, then its
+    loose root, then the workspace root — so "first wins" is `results/` over
+    `workspace_full/` over root. The single override is scratch: a copy sitting
+    under a scratch subtree never wins, because keeping it there would hand the
+    surviving paste to the demotion rule in _gather_evidence and the content
+    would vanish from evidence entirely."""
+    groups: dict[tuple[str, str], list[int]] = {}
+    for i, f in enumerate(files):
+        digest = _content_digest(f)
+        if digest is not None:
+            groups.setdefault((f.name.lower(), digest), []).append(i)
+    superseded: dict[int, int] = {}
+    for idxs in groups.values():
+        if len(idxs) < 2:
+            continue
+        winner = min(idxs, key=lambda i: (_in_scratch_subdir(files[i]), i))
+        for i in idxs:
+            if i != winner:
+                superseded[i] = winner
+    if not superseded:
+        return files
+    if duplicates is not None:
+        duplicates.extend(
+            (_evidence_display_path(files[i], root),
+             _evidence_display_path(files[superseded[i]], root))
+            for i in sorted(superseded)
+        )
+    return [f for i, f in enumerate(files) if i not in superseded]
+
+
+def _duplicate_note(pairs: list[tuple[str, str]]) -> str:
+    listing = "; ".join(
+        f"{dup} (identical to {first})"
+        for dup, first in pairs[:_DUPLICATE_NOTE_MAX_NAMES]
+    )
+    extra = len(pairs) - _DUPLICATE_NOTE_MAX_NAMES
+    return (
+        f"\n----- DUPLICATE COPIES (byte-identical, content shown once above):"
+        f" {listing}"
+        + (f" [+{extra} more]" if extra > 0 else "")
+        + " -----\n"
+    )
+
 
 def _harness_excluded_rel_paths(workspace_root: Path) -> frozenset[str]:
     """Workspace-relative paths the harness recorded as NOT agent-produced.
@@ -634,13 +730,19 @@ def _collect_deliverable_files(
     rubric_names: frozenset[str] | None = None,
     oversized: list[tuple[str, int]] | None = None,
     scaffold: list[str] | None = None,
+    duplicates: list[tuple[str, str]] | None = None,
 ) -> list[Path]:
-    """Deliverable paths under the workspace. `rubric_names` lifts the size gate
-    for the files the rubric grades by name; `oversized`, when given, receives
-    `(name, size)` for every file a size gate dropped so _gather_evidence can
-    name it in the omission manifest instead of dropping it silently; `scaffold`
-    likewise receives the name of every harness-injected file the loose-root
-    pass skipped, so the judge reads "excluded" rather than inferring absence."""
+    """Deliverable paths under the workspace, one per distinct CONTENT.
+
+    `rubric_names` lifts the size gate for the files the rubric grades by name;
+    `oversized`, when given, receives `(name, size)` for every file a size gate
+    dropped so _gather_evidence can name it in the omission manifest instead of
+    dropping it silently; `scaffold` likewise receives the name of every
+    harness-injected file the loose-root pass skipped, so the judge reads
+    "excluded" rather than inferring absence; `duplicates` receives
+    `(duplicate, original)` display paths for every byte-identical re-collection
+    that was collapsed, so the judge is told the copy exists without paying for
+    its bytes twice."""
     files: list[Path] = []
     seen: set[Path] = set()
     # Dropped paths need their own dedup set: `seen` only grows on collection,
@@ -721,6 +823,7 @@ def _collect_deliverable_files(
                 _add_sized(f)
         if scaffold is not None:
             scaffold.extend(sorted(skipped))
+        files = _dedup_by_content(files, workspace_root, duplicates)
     return files
 
 
@@ -1204,8 +1307,9 @@ def _gather_evidence(
     transcript_text = _fence_evidence_text(transcript_text)
     oversized: list[tuple[str, int]] = []
     scaffold: list[str] = []
+    duplicates: list[tuple[str, str]] = []
     deliverables = _collect_deliverable_files(
-        workspace_results, named, oversized, scaffold)
+        workspace_results, named, oversized, scaffold, duplicates)
     # Order so the files the rubric is actually ABOUT survive every member's
     # truncation budget: rubric-named files first, then report/flagged stems,
     # then other deliverables, then scratch subtrees — ascending size within
@@ -1261,7 +1365,11 @@ def _gather_evidence(
         )
     else:
         deliv_blob = "".join(b for _, b in blocks)
-    deliv_blob += scratch_note
+    # Fenced because the paths in it are agent-chosen strings pasted into the
+    # judge's own user message; the substitutions are length-preserving so the
+    # budget arithmetic below is unaffected.
+    dup_note = _fence_evidence_text(_duplicate_note(duplicates)) if duplicates else ""
+    deliv_blob += scratch_note + dup_note
     # A file dropped by a collection size gate never became a block, so the
     # budget loop below cannot name it. Carry it into the SAME manifest with its
     # size — silently absent evidence reads to the judge as "never produced".
@@ -1298,7 +1406,8 @@ def _gather_evidence(
         kept: list[str] = []
         omitted: list[str] = []
         used = 0
-        reserve = _OMISSION_MANIFEST_RESERVE + len(base_manifest) + len(scratch_note)
+        reserve = (_OMISSION_MANIFEST_RESERVE + len(base_manifest)
+                   + len(scratch_note) + len(dup_note))
         for f, block in blocks:
             room = deliv_budget - used - reserve
             if len(block) <= room:
@@ -1317,7 +1426,7 @@ def _gather_evidence(
             else:
                 omitted.append(f.name)
         tail_room = max(0, deliv_budget - used)
-        note_out = scratch_note[:tail_room]
+        note_out = (scratch_note + dup_note)[:tail_room]
         kept.append(note_out)
         kept.append(_omission_manifest(size_notes + omitted)[
             : max(0, tail_room - len(note_out))])
