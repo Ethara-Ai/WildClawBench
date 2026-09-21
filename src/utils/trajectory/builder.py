@@ -257,6 +257,312 @@ def _strip_turn_timestamp_prefix(messages: List[dict]) -> None:
                     break  # only the first text block carries the prefix
 
 
+# --------------------------------------------------------------------------- #
+# Branch-aware message selection.
+#
+# chat.jsonl is append-only and the entries form a TREE, not a list: every entry
+# (session / model_change / thinking_level_change / custom / compaction /
+# message) carries a `parentId`. A normal run is a straight line, so walking the
+# file top-to-bottom and walking the parentId chain give the same answer.
+#
+# They diverge when a turn is delivered twice — e.g. willie_prince run_3, where a
+# gateway 1006 made the agent's embedded fallback re-deliver a prompt: two user
+# rows were appended as SIBLINGS under the same parentId and the model answered
+# only one of them. The unanswered sibling is an orphan branch: it is in the
+# file, but it is not in the conversation. The file-order walk linearises it into
+# a real turn (and rewrites its parentId to look like one), so output.json — the
+# thing the judge reads — showed 21 user turns for a 20-turn task.
+#
+# Selection therefore follows the parentId chain from the conversation HEAD
+# instead of the file. Everything else (the system-before-first-user drop, the
+# parentId rewrite, timestamp-prefix stripping, turn feedback) is untouched and
+# still runs over the selected entries, so a clean run is byte-identical.
+#
+# The chain is only ever allowed to REMOVE entries the file-order walk kept:
+# `kept_chain` is built by filtering the file-order result, and the invariant is
+# re-verified explicitly before use. Anything unverifiable — missing/duplicate
+# id, dangling parentId, cycle, an empty result — falls back to the file-order
+# walk verbatim and flags `chain_walk_fallback`. This code must never be the
+# reason a run produces no trajectory.
+# --------------------------------------------------------------------------- #
+
+
+class _ChainWalkError(Exception):
+    """The parentId graph cannot be trusted; caller must use the file order."""
+
+
+class _NotASingleTree(_ChainWalkError):
+    """Entries are not one threaded conversation, so `parentId` says nothing.
+
+    Not corruption: it is what concatenated session files and synthetic entry
+    lists carrying no `parentId` at all look like. Every entry is its own root,
+    so branch-vs-trunk is undecidable and the file order is the only ordering
+    there is. Separate from :class:`_ChainWalkError` purely so this expected
+    shape is not logged as an error.
+    """
+
+
+class _ChainSelection(NamedTuple):
+    kept: List[dict]
+    pruned_ids: List[str]
+    fallback: bool
+
+
+def _iter_kept_message_entries(entries: List[dict]) -> Iterable[dict]:
+    """Yield, in file order, the entries the trajectory walk keeps as messages.
+
+    Single source of truth for "is this entry a message we publish" — used both
+    to emit the trajectory and to compare the two walks, so the two can't drift.
+    """
+    seen_user_msg = False
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("type") != "message":
+            continue
+        msg = entry.get("message", {})
+        if not isinstance(msg, dict):
+            continue
+        role = msg.get("role", "")
+        if not role:
+            continue
+        if role == "user":
+            seen_user_msg = True
+        elif role == "system" and not seen_user_msg:
+            continue
+        yield entry
+
+
+def _index_entries_by_id(entries: List[dict]) -> dict[str, int]:
+    """Map entry id -> file position for EVERY entry type.
+
+    All entry types interleave in the parentId chain (175 of 568 archived
+    sessions thread through a `compaction` entry), so the index cannot be
+    restricted to messages. A missing or duplicated id makes the graph
+    unresolvable.
+    """
+    index: dict[str, int] = {}
+    for pos, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            continue
+        entry_id = entry.get("id")
+        if not isinstance(entry_id, str) or not entry_id:
+            raise _ChainWalkError(
+                "entry at position %d has no usable id (type=%r)"
+                % (pos, entry.get("type"))
+            )
+        if entry_id in index:
+            raise _ChainWalkError("duplicate entry id %r" % entry_id)
+        index[entry_id] = pos
+    return index
+
+
+def _parent_id_of(entry: Mapping, index: Mapping[str, int]) -> Optional[str]:
+    """Resolved parent id, or None at the root. Dangling parents are fatal."""
+    parent_id = entry.get("parentId") or ""
+    if not isinstance(parent_id, str) or not parent_id:
+        return None
+    if parent_id not in index:
+        raise _ChainWalkError(
+            "entry %r points at missing parent %r" % (entry.get("id"), parent_id)
+        )
+    return parent_id
+
+
+def _chain_depth(
+    start_id: str,
+    entries: List[dict],
+    index: Mapping[str, int],
+    memo: dict[str, int],
+) -> int:
+    """Number of entries from ``start_id`` up to the root, inclusive (memoised)."""
+    path: List[str] = []
+    on_path: set = set()
+    base = 0
+    cur: Optional[str] = start_id
+    while cur is not None:
+        if cur in memo:
+            base = memo[cur]
+            break
+        if cur in on_path:
+            raise _ChainWalkError("parentId cycle through %r" % cur)
+        on_path.add(cur)
+        path.append(cur)
+        cur = _parent_id_of(entries[index[cur]], index)
+    for offset, node in enumerate(reversed(path)):
+        memo[node] = base + offset + 1
+    return memo[start_id]
+
+
+def _session_entry_ids(entries: List[dict]) -> set:
+    """Ids of the `session` file headers.
+
+    OpenClaw opens each session file with `{"type":"session","id":"chat",...}`.
+    It is a file header, not a conversation node: the real root (a
+    `model_change`) carries `parentId: null` beside it. Counting it as a root
+    would make every genuine chat.jsonl look like a two-root forest.
+    """
+    return {
+        e.get("id")
+        for e in entries
+        if isinstance(e, dict) and e.get("type") == "session" and e.get("id")
+    }
+
+
+def _require_single_tree(
+    entries: List[dict], index: Mapping[str, int], session_ids: set
+) -> None:
+    """Refuse to walk unless every entry hangs off exactly one conversation root."""
+    roots = []
+    for entry in entries:
+        if not isinstance(entry, dict) or not entry.get("id"):
+            continue
+        if entry.get("id") in session_ids:
+            continue
+        parent = _parent_id_of(entry, index)
+        if parent is None or parent in session_ids:
+            roots.append(entry.get("id"))
+    if len(roots) != 1:
+        raise _NotASingleTree(
+            "expected exactly one conversation root, found %d" % len(roots)
+        )
+
+
+def _select_head_id(
+    entries: List[dict], index: Mapping[str, int], session_ids: set
+) -> str:
+    """The conversation HEAD: deepest leaf, ties broken by latest in file order.
+
+    Deepest-leaf rather than "last line in the file" because a run can end on an
+    unanswered re-send — then the orphan IS the last line, and taking it as head
+    would publish the orphan and drop the real conversation.
+    """
+    has_child: set = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        parent_id = _parent_id_of(entry, index)
+        if parent_id:
+            has_child.add(parent_id)
+
+    memo: dict[str, int] = {}
+    best_key = (-1, -1)
+    best_id = ""
+    for entry_id, pos in index.items():
+        if entry_id in has_child or entry_id in session_ids:
+            continue
+        key = (_chain_depth(entry_id, entries, index, memo), pos)
+        if key > best_key:
+            best_key = key
+            best_id = entry_id
+    if not best_id:
+        raise _ChainWalkError("no leaf entry found")
+    return best_id
+
+
+def _ids_on_chain(head_id: str, entries: List[dict], index: Mapping[str, int]) -> set:
+    """Every entry id from ``head_id`` back to the root, all entry types."""
+    seen: set = set()
+    cur: Optional[str] = head_id
+    while cur is not None:
+        if cur in seen:
+            raise _ChainWalkError("parentId cycle through %r" % cur)
+        seen.add(cur)
+        cur = _parent_id_of(entries[index[cur]], index)
+    return seen
+
+
+def _verify_chain_is_a_subsequence(
+    kept_linear: List[dict], kept_chain: List[dict]
+) -> None:
+    """Re-check the safety invariant: the chain may only DROP, never add/reorder."""
+    linear_ids = [e.get("id") for e in kept_linear]
+    chain_ids = [e.get("id") for e in kept_chain]
+    linear_set = set(linear_ids)
+    chain_set = set(chain_ids)
+    if not chain_set <= linear_set:
+        raise _ChainWalkError("chain walk added messages the file-order walk dropped")
+    pruned = linear_set - chain_set
+    if chain_ids != [i for i in linear_ids if i not in pruned]:
+        raise _ChainWalkError("chain walk reordered messages")
+
+
+def _describe_pruned_entry(entry: Mapping) -> str:
+    """`id/role/timestamp-prefix` summary of a pruned row, for the WARNING log."""
+    msg = entry.get("message") if isinstance(entry.get("message"), Mapping) else {}
+    role = msg.get("role", "") if isinstance(msg, Mapping) else ""
+    text = ""
+    content = msg.get("content") if isinstance(msg, Mapping) else None
+    if isinstance(content, str):
+        text = content
+    elif isinstance(content, list):
+        for block in content:
+            if isinstance(block, Mapping) and isinstance(block.get("text"), str):
+                text = block["text"]
+                break
+    return "id=%s role=%s delivery_prefix=%s" % (
+        entry.get("id", ""),
+        role or "?",
+        bool(_TURN_TS_RE.match(text or "")),
+    )
+
+
+def _select_branch_aware_entries(
+    entries: List[dict], kept_linear: List[dict]
+) -> _ChainSelection:
+    """Restrict ``kept_linear`` to the messages on the HEAD's parentId chain.
+
+    Falls back to ``kept_linear`` unchanged on any doubt whatsoever.
+    """
+    try:
+        index = _index_entries_by_id(entries)
+        if not index:
+            return _ChainSelection(kept_linear, [], False)
+        session_ids = _session_entry_ids(entries)
+        _require_single_tree(entries, index, session_ids)
+        head_id = _select_head_id(entries, index, session_ids)
+        chain = _ids_on_chain(head_id, entries, index)
+
+        kept_chain = [e for e in kept_linear if e.get("id") in chain]
+        pruned_ids = [
+            str(e.get("id") or "") for e in kept_linear if e.get("id") not in chain
+        ]
+        if pruned_ids and not kept_chain:
+            raise _ChainWalkError("chain walk would drop every message")
+        _verify_chain_is_a_subsequence(kept_linear, kept_chain)
+
+        if pruned_ids:
+            logger.warning(
+                "Trajectory: pruned %d orphaned branch message(s) absent from the "
+                "answered conversation: %s",
+                len(pruned_ids),
+                "; ".join(
+                    _describe_pruned_entry(e)
+                    for e in kept_linear
+                    if e.get("id") not in chain
+                ),
+            )
+        return _ChainSelection(kept_chain, pruned_ids, False)
+    except _NotASingleTree as exc:
+        logger.info(
+            "Trajectory: entries are not one threaded conversation (%s); using "
+            "file order", exc,
+        )
+        return _ChainSelection(kept_linear, [], True)
+    except _ChainWalkError as exc:
+        logger.error(
+            "Trajectory: parentId chain walk unusable (%s); falling back to "
+            "file-order walk", exc,
+        )
+        return _ChainSelection(kept_linear, [], True)
+    except Exception as exc:  # never let selection break a run
+        logger.error(
+            "Trajectory: parentId chain walk raised (%s); falling back to "
+            "file-order walk", exc, exc_info=True,
+        )
+        return _ChainSelection(kept_linear, [], True)
+
+
 def build_trajectory_from_jsonl(
     task: Task,
     entries: List[dict],
@@ -307,27 +613,15 @@ def build_trajectory_from_jsonl(
         workspace_root=workspace_root,
     )
 
+    selection = _select_branch_aware_entries(
+        entries, list(_iter_kept_message_entries(entries))
+    )
+
     messages: List[dict] = []
     last_kept_id: Optional[str] = None
-    seen_user_msg = False
 
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        if entry.get("type") != "message":
-            continue
-        msg = entry.get("message", {})
-        if not isinstance(msg, dict):
-            continue
-        role = msg.get("role", "")
-        if not role:
-            continue
-        if role == "user":
-            seen_user_msg = True
-        elif role == "system" and not seen_user_msg:
-            continue
-
-        msg = sanitize_jsonl_message(msg)
+    for entry in selection.kept:
+        msg = sanitize_jsonl_message(entry.get("message", {}))
         entry_id = entry.get("id", "")
         parent_id = last_kept_id if last_kept_id else entry.get("parentId", "")
         messages.append({
@@ -350,13 +644,18 @@ def build_trajectory_from_jsonl(
     if media_handler is not None:
         messages = media_handler(messages, task.task_id or task.id)
 
+    # Operator-facing only: build_published_trajectory rebuilds meta_info from a
+    # fixed five-key list, so these never reach output.json or the bundle.
+    meta_info = build_trajectory_meta_info(task, input_files, output_artifacts)
+    meta_info["pruned_orphans"] = len(selection.pruned_ids)
+    meta_info["pruned_orphan_ids"] = list(selection.pruned_ids)
+    meta_info["chain_walk_fallback"] = selection.fallback
+
     return {
         "session_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "trajectory": {
-            "meta_info": build_trajectory_meta_info(
-                task, input_files, output_artifacts
-            ),
+            "meta_info": meta_info,
             "input_modalities": build_input_modalities(input_files),
             "output_modalities": build_output_modalities(output_artifacts),
         },
