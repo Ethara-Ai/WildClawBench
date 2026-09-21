@@ -33,6 +33,10 @@ are mocked (any token is accepted). Responses are deterministic fixtures.
 
 ## Usage
 
+`DELETE /v2/orders/{order_id}` **cancels** an order, it does not remove it — the
+order stays in the store with `status` flipped to `canceled`, so a `GET` on the
+same id still answers 200.
+
 ```bash
 # GET example
 curl -s "$ALPACA_API_URL/v2/account"

@@ -22,10 +22,15 @@ curl -s "$ALPACA_API_URL/v2/assets"
 
 ## Orders
 
+`DELETE /v2/orders/{order_id}` **cancels** an order, it does not remove it — the
+order stays in the store with `status` flipped to `canceled`, so a `GET` on the
+same id still answers 200.
+
 ```bash
 curl -s "$ALPACA_API_URL/v2/orders"
 curl -s "$ALPACA_API_URL/v2/orders/<order_id>"
 curl -s -X POST "$ALPACA_API_URL/v2/orders" -H 'Content-Type: application/json' -d '{}'
+# cancel an order: the row remains, status becomes "canceled"
 curl -s -X DELETE "$ALPACA_API_URL/v2/orders/<order_id>"
 ```
 
