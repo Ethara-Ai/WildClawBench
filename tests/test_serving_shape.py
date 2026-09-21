@@ -25,11 +25,16 @@ from src.utils.serving_shape import (  # noqa: E402
     envelope_vocabulary,
     find_getter,
     flatten_serving,
+    getter_addresses,
+    is_miss,
+    list_surfaces,
     loose_eq,
     near_miss,
     orphan_keys,
     partition_expected,
     project_in_process,
+    project_list_surfaces,
+    query_candidates,
     row_bag,
     serving_vocabulary,
     value_visible,
@@ -388,3 +393,200 @@ def test_a_genuinely_orphaned_write_is_still_invisible():
     # `AgeStatement` is not a contentful column, so nothing carries the value.
     assert not value_visible("14 Year", CONTENTFUL_ENTRY)
     assert orphan_keys(["AgeStatement"], {"name", "ageStatement"}) == ["AgeStatement"]
+
+
+# --------------------------------------------------------------------------- #
+# vendor not-found envelopes
+#
+# A getter answers "no such row" with a body, not an exception, and each vendor
+# spells that body its own way. An unrecognised envelope is handed back as a
+# served row, so a caller diffing before against after compares a 404 with the
+# same 404, sees no movement, and blames the write. Every literal below was
+# taken off the fleet's own not-found return paths.
+# --------------------------------------------------------------------------- #
+JIRA_404 = {"errorMessages": ["Issue COPP-200 does not exist"], "errors": {}}
+WOO_404 = {"error": "woocommerce_rest_product_invalid_id", "status": 404,
+           "message": "Invalid product ID: 611"}
+TWILIO_404 = {"code": 20404, "error": "not found", "status": 404}
+BIGCOMMERCE_404 = {"error": "Not Found", "status": 404, "title": "Not Found"}
+PLAID_404 = {"error_code": "ITEM_NOT_FOUND", "error_message": "no such item"}
+HUBSPOT_404 = {"category": "OBJECT_NOT_FOUND", "error": "contact 9 not found"}
+GENERIC_404 = {"error": "Message msg-9 not found"}
+
+# Real answers that carry an envelope-shaped key and must survive intact.
+DATADOG_SERIES = {"from_date": 1, "query": "avg:cpu", "series": [],
+                  "status": "ok", "to_date": 2}
+INTERCOM_LIST = {"data": [], "total_count": 0, "type": "list"}
+OPENLIBRARY_WORK = {"authors": [], "description": "d", "first_publish_date": "1979",
+                    "key": "/works/OL1W", "subjects": [], "title": "The Book",
+                    "type": "work"}
+ROW_WITH_AN_ERROR_COLUMN = {"id": "run-7", "error": "timeout", "name": "nightly"}
+
+
+@pytest.mark.parametrize("envelope", [
+    JIRA_404, WOO_404, TWILIO_404, BIGCOMMERCE_404, PLAID_404, HUBSPOT_404,
+    GENERIC_404, None, {},
+])
+def test_every_fleet_not_found_envelope_reads_as_a_miss(envelope):
+    assert is_miss(envelope)
+
+
+@pytest.mark.parametrize("served", [
+    DATADOG_SERIES, INTERCOM_LIST, OPENLIBRARY_WORK, ROW_WITH_AN_ERROR_COLUMN,
+    CONTENTFUL_ENTRY, FIGMA_FILE, WOOCOMMERCE_PRODUCT,
+])
+def test_a_served_row_is_never_mistaken_for_an_envelope(served):
+    assert not is_miss(served)
+
+
+def test_an_envelope_wider_than_two_keys_is_still_a_miss():
+    # The size of the body says nothing: three services answer not-found with
+    # three keys, and woocommerce's is the one that made a landed write read as
+    # a dead one.
+    assert len(WOO_404) == 3 and is_miss(WOO_404)
+
+
+def test_an_envelope_that_never_names_the_failure_is_bounded_by_size():
+    assert is_miss({"status": 404, "message": "gone"})
+    assert not is_miss({"status": "active", "type": "user", "title": "Lead"})
+
+
+# --------------------------------------------------------------------------- #
+# getter addressing: the store's key is not always the getter's key
+# --------------------------------------------------------------------------- #
+_JIRA_ROWS = [
+    {"id": "20200", "key": "COPP-200", "summary": "cold-chain cutoff",
+     "team": "ops"},
+    {"id": "20201", "key": "COPP-201", "summary": "priority bump",
+     "team": "ops"},
+]
+
+
+class _KeyedTable:
+    primary_key = "id"
+
+    def __init__(self, rows):
+        self._rows = rows
+
+    def get(self, pk):
+        return next((r for r in self._rows if r["id"] == pk), None)
+
+    def rows(self):
+        return list(self._rows)
+
+
+class _JiraLikeModule:
+    """jira registers `issues` on `id` and answers `get_issue` on `key`."""
+
+    _store = _FakeStore({"issues": _KeyedTable(_JIRA_ROWS)})
+
+    @staticmethod
+    def get_issue(issue_key):
+        for row in _JIRA_ROWS:
+            if row["key"] == issue_key:
+                return {"key": row["key"], "fields": {"summary": row["summary"]}}
+        return {"errorMessages": [f"Issue {issue_key} does not exist"],
+                "errors": {}}
+
+
+def test_getter_addresses_offers_the_store_pk_first():
+    assert getter_addresses(_JiraLikeModule, "issues", "20200")[0] == "20200"
+
+
+def test_a_getter_keyed_on_a_natural_id_is_reached_through_the_store_pk():
+    # The op addresses `id`, the getter matches `key`; without the fallback the
+    # projection is jira's 404 body and the row reads as unwritable.
+    serving, mechanism = project_in_process(_JiraLikeModule, "issues", "20200")
+    assert serving == {"key": "COPP-200", "fields": {"summary": "cold-chain cutoff"}}
+    assert mechanism == "getter:get_issue"
+
+
+def test_an_address_shared_with_a_sibling_is_never_tried():
+    # `team` is identical on both rows, so using it could project the wrong one.
+    assert "ops" not in getter_addresses(_JiraLikeModule, "issues", "20200")
+
+
+def test_a_row_that_is_genuinely_absent_still_projects_to_none():
+    serving, _ = project_in_process(_JiraLikeModule, "issues", "29999")
+    assert serving is None
+
+
+def test_a_getter_that_raises_is_reported_rather_than_re_addressed():
+    class _Raising:
+        _store = _FakeStore({"issues": _KeyedTable(_JIRA_ROWS)})
+
+        @staticmethod
+        def get_issue(_pk):
+            raise ValueError("Unknown format code 'f' for object of type 'str'")
+
+    serving, mechanism = project_in_process(_Raising, "issues", "20200")
+    assert serving is None
+    assert "ValueError" in mechanism
+
+
+# --------------------------------------------------------------------------- #
+# list and query surfaces
+#
+# gmail never emits `is_starred` from get_message and publishes it only as
+# membership of `?q=is:starred`, so a single-getter model cannot see the write
+# at all.
+# --------------------------------------------------------------------------- #
+_GMAIL_ROWS = [
+    {"id": "m-1", "thread_id": "t-1", "is_starred": False, "snippet": "one"},
+    {"id": "m-2", "thread_id": "t-2", "is_starred": True, "snippet": "two"},
+]
+
+
+class _GmailLikeModule:
+    _store = _FakeStore({"messages": _KeyedTable(_GMAIL_ROWS)})
+
+    @staticmethod
+    def get_message(pk):
+        row = next((r for r in _GMAIL_ROWS if r["id"] == pk), None)
+        if row is None:
+            return {"error": f"Message {pk} not found"}
+        return {"id": row["id"], "threadId": row["thread_id"],
+                "snippet": row["snippet"]}
+
+    @staticmethod
+    def list_messages(query="", max_results=25):
+        rows = _GMAIL_ROWS
+        if "is:starred" in query:
+            rows = [r for r in rows if r["is_starred"]]
+        return {"messages": [{"id": r["id"]} for r in rows[:max_results]]}
+
+
+def test_list_surfaces_finds_the_tables_collection_reader():
+    assert [name for name, _fn in list_surfaces(_GmailLikeModule, "messages")] \
+        == ["list_messages"]
+
+
+def test_query_candidates_spell_a_truthy_flag_the_way_a_vendor_grammar_does():
+    assert query_candidates([("is_starred", "true")]) == [
+        "is_starred:true", "is:starred", "true"]
+
+
+def test_query_candidates_leave_a_plain_column_alone():
+    assert query_candidates([("price_amount", "749")]) == ["price_amount:749", "749"]
+
+
+def test_the_getter_alone_cannot_see_a_flag_only_a_query_route_publishes():
+    before = project_in_process(_GmailLikeModule, "messages", "m-1")[0]
+    _GMAIL_ROWS[0]["is_starred"] = True
+    try:
+        assert project_in_process(_GmailLikeModule, "messages", "m-1")[0] == before
+    finally:
+        _GMAIL_ROWS[0]["is_starred"] = False
+
+
+def test_the_query_surface_snapshot_moves_when_the_flag_flips():
+    payload = [("is_starred", "true")]
+    before = project_list_surfaces(_GmailLikeModule, "messages", payload)
+    _GMAIL_ROWS[0]["is_starred"] = True
+    try:
+        after = project_list_surfaces(_GmailLikeModule, "messages", payload)
+    finally:
+        _GMAIL_ROWS[0]["is_starred"] = False
+    assert before["list_messages?query=is:starred"] != \
+        after["list_messages?query=is:starred"]
+    assert before["list_messages"] == after["list_messages"]

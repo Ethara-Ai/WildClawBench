@@ -41,6 +41,7 @@ stack and by a module that static validation paths import.
 """
 from __future__ import annotations
 
+import inspect
 import re
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
@@ -55,7 +56,12 @@ __all__ = [
     "orphan_keys",
     "verify_against_serving",
     "find_getter",
+    "getter_addresses",
+    "is_miss",
+    "list_surfaces",
     "project_in_process",
+    "project_list_surfaces",
+    "query_candidates",
     "ORPHAN_REASON",
     "UNVERIFIABLE",
     "UNVERIFIABLE_REASON",
@@ -85,6 +91,13 @@ UNVERIFIABLE_REASON = ("write moved the row on a live column but the stored form
 # else keeps them top-level. Both the stored row and a patch payload built by
 # ``inject_director._patch_row`` use this wrapper.
 NESTED_KEY = "fields"
+
+_KEY_FOLD_RE = re.compile(r"[^a-z0-9]")
+
+
+def _fold_key(key: Any) -> str:
+    """``errorMessages``, ``error_messages`` and ``ERROR-MESSAGES`` are one key."""
+    return _KEY_FOLD_RE.sub("", str(key).lower())
 
 
 def row_bag(row: Mapping[str, Any]) -> Dict[str, Any]:
@@ -297,14 +310,138 @@ def find_getter(module: Any, table: str) -> Optional[Callable[..., Any]]:
     return None
 
 
+# --------------------------------------------------------------------------- #
+# Not-found envelopes: the vocabulary the fleet actually spells them in.
+# --------------------------------------------------------------------------- #
+
+# A getter says "no such row" by RETURNING an envelope rather than raising, and
+# every service spells that envelope in its own vendor's dialect. Recognising
+# only one spelling is not a partial answer but a wrong one: an unrecognised
+# 404 body is handed back as a served row, and a caller that diffs before
+# against after then compares a 404 to the same 404, finds them equal, and
+# reports a write that landed perfectly as invisible.
+#
+# Census of every dict a fleet ``get_*``/``list_*`` returns on a not-found path
+# (all 50 services): ``error`` in 42 services, ``message`` in 9, ``status`` in
+# 4, ``code`` in 3, plus jira's ``errorMessages``/``errors``, plaid's
+# ``error_code``/``error_message``, hubspot's ``category`` and bigcommerce's
+# ``title``. Three of those shapes carry MORE than two keys, so size is not a
+# usable proxy either.
+_ERROR_MARKERS = frozenset({
+    "error", "errors", "errormessage", "errormessages", "errorcode",
+    "errordescription", "fault",
+})
+
+# Keys that ride ALONG with a marker inside a vendor envelope. On their own they
+# are ordinary response fields -- datadog answers a real metrics query with
+# ``status``, openlibrary serves a real book under ``title``/``type`` -- so they
+# only count towards a miss when the WHOLE result is built out of them.
+_ENVELOPE_COMPANIONS = frozenset({
+    "message", "messages", "detail", "details", "status", "statuscode",
+    "code", "title", "category", "type", "reason", "success", "ok",
+})
+
+def is_miss(result: Any) -> bool:
+    """True when a getter's return value is a not-found envelope, not a row.
+
+    A result is a miss when it is ``None`` or empty, or when every key it
+    carries belongs to the envelope vocabulary AND at least one of them names
+    the failure. Requiring EVERY key to be vocabulary is what keeps a real row
+    that happens to hold an ``error`` column from being erased: such a row also
+    carries its own business columns, and those are not in the vocabulary. An
+    all-companion envelope of at most two keys (``{"status": 404, "message":
+    ...}``) also counts, which preserves the old size-bounded behaviour for a
+    service that never names the failure at all.
+    """
+    if result is None:
+        return True
+    if not isinstance(result, Mapping):
+        return False
+    if not result:
+        return True
+    folded = {_fold_key(k) for k in result}
+    if not folded <= (_ERROR_MARKERS | _ENVELOPE_COMPANIONS):
+        return False
+    return bool(folded & _ERROR_MARKERS) or len(folded) <= 2
+
+
+# --------------------------------------------------------------------------- #
+# Getter addressing: the store's key is not always the getter's key.
+# --------------------------------------------------------------------------- #
+
+#: Fields a getter is likely to key on when the STORE keys on something else.
+#: jira registers ``issues`` with ``primary_key="id"`` and answers
+#: ``get_issue(issue_key)`` by matching ``row["key"]``, so addressing that
+#: getter with the store pk returns a 404 for a row that reads back perfectly.
+_NATURAL_ID_FIELDS = ("key", "slug", "sku", "number", "code", "name",
+                      "external_id", "uid", "username", "email", "id")
+
+#: How many addresses one projection may try. Bounded because this runs once
+#: per op per probe inside preflight.
+_ADDRESS_BUDGET = 6
+
+
+def _table_rows(module: Any, table: str) -> Tuple[List[Any], Optional[str]]:
+    """``(rows, primary_key)`` of a store table, or ``([], None)``."""
+    store = getattr(module, "_store", None)
+    if store is None:
+        return [], None
+    try:
+        handle = store.table(table)
+        return list(handle.rows()), handle.primary_key
+    except Exception:  # noqa: BLE001 - no such table is the caller's finding
+        return [], None
+
+
+def getter_addresses(module: Any, table: str, pk: Any) -> List[Any]:
+    """Every address a getter for ``table`` might answer to for row ``pk``.
+
+    The store primary key comes first -- it is the right address for most of the
+    fleet. The alternatives come from THE ROW ITSELF, not from a per-service
+    table: each natural-identifier field the row carries whose value is UNIQUE
+    within the table. Uniqueness is the safety property: an alternate address
+    can only ever reach the row it was read off, so a fallback can rescue a
+    mis-addressed projection but never silently project a sibling.
+    """
+    addresses: List[Any] = [pk]
+    rows, primary = _table_rows(module, table)
+    if primary is None:
+        return addresses
+    row = next((r for r in rows if isinstance(r, Mapping)
+                and str(r.get(primary)) == str(pk)), None)
+    if row is None:
+        return addresses
+    seen = {str(pk)}
+    for field in _NATURAL_ID_FIELDS:
+        if len(addresses) >= _ADDRESS_BUDGET:
+            break
+        if field == primary or field not in row:
+            continue
+        value = row[field]
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            continue
+        if str(value) in seen or str(value) == "":
+            continue
+        twins = sum(1 for r in rows if isinstance(r, Mapping)
+                    and str(r.get(field)) == str(value))
+        if twins != 1:
+            continue  # ambiguous: this address could reach a sibling
+        seen.add(str(value))
+        addresses.append(value)
+    return addresses
+
+
 def project_in_process(module: Any, table: str, pk: Any) -> Tuple[Optional[Dict[str, Any]], str]:
     """Read one row back through the service's own getter.
 
     Returns ``(serving_row, mechanism)``. ``mechanism`` is ``"getter:<name>"``
     when the real projection ran and ``"raw-store"`` when the module exposes no
-    getter for the table and the caller is seeing the unprojected row. Getters
-    signal 'not found' by returning an error dict rather than raising, so an
-    ``error`` key is normalized to None.
+    getter for the table and the caller is seeing the unprojected row.
+
+    A getter that MISSES on the store pk is asked again at the row's own natural
+    identifiers before the row is called unreadable (see ``getter_addresses``);
+    a getter that RAISES is reported straight away, because a read surface the
+    agent cannot call without a 500 is itself the finding.
     """
     fn = find_getter(module, table)
     if fn is None:
@@ -315,15 +452,123 @@ def project_in_process(module: Any, table: str, pk: Any) -> Tuple[Optional[Dict[
             return store.table(table).get(pk), "raw-store"
         except Exception:
             return None, "raw-store"
+    for address in getter_addresses(module, table, pk):
+        try:
+            result = fn(address)
+        except Exception as exc:  # a getter that raises is itself the finding
+            return None, f"getter:{fn.__name__}:{type(exc).__name__}: {exc}"
+        if isinstance(result, Mapping) and not is_miss(result):
+            return dict(result), f"getter:{fn.__name__}"
+    return None, f"getter:{fn.__name__}"
+
+
+# --------------------------------------------------------------------------- #
+# List and query surfaces: one getter is not the whole serving shape.
+# --------------------------------------------------------------------------- #
+
+#: Parameter names a list surface uses for its free-form filter. A write whose
+#: only reader is a query route (gmail serves ``is_starred`` exclusively through
+#: ``?q=is:starred``) is invisible to every projection that does not pass one.
+_QUERY_PARAMS = ("query", "q", "search", "filter", "term", "text")
+
+#: Cost ceiling: this runs per op, per probe, inside preflight.
+_SURFACE_BUDGET = 4
+_QUERY_BUDGET = 6
+
+_TRUTHY = {"true", "yes", "1", "on"}
+
+
+def list_surfaces(module: Any, table: str) -> List[Tuple[str, Callable[..., Any]]]:
+    """The collection-shaped read functions a data module exposes for ``table``.
+
+    Named by the same convention ``find_getter`` uses, widened to the three
+    prefixes the fleet spells a collection with. Order is deterministic and the
+    count is bounded so a wide module cannot make the gate quadratic.
+    """
+    singular = _singular(table)
+    names: List[str] = []
+    for prefix in ("list_", "search_", "query_"):
+        for stem in (table, singular):
+            candidate = f"{prefix}{stem}"
+            if candidate not in names:
+                names.append(candidate)
+    out: List[Tuple[str, Callable[..., Any]]] = []
+    for name in names:
+        fn = getattr(module, name, None)
+        if callable(fn):
+            out.append((name, fn))
+        if len(out) >= _SURFACE_BUDGET:
+            break
+    return out
+
+
+def query_candidates(payload: Iterable[Tuple[str, Any]]) -> List[str]:
+    """Filter strings worth pushing through a list surface for this payload.
+
+    These are GUESSES at a vendor's query grammar, and they are safe to guess
+    precisely because the caller uses them differentially: a candidate only
+    counts when the surface's answer MOVED across the write, and a query the
+    service does not understand answers the same way before and after. So a
+    wrong guess costs one call and can never manufacture a verdict.
+
+    Three spellings, in order: ``key:value`` (the common ``field:term`` form),
+    ``head:tail`` for a truthy ``head_tail`` flag (gmail's ``is_unread`` is
+    queried as ``is:unread``, github's ``is_open`` as ``is:open``), and the bare
+    value as free text.
+    """
+    out: List[str] = []
+
+    def add(text: str) -> None:
+        if text and text not in out and len(out) < _QUERY_BUDGET:
+            out.append(text)
+
+    for key, value in payload:
+        if isinstance(value, (dict, list)):
+            continue
+        name, text = str(key), str(value)
+        add(f"{name}:{text}")
+        head, sep, tail = name.partition("_")
+        if sep and tail and text.strip().lower() in _TRUTHY:
+            add(f"{head}:{tail}")
+        add(text)
+    return out
+
+
+def project_list_surfaces(module: Any, table: str,
+                          payload: Iterable[Tuple[str, Any]] = ()) -> Dict[str, Any]:
+    """Snapshot every list/query surface of ``table``, keyed by how it was read.
+
+    Each surface is read once unfiltered and once per query candidate, so the
+    caller can diff the two snapshots and see a write whose only reader is a
+    query route. A surface that raises or refuses its arguments is simply absent
+    from the snapshot on both sides, which keeps it out of the diff.
+    """
+    snapshot: Dict[str, Any] = {}
+    queries = list(query_candidates(payload))
+    for name, fn in list_surfaces(module, table):
+        param = _query_param(fn)
+        for label, kwargs in [(name, {})] + (
+                [(f"{name}?{param}={q}", {param: q}) for q in queries]
+                if param else []):
+            try:
+                snapshot[label] = fn(**kwargs)
+            except Exception:  # noqa: BLE001 - an unusable surface is not a diff
+                continue
+    return snapshot
+
+
+def _query_param(fn: Callable[..., Any]) -> Optional[str]:
+    """The free-form filter parameter ``fn`` accepts, when it has one."""
     try:
-        result = fn(pk)
-    except Exception as exc:  # a getter that raises is itself the finding
-        return None, f"getter:{fn.__name__}:{type(exc).__name__}: {exc}"
-    if isinstance(result, Mapping) and "error" in result and len(result) <= 2:
-        return None, f"getter:{fn.__name__}"
-    if not isinstance(result, Mapping):
-        return None, f"getter:{fn.__name__}"
-    return dict(result), f"getter:{fn.__name__}"
+        params = inspect.signature(fn).parameters
+    except (TypeError, ValueError):  # builtins and C callables have no signature
+        return None
+    for name in _QUERY_PARAMS:
+        param = params.get(name)
+        if param is not None and param.kind in (param.POSITIONAL_OR_KEYWORD,
+                                                param.KEYWORD_ONLY):
+            return name
+    return None
 
 
 # A serving projection is a JSON document, so its size is what has to be

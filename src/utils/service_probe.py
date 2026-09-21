@@ -72,7 +72,20 @@ _NULL_SENTINELS = frozenset({"null", "none", "nan", "n/a", "na", "-", "--"})
 
 
 def is_empty(value: Any) -> bool:
-    return any(value is e or value == e for e in _EMPTY) if not isinstance(value, bool) else False
+    """Whether a value carries nothing, container members included.
+
+    A CSV cell spelled ``""`` reaches a list coercer as ``[""]`` and leaves it
+    as ``[]``. Both hold no value, so calling that a coercion loss reports a
+    faithful loader as a defect; emptiness therefore has to be judged of a
+    container's CONTENTS and not just of the container.
+    """
+    if isinstance(value, bool):
+        return False
+    if any(value is e or value == e for e in _EMPTY):
+        return True
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return all(is_empty(item) or is_null_sentinel(item) for item in value)
+    return False
 
 
 def is_null_sentinel(value: Any) -> bool:

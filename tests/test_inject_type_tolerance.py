@@ -588,3 +588,85 @@ def test_a_correctly_typed_replay_writes_no_coercion_entry():
     _verdicts, records, _store = _replay(op)
 
     assert [r for r in records if r["type"] == "inject.coercion"] == []
+
+
+# --- observability: one getter is not the whole serving shape ---------------
+#
+# The gate's second opinion on an applied write used to consult exactly one
+# projection, `get_<singular>(store_pk)`. Three shapes defeat that and each one
+# turned a landed, agent-reachable write into a LANDS-BUT-INVISIBLE refusal: a
+# value published only by a query route, an op that restates state the world
+# already holds, and a cosmetic stamp misfiled beside a payload that serves.
+
+
+def _replay_module(api, module, store, ops, seed_table=None):
+    from src.utils.inject_director import InjectStage
+    from src.utils.inject_inproc import InProcessApplier, replay_service_ops
+
+    module._store = store
+    with tempfile.TemporaryDirectory() as scratch:
+        applier = InProcessApplier({api: module}, scratch)
+        stage = InjectStage(index=1, name="stage1", from_turn=0, to_turn=1,
+                            silent=list(ops))
+        verdicts = replay_service_ops(applier, api, [(stage, op) for op in ops])
+    return verdicts, store
+
+
+def _gmail_like():
+    store = ms.Store("gmail-api")
+    store.register("messages", "id", lambda: [
+        {"id": "msg-brief", "thread_id": "thr-1", "is_starred": False,
+         "is_unread": True, "snippet": "cold chain"},
+        {"id": "msg-other", "thread_id": "thr-2", "is_starred": True,
+         "is_unread": False, "snippet": "other"},
+    ])
+    module = types.ModuleType("gmail_data")
+
+    def get_message(pk):
+        row = store.table("messages").get(pk)
+        if row is None:
+            return {"error": f"Message {pk} not found"}
+        return {"id": row["id"], "threadId": row["thread_id"],
+                "snippet": row["snippet"]}
+
+    def list_messages(query="", max_results=25):
+        rows = store.table("messages").rows()
+        if "is:starred" in query:
+            rows = [r for r in rows if r["is_starred"]]
+        if "is:unread" in query:
+            rows = [r for r in rows if r["is_unread"]]
+        return {"messages": [{"id": r["id"]} for r in rows[:max_results]]}
+
+    module.get_message = get_message
+    module.list_messages = list_messages
+    return module, store
+
+
+def test_a_write_only_a_query_route_publishes_still_counts_as_served():
+    from src.utils.inject_inproc import LANDS_AND_SERVES
+
+    module, store = _gmail_like()
+    op = {"id": "loud_star_brief", "service": "gmail-api",
+          "admin": {"op": "patch", "table": "messages", "pk": "msg-brief",
+                    "set": {"is_starred": "true"}}}
+    verdicts, store = _replay_module("gmail-api", module, store, [op])
+
+    # get_message never emits the flag; ?q=is:starred is the only reader.
+    assert [v.verdict for v in verdicts] == [LANDS_AND_SERVES]
+    assert "list_messages" in verdicts[0].detail
+    assert store.table("messages").get("msg-brief")["is_starred"] is True
+
+
+def test_an_op_that_restates_the_baseline_is_not_an_invisible_write():
+    from src.utils.inject_inproc import LANDS_AND_SERVES
+
+    module, store = _gmail_like()
+    op = {"id": "loud_brief_unread", "service": "gmail-api",
+          "admin": {"op": "patch", "table": "messages", "pk": "msg-brief",
+                    "set": {"is_unread": "true"}}}
+    verdicts, _store = _replay_module("gmail-api", module, store, [op])
+
+    # The row is already unread, so the write moves nothing anywhere; a write
+    # that produced no drift cannot have produced drift the agent cannot see.
+    assert [v.verdict for v in verdicts] == [LANDS_AND_SERVES]
+    assert "no-op" in verdicts[0].detail

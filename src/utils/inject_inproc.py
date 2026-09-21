@@ -21,12 +21,13 @@ failed on a shim's behalf.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.utils.inject_director import InjectApplier, InjectStage
-from src.utils.serving_shape import partition_expected, project_in_process, value_visible
+from src.utils.serving_shape import (partition_expected, project_in_process,
+                                     project_list_surfaces, value_visible)
 
 __all__ = [
     "LANDS_AND_SERVES",
@@ -206,19 +207,27 @@ class _Target:
     register — a table typo reads as "row not found" through the admin plane,
     which would be reported as absent state rather than as the authoring error
     it is. ``table``/``pk`` are None for the shapes whose target is only known
-    after resolution against live state; ``written`` holds the scalars the op
-    means to make true, which is what tells a redundant write apart from a lost
-    one when the serving shape does not move.
+    after resolution against live state; ``payload`` holds the key/value pairs
+    the op means to make true, which is what tells a redundant write apart from
+    a lost one when the serving shape does not move.
+
+    The pairs are kept rather than just the values because a probe has to be
+    able to ask a read surface about the KEY a value was written to, not only
+    about the value itself.
     """
 
     table: Optional[str] = None
     pk: Optional[Any] = None
-    written: Tuple[Any, ...] = ()
+    payload: Tuple[Tuple[str, Any], ...] = ()
     missing: Optional[str] = None
 
     @property
     def addressable(self) -> bool:
         return bool(self.table) and self.pk is not None
+
+    @property
+    def written(self) -> Tuple[Any, ...]:
+        return tuple(value for _key, value in self.payload)
 
 
 def _target_of(op: Dict[str, Any], applier: InProcessApplier, api: str) -> _Target:
@@ -240,12 +249,12 @@ def _target_of(op: Dict[str, Any], applier: InProcessApplier, api: str) -> _Targ
         set_ = spec.get("set") if isinstance(spec.get("set"), dict) else {}
         columns, envelope = partition_expected(set_, nested=True)
         return _Target(table, spec.get("pk"),
-                       tuple({**columns, **envelope}.values()))
+                       tuple({**columns, **envelope}.items()))
     if kind == "upsert":
         row = spec.get("row") if isinstance(spec.get("row"), dict) else {}
         bag = row.get("fields") if isinstance(row.get("fields"), dict) else row
         return _Target(table, row.get(spec.get("pk_field") or "id"),
-                       tuple(bag.values()))
+                       tuple(bag.items()))
     return _Target()
 
 
@@ -293,7 +302,7 @@ def replay_service_ops(applier: InProcessApplier, api: str,
             out.append(OpVerdict(op_id, stage.name, api, TABLE_MISSING, target.missing))
             continue
         probe = module is not None and target.addressable
-        before = project_in_process(module, target.table, target.pk)[0] if probe else None
+        before = _observe(module, target) if probe else _Observation()
         try:
             rec = applier._apply_api_mutation(op, stage, stage.to_turn or 0, silent=True)
         except Exception as exc:  # noqa: BLE001 - the raise IS the finding
@@ -302,7 +311,7 @@ def replay_service_ops(applier: InProcessApplier, api: str,
             continue
         verdict, detail = _verdict_from_record(rec)
         if verdict == LANDS_AND_SERVES and probe:
-            verdict, detail = _judge_serving(module, target, before)
+            verdict, detail = _judge_serving(module, target, before, rec)
         out.append(OpVerdict(op_id, stage.name, api, verdict, detail))
     return out
 
@@ -335,28 +344,69 @@ def _projects_a_sibling(module: Any, table: str, pk: Any) -> bool:
     return False
 
 
-def _judge_serving(module: Any, target: _Target,
-                   before: Optional[Dict[str, Any]]) -> Tuple[str, str]:
-    """Second opinion on an applied write: ask the service getter directly.
+@dataclass
+class _Observation:
+    """Everything the agent could read about one row at one instant.
 
-    A projection that MOVED is the proof the write reached the agent. One that
-    did not is only a failure when what the op wanted is also absent from it:
-    seed-stage ops restate the baseline the overlay already carries, and a
-    coercer legitimately retypes what it is handed, so demanding movement alone
-    would refuse the fleet's normal shape.
+    The single-row getter is only part of the serving shape. A write can be
+    published exclusively by a COLLECTION route — gmail never emits
+    ``is_starred`` from ``get_message`` and serves it only as membership of
+    ``?q=is:starred`` — so the row projection and the table's list/query
+    surfaces are captured together and diffed together.
     """
-    after, mechanism = project_in_process(module, target.table, target.pk)
-    if after is None:
+
+    row: Optional[Dict[str, Any]] = None
+    mechanism: str = "no-probe"
+    surfaces: Dict[str, Any] = field(default_factory=dict)
+
+    def moved_surface(self, other: "_Observation") -> Optional[str]:
+        """The first list/query surface whose answer differs between the two."""
+        for label, value in self.surfaces.items():
+            if label in other.surfaces and other.surfaces[label] != value:
+                return label
+        return None
+
+
+def _observe(module: Any, target: _Target) -> _Observation:
+    row, mechanism = project_in_process(module, target.table, target.pk)
+    return _Observation(row, mechanism,
+                        project_list_surfaces(module, target.table, target.payload))
+
+
+def _judge_serving(module: Any, target: _Target, before: _Observation,
+                   rec: Dict[str, Any]) -> Tuple[str, str]:
+    """Second opinion on an applied write: ask the service's read surfaces.
+
+    A projection that MOVED is the proof the write reached the agent, and the
+    row getter is asked first because it is the cheapest and the most direct.
+    When it does not move, the table's collection routes are asked the same
+    question, since a value can be published as membership of a filtered list
+    without ever appearing as a field.
+
+    Stillness on every surface is only a failure when the write actually
+    produced drift. An op that restates state the world already holds leaves
+    the stored row byte-identical, and a write that changed nothing cannot have
+    changed something the agent is unable to see.
+    """
+    after = _observe(module, target)
+    if after.row is None:
         if not _projects_a_sibling(module, target.table, target.pk):
             return (LANDS_AND_SERVES,
-                    f"{mechanism} is not a pk-addressable projection; the write "
-                    "was verified on the stored row")
+                    f"{after.mechanism} is not a pk-addressable projection; the "
+                    "write was verified on the stored row")
         return (LANDS_BUT_INVISIBLE,
-                f"the row is unreadable through {mechanism} after the write")
-    if after != before:
-        return LANDS_AND_SERVES, f"visible via {mechanism}"
-    if all(value_visible(v, after) for v in target.written):
-        return LANDS_AND_SERVES, f"no-op, already served via {mechanism}"
+                f"the row is unreadable through {after.mechanism} after the write")
+    if after.row != before.row:
+        return LANDS_AND_SERVES, f"visible via {after.mechanism}"
+    surface = before.moved_surface(after)
+    if surface is not None:
+        return LANDS_AND_SERVES, f"visible via {surface}"
+    if not rec.get("changed"):
+        return (LANDS_AND_SERVES,
+                f"no-op: the write left the stored row unchanged, so there is no "
+                f"drift for {after.mechanism} to serve")
+    if all(value_visible(v, after.row) for v in target.written):
+        return LANDS_AND_SERVES, f"no-op, already served via {after.mechanism}"
     return (LANDS_BUT_INVISIBLE,
-            f"{mechanism} serves neither the written values nor anything new — "
-            "the write cannot reach the agent")
+            f"{after.mechanism} serves neither the written values nor anything "
+            "new — the write cannot reach the agent")

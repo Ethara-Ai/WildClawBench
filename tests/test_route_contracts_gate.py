@@ -456,6 +456,18 @@ def test_non_empty_seed_coerced_to_empty_is_an_error(crc, tmp_path):
     assert "the seeded value is gone" in findings[0]["detail"]
 
 
+def test_a_list_of_empties_is_not_a_coercion_loss(crc, tmp_path):
+    """A blank CSV cell reaches a list coercer as ``[""]`` and leaves it as
+    ``[]``. Both hold nothing, so reporting the round trip as a lost value
+    blames a faithful loader for reading the seed correctly."""
+    api_dir = _build_service(
+        tmp_path,
+        [{"id": "1", "member_ids": [""]}],
+        'row["member_ids"] = [p for p in r["member_ids"] if p]',
+    )
+    assert _seed_findings(crc, api_dir) == []
+
+
 def test_correct_round_trip_is_clean(crc, tmp_path):
     api_dir = _build_service(
         tmp_path,

@@ -42,7 +42,8 @@ from src.utils.inject_director import (
     InjectConfigError, InjectScript, NarrativeClock, resolve_stage_mtime,
 )
 from src.utils.inject_inproc import (
-    InProcessApplier, NEEDS_RUNTIME, OpVerdict, ordered_api_ops, replay_service_ops,
+    InProcessApplier, LANDS_AND_SERVES, NEEDS_RUNTIME, OpVerdict, ordered_api_ops,
+    replay_service_ops,
 )
 from src.utils.inject_validator import _resolve_fs_src, validate_inject_script
 from src.utils.mock_overlay import ENVIRONMENT_DIR, OverlayError, overlaid_data_module, overlaid_tree
@@ -304,7 +305,8 @@ def _replay_findings(script: InjectScript, task_dir: Path,
                     f"the task's own mock_data does not load: {type(exc).__name__}: {exc}"))
                 continue
             replayed += len(verdicts)
-            findings.extend(_finding_for(v) for v in verdicts if v.verdict != "LANDS-AND-SERVES")
+            findings.extend(_finding_for(v) for v in verdicts
+                            if v.verdict != LANDS_AND_SERVES)
     return findings, replayed
 
 
