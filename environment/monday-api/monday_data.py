@@ -316,15 +316,28 @@ def _set_column_value(item_id, column_id, text=None, value=None):
 
 
 def update_item(item_id, column_id=None, text=None, value=None, group_id=None,
-                name=None, column_values=None):
+                name=None, column_values=None, board_id=None):
     item = _find_item(item_id)
     if not item:
         return {"error": f"Item {item_id} not found"}
 
+    # A move carries the item out of every group it could still belong to, so
+    # the target group is required with it and validated against the new board.
+    target_board = item["board_id"]
+    if board_id is not None and board_id != item["board_id"]:
+        if not _find_board(board_id):
+            return {"error": f"Board {board_id} not found"}
+        if group_id is None:
+            return {"error": f"Moving item {item_id} to board {board_id} requires "
+                             f"group_id naming a group on that board",
+                    "invalid": True}
+        target_board = board_id
+
     if group_id is not None:
-        if not _find_group(item["board_id"], group_id):
-            return {"error": f"Group {group_id} not found on board {item['board_id']}"}
-        _store.table("items").patch(item_id, {"group_id": group_id})
+        if not _find_group(target_board, group_id):
+            return {"error": f"Group {group_id} not found on board {target_board}"}
+        _store.table("items").patch(item_id, {"board_id": target_board,
+                                              "group_id": group_id})
         item = _find_item(item_id) or item
 
     if name is not None:

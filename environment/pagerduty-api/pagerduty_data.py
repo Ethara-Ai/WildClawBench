@@ -224,10 +224,24 @@ def create_incident(title, service_id, urgency="high", assigned_to=None):
     return incident
 
 
-def update_incident(incident_id, status=None, assigned_to=None):
+def update_incident(incident_id, status=None, assigned_to=None, title=None,
+                    urgency=None, service_id=None):
     for inc in _incidents_rows():
         if inc["incident_id"] == incident_id:
             _changes = {}
+            if title is not None:
+                _changes["title"] = title
+            if urgency is not None:
+                _changes["urgency"] = urgency
+            if service_id is not None:
+                service = next((s for s in _services_rows()
+                                if s["service_id"] == service_id), None)
+                if not service:
+                    return {"error": f"Service {service_id} not found"}
+                # Denormalized from the service, so a move must re-derive it or
+                # the incident keeps escalating to the team it just left.
+                _changes["service_id"] = service_id
+                _changes["escalation_policy_id"] = service["escalation_policy_id"]
             if status is not None:
                 if status.lower() not in VALID_STATUSES:
                     return {"error": f"Invalid status '{status}'"}

@@ -105,6 +105,43 @@ def test_monday_board_groups_unknown_board_404(monday):
     assert monday.get("/v2/boards/board-nope/groups").status_code == 404
 
 
+def test_monday_update_item_moves_it_between_boards(monday, monday_item):
+    """board_id was declared by create and omitted by update, so an item could
+    be born on a board and never leave it -- the caller's move was accepted at
+    the schema and dropped before the store."""
+    r = monday.put(f"/v2/items/{monday_item}",
+                   json={"board_id": "board-102", "group_id": "grp-open"})
+    assert r.status_code == 200, r.text
+    item = monday.get(f"/v2/items/{monday_item}").json()
+    assert item["board_id"] == "board-102"
+    assert item["group"]["id"] == "grp-open"
+
+
+def test_monday_board_move_without_a_group_is_refused(monday, monday_item):
+    """A move strands the item outside every group on the new board, so the
+    target group travels with it or the move does not happen at all."""
+    r = monday.put(f"/v2/items/{monday_item}", json={"board_id": "board-102"})
+    assert r.status_code == 400, r.text
+    assert monday.get(f"/v2/items/{monday_item}").json()["board_id"] == "board-101"
+
+
+def test_monday_board_move_to_an_unknown_board_is_refused(monday, monday_item):
+    r = monday.put(f"/v2/items/{monday_item}",
+                   json={"board_id": "board-nope", "group_id": "grp-open"})
+    assert r.status_code == 404, r.text
+    assert monday.get(f"/v2/items/{monday_item}").json()["board_id"] == "board-101"
+
+
+def test_monday_restating_the_current_board_is_a_no_op(monday, monday_item):
+    """board_id is a declared field, so the route guard passes a body carrying
+    only it; the data layer is what has to notice nothing moved."""
+    r = monday.put(f"/v2/items/{monday_item}", json={"board_id": "board-101"})
+    assert r.status_code == 200, r.text
+    item = monday.get(f"/v2/items/{monday_item}").json()
+    assert item["board_id"] == "board-101"
+    assert item["group"]["id"] == "grp-todo"
+
+
 # ---------------------------------------------------------------------------
 # gmail-api
 # ---------------------------------------------------------------------------
@@ -502,3 +539,358 @@ def test_paypal_payout_create_persists_under_its_batch_id(paypal_svc):
 def paypal_svc():
     with _client("paypal-api") as c:
         yield c
+
+
+# ---------------------------------------------------------------------------
+# The UPDATE_DROPS_FIELD wave: a field a resource can be born with has to be
+# reachable through its update route. Either it lands and serves back, or the
+# route reads it and refuses a change the vendor calls immutable -- what it may
+# not do is accept the key and drop it.
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def confluence():
+    with _client("confluence-api") as c:
+        yield c
+
+
+@pytest.fixture()
+def confluence_page(confluence):
+    r = confluence.post("/wiki/rest/api/content",
+                        json={"title": "Regression fixture", "space": {"key": "ENG"},
+                              "body": {"storage": {"value": "seed",
+                                                   "representation": "storage"}}})
+    assert r.status_code == 201, r.text
+    yield r.json()["id"]
+
+
+def test_confluence_update_moves_a_page_to_another_space(confluence, confluence_page):
+    read = f"/wiki/rest/api/content/{confluence_page}"
+    assert confluence.put(read, json={"space": {"key": "PROD"}}).status_code == 200
+    assert confluence.get(read).json()["space"]["key"] == "PROD"
+
+
+def test_confluence_update_reparents_a_page(confluence, confluence_page):
+    parent = confluence.post("/wiki/rest/api/content",
+                             json={"title": "Parent fixture",
+                                   "space": {"key": "ENG"}}).json()["id"]
+    read = f"/wiki/rest/api/content/{confluence_page}"
+    assert confluence.put(read, json={"ancestors": [{"id": parent}]}).status_code == 200
+    assert confluence.get(read).json()["ancestors"][0]["id"] == parent
+
+
+def test_confluence_update_reattributes_the_author(confluence, confluence_page):
+    read = f"/wiki/rest/api/content/{confluence_page}"
+    assert confluence.put(read, json={"created_by": "helena"}).status_code == 200
+    assert confluence.get(read).json()["history"]["createdBy"]["username"] == "helena"
+
+
+def test_confluence_page_cannot_be_its_own_ancestor(confluence, confluence_page):
+    read = f"/wiki/rest/api/content/{confluence_page}"
+    r = confluence.put(read, json={"ancestors": [{"id": confluence_page}]})
+    assert r.status_code == 400, r.text
+    assert "ancestor" in r.text
+
+
+def test_confluence_update_rejects_an_unknown_space(confluence, confluence_page):
+    read = f"/wiki/rest/api/content/{confluence_page}"
+    assert confluence.put(read, json={"space": {"key": "NOPE"}}).status_code == 404
+    assert confluence.get(read).json()["space"]["key"] == "ENG"
+
+
+def test_confluence_create_honours_the_declared_content_type(confluence):
+    """`type` was declared on the create model and never read, so every body
+    became a page no matter what it asked for."""
+    r = confluence.post("/wiki/rest/api/content",
+                        json={"title": "Blog fixture", "type": "blogpost",
+                              "space": {"key": "ENG"}})
+    assert r.status_code == 201, r.text
+    assert confluence.get(f"/wiki/rest/api/content/{r.json()['id']}").json()["type"] == "blogpost"
+
+
+@pytest.fixture(scope="module")
+def contentful():
+    with _client("contentful-api") as c:
+        yield c
+
+
+def test_contentful_update_refuses_to_change_an_entrys_content_type(contentful):
+    base = "/spaces/space-orbit/environments/master/entries"
+    made = contentful.post(base, json={"content_type": "author",
+                                       "fields": {"name": "Regression fixture"}})
+    assert made.status_code == 201, made.text
+    entry_id = made.json()["sys"]["id"]
+    try:
+        ok = contentful.put(f"{base}/{entry_id}",
+                            json={"fields": {"bio": "x"}, "content_type": "author"})
+        assert ok.status_code == 200, ok.text
+        bad = contentful.put(f"{base}/{entry_id}",
+                             json={"fields": {"bio": "y"}, "content_type": "blogPost"})
+        assert bad.status_code == 400, bad.text
+        entry = contentful.get(f"{base}/{entry_id}").json()
+        assert entry["sys"]["contentType"]["sys"]["id"] == "author"
+        assert entry["fields"]["bio"] == "x"
+    finally:
+        contentful.delete(f"{base}/{entry_id}")
+
+
+@pytest.fixture(scope="module")
+def datadog():
+    with _client("datadog-api") as c:
+        yield c
+
+
+def test_datadog_update_persists_the_monitor_type(datadog):
+    made = datadog.post("/api/v1/monitor", json={
+        "name": "Regression fixture", "type": "metric alert",
+        "query": "avg(last_5m):avg:system.cpu.user{*} > 90"})
+    assert made.status_code == 201, made.text
+    monitor_id = made.json()["id"]
+    r = datadog.put(f"/api/v1/monitor/{monitor_id}", json={"type": "service check"})
+    assert r.status_code == 200, r.text
+    assert datadog.get(f"/api/v1/monitor/{monitor_id}").json()["type"] == "service check"
+
+
+@pytest.fixture(scope="module")
+def docusign():
+    with _client("docusign-api") as c:
+        yield c
+
+
+DS_ENVELOPES = "/restapi/v2.1/accounts/acct-1/envelopes"
+
+
+def _envelope(docusign, subject, signer, doc):
+    r = docusign.post(DS_ENVELOPES, json={
+        "emailSubject": subject, "status": "created",
+        "recipients": {"signers": [{"name": signer, "email": f"{signer}@orbit-labs.com"}]},
+        "documents": [{"name": doc, "pages": 1}]})
+    assert r.status_code == 201, r.text
+    return r.json()["envelopeId"]
+
+
+def test_docusign_update_persists_the_fields_create_could_set(docusign):
+    envelope = _envelope(docusign, "Original subject", "ann", "a.pdf")
+    r = docusign.put(f"{DS_ENVELOPES}/{envelope}", json={
+        "status": "sent", "emailSubject": "Edited subject", "templateId": "tpl-77",
+        "senderName": "Priya Nair", "senderEmail": "priya.nair@orbit-labs.com"})
+    assert r.status_code == 200, r.text
+    got = docusign.get(f"{DS_ENVELOPES}/{envelope}").json()
+    assert got["emailSubject"] == "Edited subject"
+    assert got["templateId"] == "tpl-77"
+    assert got["sender"]["userName"] == "Priya Nair"
+    assert got["sender"]["email"] == "priya.nair@orbit-labs.com"
+
+
+def test_docusign_update_replaces_recipients_and_documents(docusign):
+    envelope = _envelope(docusign, "Set fixture", "bob", "b.pdf")
+    r = docusign.put(f"{DS_ENVELOPES}/{envelope}", json={
+        "status": "created",
+        "recipients": {"signers": [{"name": "Carol", "email": "carol@orbit-labs.com"}]},
+        "documents": [{"name": "c.pdf", "pages": 4}]})
+    assert r.status_code == 200, r.text
+    signers = docusign.get(f"{DS_ENVELOPES}/{envelope}/recipients").json()["signers"]
+    docs = docusign.get(f"{DS_ENVELOPES}/{envelope}/documents").json()["envelopeDocuments"]
+    assert [s["name"] for s in signers] == ["Carol"]
+    assert [(d["name"], d["pages"]) for d in docs] == [("c.pdf", 4)]
+
+
+def test_docusign_created_envelopes_do_not_share_recipient_keys(docusign):
+    """The synthesized recipient key used to be a bare ``str(i)``, which is the
+    table's primary key -- so the second envelope created through the API
+    upserted its signer "1" on top of the first envelope's signer "1" and took
+    the row. Wiring the recipient set into update made the collision reachable
+    twice over, so the key is now scoped to its envelope."""
+    first = _envelope(docusign, "First", "dana", "d.pdf")
+    second = _envelope(docusign, "Second", "erik", "e.pdf")
+    names = lambda e: [s["name"] for s in
+                       docusign.get(f"{DS_ENVELOPES}/{e}/recipients").json()["signers"]]
+    assert names(first) == ["dana"]
+    assert names(second) == ["erik"]
+    docusign.put(f"{DS_ENVELOPES}/{second}", json={
+        "status": "created",
+        "recipients": {"signers": [{"name": "frank", "email": "frank@orbit-labs.com"}]}})
+    assert names(first) == ["dana"]
+    assert names(second) == ["frank"]
+
+
+@pytest.fixture(scope="module")
+def gcal():
+    with _client("google-calendar-api") as c:
+        yield c
+
+
+def test_google_calendar_patch_persists_creator_and_organizer(gcal):
+    base = "/calendar/v3/calendars/amelia@orbit-labs.com/events"
+    made = gcal.post(base, json={"summary": "Regression fixture",
+                                 "start": {"dateTime": "2026-04-01T10:00:00Z"},
+                                 "end": {"dateTime": "2026-04-01T11:00:00Z"}})
+    assert made.status_code == 201, made.text
+    event_id = made.json()["id"]
+    try:
+        r = gcal.patch(f"{base}/{event_id}",
+                       json={"creator": "helena@orbit-labs.com",
+                             "organizer": "jonas@orbit-labs.com"})
+        assert r.status_code == 200, r.text
+        event = gcal.get(f"{base}/{event_id}").json()
+        assert event["creator"] == "helena@orbit-labs.com"
+        assert event["organizer"] == "jonas@orbit-labs.com"
+        assert event["summary"] == "Regression fixture"
+    finally:
+        gcal.delete(f"{base}/{event_id}")
+
+
+@pytest.fixture(scope="module")
+def pagerduty():
+    with _client("pagerduty-api") as c:
+        yield c
+
+
+def test_pagerduty_update_persists_title_and_urgency(pagerduty):
+    made = pagerduty.post("/incidents", json={"title": "Regression fixture",
+                                              "service_id": "PS001", "urgency": "high"})
+    assert made.status_code == 201, made.text
+    incident = made.json()["incident_id"]
+    r = pagerduty.put(f"/incidents/{incident}",
+                      json={"title": "Retitled by agent", "urgency": "low"})
+    assert r.status_code == 200, r.text
+    got = pagerduty.get(f"/incidents/{incident}").json()
+    assert got["title"] == "Retitled by agent"
+    assert got["urgency"] == "low"
+
+
+def test_pagerduty_moving_a_service_rederives_the_escalation_policy(pagerduty):
+    """escalation_policy_id is denormalized off the service, so a move that did
+    not re-derive it would leave the incident escalating to the team it left."""
+    made = pagerduty.post("/incidents", json={"title": "Move fixture",
+                                              "service_id": "PS001"})
+    incident = made.json()["incident_id"]
+    services = {s["service_id"]: s for s in
+                pagerduty.get("/services").json()["services"]}
+    target = next(sid for sid in services if sid != "PS001")
+    r = pagerduty.put(f"/incidents/{incident}", json={"service_id": target})
+    assert r.status_code == 200, r.text
+    got = pagerduty.get(f"/incidents/{incident}").json()
+    assert got["service_id"] == target
+    assert got["escalation_policy_id"] == services[target]["escalation_policy_id"]
+
+
+def test_pagerduty_update_rejects_an_unknown_service(pagerduty):
+    made = pagerduty.post("/incidents", json={"title": "Reject fixture",
+                                              "service_id": "PS001"})
+    incident = made.json()["incident_id"]
+    r = pagerduty.put(f"/incidents/{incident}", json={"service_id": "PS-nope"})
+    assert r.status_code in (400, 404), r.text
+    assert pagerduty.get(f"/incidents/{incident}").json()["service_id"] == "PS001"
+
+
+@pytest.fixture(scope="module")
+def zendesk():
+    with _client("zendesk-api") as c:
+        yield c
+
+
+@pytest.fixture()
+def zendesk_ticket(zendesk):
+    r = zendesk.post("/api/v2/tickets", json={"ticket": {
+        "subject": "Regression fixture", "description": "seed body",
+        "requester_id": 1, "organization_id": 1}})
+    assert r.status_code == 201, r.text
+    yield r.json()["ticket"]["id"]
+
+
+def test_zendesk_update_persists_subject_requester_and_organization(zendesk,
+                                                                    zendesk_ticket):
+    read = f"/api/v2/tickets/{zendesk_ticket}"
+    r = zendesk.put(read, json={"ticket": {"subject": "Retitled by agent",
+                                           "requester_id": 4, "organization_id": 2}})
+    assert r.status_code == 200, r.text
+    got = zendesk.get(read).json()["ticket"]
+    assert got["subject"] == "Retitled by agent"
+    assert got["requester_id"] == 4
+    assert got["organization_id"] == 2
+    assert got["description"] == "seed body"
+
+
+def test_zendesk_description_is_read_only(zendesk, zendesk_ticket):
+    """Zendesk's description IS the ticket's first comment, not a column, so
+    the honest answer to an edit is a refusal rather than a silent drop."""
+    read = f"/api/v2/tickets/{zendesk_ticket}"
+    r = zendesk.put(read, json={"ticket": {"description": "rewritten history"}})
+    assert r.status_code == 400, r.text
+    assert "read-only" in r.text
+    assert zendesk.get(read).json()["ticket"]["description"] == "seed body"
+
+
+def test_zendesk_restating_the_description_is_not_an_edit(zendesk, zendesk_ticket):
+    read = f"/api/v2/tickets/{zendesk_ticket}"
+    r = zendesk.put(read, json={"ticket": {"description": "seed body",
+                                           "priority": "urgent"}})
+    assert r.status_code == 200, r.text
+    assert zendesk.get(read).json()["ticket"]["priority"] == "urgent"
+
+
+def test_zendesk_a_body_naming_nothing_does_not_move_updated_at(zendesk,
+                                                                zendesk_ticket):
+    """Found sweeping this route while wiring its dropped fields: updated_at was
+    stamped outside the `if changes` branch, so an empty ticket envelope moved
+    the clock over an untouched row. A comment still earns the stamp -- it is a
+    write against the ticket even when no column moved."""
+    read = f"/api/v2/tickets/{zendesk_ticket}"
+    mod = _data_module(zendesk.app, "zendesk_data")
+    mod._store.table("tickets").patch(zendesk_ticket,
+                                      {"updated_at": "2026-01-05T09:00:00Z"})
+    before = zendesk.get(read).json()["ticket"]
+    assert before["updated_at"] == "2026-01-05T09:00:00Z"
+    assert zendesk.put(read, json={"ticket": {}}).status_code == 200
+    assert zendesk.get(read).json()["ticket"] == before
+    assert zendesk.put(read, json={"ticket": {"comment": {"body": "a note"}}}).status_code == 200
+    assert zendesk.get(read).json()["ticket"]["updated_at"] != before["updated_at"]
+
+
+@pytest.fixture(scope="module")
+def whatsapp():
+    with _client("whatsapp-api") as c:
+        yield c
+
+
+def test_whatsapp_mark_read_writes_the_status_it_was_given(whatsapp):
+    """`status` was declared on the body and never read -- the handler wrote a
+    hardcoded "read" -- so the field an agent set was accepted and dropped."""
+    message = whatsapp.get("/v17.0/messages").json()["data"][0]["message_id"]
+    r = whatsapp.post("/v17.0/messages/status",
+                      json={"messaging_product": "whatsapp", "status": "read",
+                            "message_id": message})
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "read"
+    served = [m for m in whatsapp.get("/v17.0/messages").json()["data"]
+              if m["message_id"] == message]
+    assert served and served[0]["status"] == "read"
+
+
+def test_whatsapp_mark_read_refuses_a_status_graph_does_not_document(whatsapp):
+    message = whatsapp.get("/v17.0/messages").json()["data"][0]["message_id"]
+    r = whatsapp.post("/v17.0/messages/status",
+                      json={"messaging_product": "whatsapp", "status": "delivered",
+                            "message_id": message})
+    assert r.status_code == 400, r.text
+
+
+def test_whatsapp_refuses_a_messaging_product_that_is_not_whatsapp(whatsapp):
+    """messaging_product is required on every Cloud API send and the only value
+    Graph accepts is "whatsapp". The mock declared it and never read it, so
+    "sms" was accepted and the message went out over WhatsApp anyway."""
+    contact = whatsapp.get("/v17.0/contacts").json()["data"][0]["wa_id"]
+    before = len(whatsapp.get("/v17.0/messages").json()["data"])
+    r = whatsapp.post("/v17.0/messages", json={
+        "messaging_product": "sms", "to": contact, "type": "text",
+        "text": {"body": "should not send"}})
+    assert r.status_code == 400, r.text
+    assert "messaging_product" in r.text
+    assert len(whatsapp.get("/v17.0/messages").json()["data"]) == before
+
+    message = whatsapp.get("/v17.0/messages").json()["data"][0]["message_id"]
+    bad = whatsapp.post("/v17.0/messages/status",
+                        json={"messaging_product": "sms", "status": "read",
+                              "message_id": message})
+    assert bad.status_code == 400, bad.text

@@ -113,9 +113,16 @@ class EntryUpdateBody(BaseModel):
     # ``fields`` holds the content type's own field ids, so it stays an open
     # mapping while the envelope closes. Required rather than defaulted: a body
     # naming nothing used to answer 200 with only sys.updatedAt moved.
+    #
+    # ``content_type`` is here because create declares it and an update that
+    # drops it silently is the defect this wave is closing. It is read and
+    # checked rather than written: an entry's content type is fixed when the
+    # entry is created, so restating it is a no-op and naming a different one
+    # is refused instead of quietly ignored.
     model_config = ConfigDict(extra="forbid")
 
     fields: Dict[str, Any]
+    content_type: Optional[str] = None
 
 
 @app.put("/spaces/{space_id}/environments/{env_id}/entries/{entry_id}")
@@ -123,9 +130,11 @@ def update_entry(space_id: str, env_id: str, entry_id: str, body: EntryUpdateBod
     if not body.fields:
         return JSONResponse(status_code=400, content={
             "error": "fields is empty; name at least one entry field to write"})
-    result = contentful_data.update_entry(entry_id, body.fields)
+    result = contentful_data.update_entry(entry_id, body.fields,
+                                          content_type=body.content_type)
     if "error" in result:
-        return JSONResponse(status_code=404, content=result)
+        return JSONResponse(status_code=400 if result.get("invalid") else 404,
+                            content=result)
     return result
 
 

@@ -91,12 +91,16 @@ class IncidentUpdateBody(BaseModel):
 
     status: Optional[str] = None
     assigned_to: Optional[str] = None
+    title: Optional[str] = None
+    urgency: Optional[str] = None
+    service_id: Optional[str] = None
 
 
 @app.put("/incidents/{incident_id}")
 def update_incident(incident_id: str, body: IncidentUpdateBody):
     result = pagerduty_data.update_incident(
-        incident_id, status=body.status, assigned_to=body.assigned_to)
+        incident_id, status=body.status, assigned_to=body.assigned_to,
+        title=body.title, urgency=body.urgency, service_id=body.service_id)
     if "error" in result:
         status = 404 if "not found" in result["error"] else 400
         return JSONResponse(status_code=status, content=result)

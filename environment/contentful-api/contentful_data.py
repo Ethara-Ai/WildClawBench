@@ -292,9 +292,15 @@ def create_entry(content_type, fields):
     return _entry_obj(entry)
 
 
-def update_entry(entry_id, fields):
+def update_entry(entry_id, fields, content_type=None):
     for e in _entries_rows():
         if e["id"] == entry_id:
+            if content_type is not None and content_type != e["content_type"]:
+                return {
+                    "error": f"Cannot change content type from {e['content_type']} "
+                             f"to {content_type}; create a new entry instead",
+                    "invalid": True,
+                }
             if fields:
                 e["fields"].update(fields)
                 e["updated_at"] = _now()

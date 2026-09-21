@@ -67,14 +67,37 @@ def get_envelope(accountId: str, envelopeId: str):
 
 
 class EnvelopeUpdateBody(BaseModel):
+    """The editable half of an envelope, matched field for field against create.
+
+    `status` stays required, which is what makes an empty body a 422 here
+    rather than a 200 over an untouched envelope. The six fields below it are
+    the ones create declares: an envelope could be born with a subject, a
+    sender, a template and its recipient and document sets, and then none of
+    them could be corrected through this route -- the caller's edit was
+    accepted and dropped. `recipients` and `documents` replace their sets
+    rather than merging into them, because each arrives as a whole list and a
+    partial merge would have no key to merge on.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
     status: str
+    emailSubject: Optional[str] = None
+    templateId: Optional[str] = None
+    senderName: Optional[str] = None
+    senderEmail: Optional[str] = None
+    recipients: Optional[Dict[str, Any]] = None
+    documents: Optional[List[Dict[str, Any]]] = None
 
 
 @app.put("/restapi/v2.1/accounts/{accountId}/envelopes/{envelopeId}")
 def update_envelope(accountId: str, envelopeId: str, body: EnvelopeUpdateBody):
-    result = docusign_data.update_envelope(envelopeId, body.status)
+    result = docusign_data.update_envelope(
+        envelopeId, body.status,
+        email_subject=body.emailSubject, template_id=body.templateId,
+        sender_name=body.senderName, sender_email=body.senderEmail,
+        recipients=body.recipients, documents=body.documents,
+    )
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result

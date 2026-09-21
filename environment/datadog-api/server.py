@@ -96,6 +96,7 @@ class MonitorUpdateBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: Optional[str] = None
+    type: Optional[str] = None
     query: Optional[str] = None
     message: Optional[str] = None
     overall_state: Optional[str] = None
@@ -109,8 +110,9 @@ def update_monitor(monitor_id: str, body: MonitorUpdateBody):
     if refusal is not None:
         return refusal
     result = datadog_data.update_monitor(
-        monitor_id, name=body.name, query=body.query, message=body.message,
-        overall_state=body.overall_state, priority=body.priority, tags=body.tags,
+        monitor_id, name=body.name, mtype=body.type, query=body.query,
+        message=body.message, overall_state=body.overall_state,
+        priority=body.priority, tags=body.tags,
     )
     if "error" in result:
         return JSONResponse(status_code=404, content=result)

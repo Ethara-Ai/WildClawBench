@@ -255,13 +255,13 @@ def send_template(to_wa_id, template_name, components=None):
     return {"messages": [{"id": msg_id, "message_status": "accepted"}]}
 
 
-def mark_read(message_id):
+def mark_read(message_id, status="read"):
     for m in _messages_rows():
         if m["message_id"] == message_id:
-            _changes = {"status": "read"}
+            _changes = {"status": status}
             m.update(_changes)
             _store_patch("messages", m, _changes)
-            return {"success": True, "message_id": message_id}
+            return {"success": True, "message_id": message_id, "status": status}
     return {"error": f"Message {message_id} not found"}
 
 _store.eager_load()

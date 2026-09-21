@@ -102,10 +102,30 @@ class TemplateBlock(BaseModel):
     components: Optional[List[Dict[str, Any]]] = None
 
 
+MESSAGING_PRODUCT = "whatsapp"
+
+
+def _wrong_messaging_product(value):
+    """Graph's own refusal, or None when the caller named the right product.
+
+    `messaging_product` is required on every Cloud API message send and the
+    only accepted value is "whatsapp"; Graph answers 400 with code 100 when it
+    is missing or anything else. The mock used to declare the field and never
+    read it, so `"messaging_product": "sms"` was accepted and the message went
+    out over WhatsApp anyway -- a declared field the caller could set and the
+    store never saw, which is this wave's defect class on the create side.
+    """
+    if value == MESSAGING_PRODUCT:
+        return None
+    return JSONResponse(status_code=400, content={"error": {
+        "message": f"(#100) Param messaging_product must be {MESSAGING_PRODUCT}",
+        "type": "OAuthException", "code": 100}})
+
+
 class SendMessageBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    messaging_product: str = "whatsapp"
+    messaging_product: str = MESSAGING_PRODUCT
     to: str
     type: str  # "text" or "template"
     text: Optional[TextMessage] = None
@@ -114,6 +134,9 @@ class SendMessageBody(BaseModel):
 
 @app.post("/v17.0/messages")
 def send_message(body: SendMessageBody):
+    refusal = _wrong_messaging_product(body.messaging_product)
+    if refusal is not None:
+        return refusal
     if body.type == "text":
         if not body.text:
             return JSONResponse(status_code=400, content={"error": "text body required"})
@@ -133,17 +156,29 @@ def send_message(body: SendMessageBody):
     return result
 
 
+#: Graph documents this write with "read" and no other value. Threaded through
+#: to the store rather than hardcoded there, so the declared field is what lands.
+READ_STATUS = "read"
+
+
 class ReadStatusBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    messaging_product: str = "whatsapp"
-    status: str = "read"
+    messaging_product: str = MESSAGING_PRODUCT
+    status: str = READ_STATUS
     message_id: str
 
 
 @app.post("/v17.0/messages/status")
 def mark_read(body: ReadStatusBody):
-    result = whatsapp_data.mark_read(body.message_id)
+    refusal = _wrong_messaging_product(body.messaging_product)
+    if refusal is not None:
+        return refusal
+    if body.status != READ_STATUS:
+        return JSONResponse(status_code=400, content={"error": {
+            "message": f"(#100) Param status must be {READ_STATUS}",
+            "type": "OAuthException", "code": 100}})
+    result = whatsapp_data.mark_read(body.message_id, status=body.status)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result

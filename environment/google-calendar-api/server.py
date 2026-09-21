@@ -129,6 +129,8 @@ class EventUpdateBody(BaseModel):
     recurrence: Optional[List[str]] = None
     status: Optional[str] = None
     visibility: Optional[str] = None
+    creator: Optional[str] = None
+    organizer: Optional[str] = None
 
 
 @app.patch("/calendar/v3/calendars/{calendar_id}/events/{event_id}")

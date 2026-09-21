@@ -252,7 +252,8 @@ def create_content(title, space_key, body="", parent_id=None, created_by="apiuse
 
 
 def update_content(content_id, title=None, body=None, version_number=None,
-                   content_type=None):
+                   content_type=None, space_key=None, parent_id=None,
+                   created_by=None):
     """Apply the named edits to a page, bumping its version only if one lands.
 
     The version bump is inside `if changes` for the reason the route guard
@@ -270,6 +271,13 @@ def update_content(content_id, title=None, body=None, version_number=None,
             "error": f"Cannot change content type from {page['type']} to {content_type}",
             "invalid": True,
         }
+    if space_key is not None and not _find_space(space_key):
+        return {"error": f"No space with key: {space_key}"}
+    if parent_id is not None:
+        if parent_id == content_id:
+            return {"error": "A page cannot be its own ancestor", "invalid": True}
+        if not _find_page(parent_id):
+            return {"error": f"No parent content with id: {parent_id}"}
     expected = page["version"] + 1
     if version_number is not None and version_number != expected:
         return {
@@ -281,6 +289,12 @@ def update_content(content_id, title=None, body=None, version_number=None,
         changes["title"] = title
     if body is not None:
         changes["body"] = body
+    if space_key is not None:
+        changes["space_key"] = space_key
+    if parent_id is not None:
+        changes["parent_id"] = parent_id
+    if created_by is not None:
+        changes["created_by"] = created_by
     if changes:
         changes["version"] = expected
         _store_patch("pages", page["id"], changes)

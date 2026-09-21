@@ -90,6 +90,15 @@ def create_ticket(body: TicketCreateBody):
 
 
 class TicketUpdate(BaseModel):
+    """The editable half of a ticket, matched field for field against create.
+
+    `subject`, `requester_id` and `organization_id` are edits Zendesk supports
+    and this route used to drop on the floor. `description` is here for the
+    same reason but is read-only on the real API -- it is the ticket's first
+    comment, not a column -- so it is read and refused rather than dropped, and
+    a caller who wants to add prose sends `comment` instead.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
     status: Optional[str] = None
@@ -98,6 +107,10 @@ class TicketUpdate(BaseModel):
     type: Optional[str] = None
     tags: Optional[List[str]] = None
     comment: Optional[TicketComment] = None
+    subject: Optional[str] = None
+    description: Optional[str] = None
+    requester_id: Optional[int] = None
+    organization_id: Optional[int] = None
 
 
 class TicketUpdateBody(BaseModel):
@@ -115,6 +128,8 @@ def update_ticket(ticket_id: int, body: TicketUpdateBody):
         comment_body=t.comment.body if t.comment else None,
         comment_public=t.comment.public if t.comment else True,
         comment_author_id=t.comment.author_id if t.comment else None,
+        subject=t.subject, description=t.description,
+        requester_id=t.requester_id, organization_id=t.organization_id,
     )
     if "error" in result:
         status = 404 if "not found" in result["error"] else 400

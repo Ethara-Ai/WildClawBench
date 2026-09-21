@@ -223,9 +223,25 @@ def create_envelope(payload):
     }
     _store_insert("envelopes", env)
 
-    for i, r in enumerate(payload.get("recipients", {}).get("signers", []), start=1):
+    _set_signers(envelope_id, payload.get("recipients", {}).get("signers", []), status)
+    _set_documents(envelope_id, payload.get("documents", []))
+    return {"envelopeId": envelope_id, "status": status,
+            "statusDateTime": now, "uri": f"/envelopes/{envelope_id}"}
+
+
+def _set_signers(envelope_id, signers, status):
+    """Replace the envelope's signer set.
+
+    The synthesized key is scoped to the envelope. It used to be a bare
+    ``str(i)``, which is this table's primary key, so the second envelope ever
+    created through the API upserted a recipient "1" on top of the first
+    envelope's recipient "1" and silently took its row. Seeded rows carry their
+    own ``rcp-N`` and are untouched by this.
+    """
+    _store.table("recipients").delete_where(lambda r: r["envelope_id"] == envelope_id)
+    for i, r in enumerate(signers or [], start=1):
         _store_insert("recipients", {
-            "recipient_id": r.get("recipientId") or str(i),
+            "recipient_id": r.get("recipientId") or f"{envelope_id}-r{i}",
             "envelope_id": envelope_id,
             "name": r.get("name", ""),
             "email": r.get("email", ""),
@@ -235,20 +251,24 @@ def create_envelope(payload):
             "signed_time": None,
         })
 
-    for i, d in enumerate(payload.get("documents", []), start=1):
+
+def _set_documents(envelope_id, documents):
+    """Replace the envelope's document set; keys scoped as in :func:`_set_signers`."""
+    _store.table("documents").delete_where(lambda d: d["envelope_id"] == envelope_id)
+    for i, d in enumerate(documents or [], start=1):
         _store_insert("documents", {
-            "document_id": d.get("documentId") or str(i),
+            "document_id": d.get("documentId") or f"{envelope_id}-d{i}",
             "envelope_id": envelope_id,
             "name": d.get("name", f"document-{i}.pdf"),
             "document_type": "content",
             "page_count": int(d.get("pages", 1)),
             "order": i,
         })
-    return {"envelopeId": envelope_id, "status": status,
-            "statusDateTime": now, "uri": f"/envelopes/{envelope_id}"}
 
 
-def update_envelope(envelope_id, status):
+def update_envelope(envelope_id, status, email_subject=None, template_id=None,
+                    sender_name=None, sender_email=None, recipients=None,
+                    documents=None):
     e = _find_envelope(envelope_id)
     if e is None:
         return {"error": f"envelope {envelope_id} not found"}
@@ -259,7 +279,19 @@ def update_envelope(envelope_id, status):
         changes["sent_time"] = now
     if status == "completed":
         changes["completed_time"] = now
+    if email_subject is not None:
+        changes["email_subject"] = email_subject
+    if template_id is not None:
+        changes["template_id"] = template_id
+    if sender_name is not None:
+        changes["sender_name"] = sender_name
+    if sender_email is not None:
+        changes["sender_email"] = sender_email
     _store_patch("envelopes", envelope_id, changes)
+    if recipients is not None:
+        _set_signers(envelope_id, recipients.get("signers") or [], status)
+    if documents is not None:
+        _set_documents(envelope_id, documents)
     return {"envelopeId": envelope_id, "status": status, "statusDateTime": now}
 
 

@@ -158,13 +158,23 @@ class ContentUpdateBody(BaseModel):
     content type, so it validates rather than writes, and restating it collects
     no change.
 
+    `space`, `ancestors` and `created_by` are here because create declares them
+    and a page that can be born in a space, under a parent and with an author
+    should be movable, re-parentable and re-attributable through the same
+    resource. `created_by` has no counterpart in the real API on either verb --
+    Confluence takes the author from the caller's credentials -- so it is this
+    mock's fixture affordance, kept symmetric across create and update rather
+    than accepted on one and dropped on the other.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     title: Optional[str] = None
     type: Optional[str] = None
+    space: Optional[ContentSpace] = None
+    ancestors: Optional[list[ContentAncestor]] = None
     body: Optional[ContentBodyWrapper] = None
+    created_by: Optional[str] = None
     version: Optional[ContentVersion] = None
 
 
@@ -179,6 +189,9 @@ def update_content(content_id: str, body: ContentUpdateBody):
         body=body.body.storage.value if body.body else None,
         version_number=body.version.number if body.version else None,
         content_type=body.type,
+        space_key=body.space.key if body.space else None,
+        parent_id=body.ancestors[0].id if body.ancestors else None,
+        created_by=body.created_by,
     )
     if "error" in result:
         status = 409 if result.get("conflict") else 400 if result.get("invalid") else 404

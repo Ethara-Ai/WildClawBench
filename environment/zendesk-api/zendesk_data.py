@@ -231,11 +231,22 @@ def create_ticket(subject, description=None, priority="normal", ticket_type="que
 
 def update_ticket(ticket_id, status=None, priority=None, assignee_id=None,
                   ticket_type=None, tags=None, comment_body=None,
-                  comment_public=True, comment_author_id=None):
+                  comment_public=True, comment_author_id=None, subject=None,
+                  description=None, requester_id=None, organization_id=None):
     t = _find(_tickets_rows(), ticket_id)
     if not t:
         return {"error": f"Ticket {ticket_id} not found"}
+    if description is not None and description != t["description"]:
+        return {"error": "description is read-only; it is the ticket's first "
+                         "comment. Send comment.body to add to the thread.",
+                "invalid": True}
     changes = {}
+    if subject is not None:
+        changes["subject"] = subject
+    if requester_id is not None:
+        changes["requester_id"] = _to_int(requester_id)
+    if organization_id is not None:
+        changes["organization_id"] = _to_int(organization_id)
     if status is not None:
         if status not in VALID_STATUS:
             return {"error": f"Invalid status: {status}"}
@@ -259,8 +270,10 @@ def update_ticket(ticket_id, status=None, priority=None, assignee_id=None,
             "public": bool(comment_public),
             "created_at": _now(),
         })
-    changes["updated_at"] = _now()
-    _store_patch("tickets", t["id"], changes)
+    ticket_was_written = bool(changes) or bool(comment_body)
+    if ticket_was_written:
+        changes["updated_at"] = _now()
+        _store_patch("tickets", t["id"], changes)
     return {"ticket": {**t, **changes}}
 
 

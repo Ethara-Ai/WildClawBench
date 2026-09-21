@@ -124,13 +124,16 @@ class ItemUpdateBody(BaseModel):
     group_id: Optional[str] = None
     item_name: Optional[str] = None
     column_values: Optional[Dict[str, Any]] = None
+    board_id: Optional[str] = None
 
 
 #: The names ``monday_data.update_item`` actually branches on. ``text`` and
 #: ``value`` are deliberately absent: both are modifiers of ``column_id`` and
 #: neither reaches a write branch without it, so a body carrying only those is
-#: still a no-op and has to be reported as one.
-ITEM_UPDATE_FIELDS = ("column_values", "column_id", "item_name", "group_id")
+#: still a no-op and has to be reported as one. ``board_id`` is safe to list only
+#: because the data layer refuses a move that arrives without ``group_id``.
+ITEM_UPDATE_FIELDS = ("column_values", "column_id", "item_name", "group_id",
+                      "board_id")
 
 
 @app.put("/v2/items/{item_id}")
@@ -138,7 +141,8 @@ def update_item(item_id: str, body: ItemUpdateBody):
     # Mirrors update_item's own write conditions, so nothing that used to apply
     # is refused here: the empty string is a rename, the empty dict is not.
     if not (body.group_id is not None or body.item_name is not None
-            or body.column_id is not None or bool(body.column_values)):
+            or body.column_id is not None or bool(body.column_values)
+            or body.board_id is not None):
         return JSONResponse(status_code=400, content={
             "error": "no updatable field supplied; expected one of "
                      + ", ".join(ITEM_UPDATE_FIELDS)
@@ -153,9 +157,11 @@ def update_item(item_id: str, body: ItemUpdateBody):
         group_id=body.group_id,
         name=body.item_name,
         column_values=body.column_values,
+        board_id=body.board_id,
     )
     if "error" in result:
-        return JSONResponse(status_code=404, content=result)
+        return JSONResponse(status_code=400 if result.get("invalid") else 404,
+                            content=result)
     return result
 
 

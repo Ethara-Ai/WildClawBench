@@ -276,12 +276,14 @@ def create_monitor(name, mtype, query, message="", priority=3, tags=None):
 
 
 def update_monitor(monitor_id, name=None, query=None, message=None,
-                   overall_state=None, priority=None, tags=None):
+                   overall_state=None, priority=None, tags=None, mtype=None):
     for m in _monitors_rows():
         if str(m["id"]) == str(monitor_id):
             _changes = {}
             if name is not None:
                 _changes["name"] = name
+            if mtype is not None:
+                _changes["type"] = mtype
             if query is not None:
                 _changes["query"] = query
             if message is not None:

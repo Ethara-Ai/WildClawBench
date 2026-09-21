@@ -250,7 +250,7 @@ def update_event(calendar_id, event_id, payload):
         if e["calendar_id"] == resolved and e["id"] == event_id:
             updates = {}
             for field in ("summary", "description", "location", "status",
-                          "visibility", "recurrence"):
+                          "visibility", "recurrence", "creator", "organizer"):
                 if field in payload:
                     updates[field] = payload[field]
             if "start" in payload:
