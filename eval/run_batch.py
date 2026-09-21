@@ -2075,9 +2075,8 @@ def _condense_transcript_for_judge(traj: dict, limit: int | None = None,
                 txt = b.get("text") or b.get("content") or ""
                 if isinstance(txt, str) and txt.strip():
                     _emit(f"[toolResult] {txt.strip()}")
-    # Emit a terminal-turn landmark on the last flattened entry so the judge (and
-    # grading._budget_transcript's boundary-aware tail anchor) can locate the
-    # final turn even when a boundary-aware evidence cut drops middle lines. The
+    # Emit a terminal-turn landmark on the last flattened entry so the judge can
+    # locate the final turn, which its response criteria are graded against. The
     # never-truncate policy is preserved: this only PREPENDS a label, drops
     # nothing. judge_system.md names both landmarks.
     if out:

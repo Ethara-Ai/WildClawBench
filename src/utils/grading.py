@@ -1145,61 +1145,16 @@ def _deliverable_evidence_marker(path: Path) -> str | None:
 
 
 _TRANSCRIPT_MARKER = "\n----- TRANSCRIPT (condensed) -----\n"
-# Terminal-turn landmarks emitted by _condense_transcript_for_judge (see
-# eval/run_batch.py) and named in system_prompts/judge_system.md. A task can end
-# on an assistant message OR a submit-tool action, so a boundary-aware cut must
-# recognise both to keep the final turn whole.
-_TERMINAL_LANDMARKS = ("[FINAL ASSISTANT MESSAGE]", "[SUBMIT TOOL OUTPUT]")
 
 
-def _budget_transcript(transcript: str, budget: int) -> str:
-    # Middle-drop on physical-line boundaries: keep a head window, an explicit
-    # truncation marker, and a tail window anchored on the terminal landmark so
-    # the final turn survives. INVARIANT: the return is ALWAYS <= budget chars
-    # (the OAuth judge 200K ceiling, AGENTS.md #18, is a hard gate — an
-    # over-budget transcript makes _gather_evidence exceed the member budget and
-    # every criterion abstains). When the final turn alone exceeds budget we keep
-    # its END (most-recent content) clamped to budget, never the whole transcript.
-    if budget <= 0:
-        return ""
-    if len(transcript) <= budget:
-        return transcript
-    lines = transcript.split("\n")
-    # LAST landmark, not first: agent text can echo a landmark string earlier; a
-    # first-match anchor grows the tail from that decoy back to ~whole transcript
-    # (measured 7x over budget). `-1` sentinel honors a landmark at line 0.
-    anchor = -1
-    for i in range(len(lines) - 1, -1, -1):
-        if any(mark in lines[i] for mark in _TERMINAL_LANDMARKS):
-            anchor = i
-            break
-    tail_start = anchor if anchor >= 0 else len(lines) - 1
-    tail = "\n".join(lines[tail_start:])
-    marker = "\n... [truncated {n} lines] ...\n"
-    # If the final turn alone can't fit, drop the head entirely and keep the END
-    # of the tail so the return stays <= budget (the marker + turn-end, not the
-    # whole transcript). rendered with n=tail_start (all prior lines dropped).
-    rendered_marker = marker.format(n=tail_start)
-    if len(tail) + len(rendered_marker) >= budget:
-        room = budget - len(rendered_marker)
-        if room <= 0:
-            return tail[-budget:]
-        return rendered_marker + tail[-room:]
-    head: list[str] = []
-    head_len = 0
-    tail_len = len(tail) + 1
-    i = 0
-    while i < tail_start:
-        add = len(lines[i]) + 1
-        if head_len + add + tail_len + len(marker.format(n=tail_start - i)) >= budget:
-            break
-        head.append(lines[i])
-        head_len += add
-        i += 1
-    dropped = tail_start - i
-    if dropped <= 0:
-        return "\n".join(head + [tail])[:budget]
-    return "\n".join(head) + marker.format(n=dropped) + tail
+class TranscriptTooLarge(RuntimeError):
+    """The condensed conversation alone overruns one member's evidence budget.
+
+    Raised by `_gather_evidence`, caught by `grade_with_rubric`, and never seen
+    by a caller: the "grading never raises" contract (see the total-failure
+    block at the bottom of this module) is unchanged. It exists so that the one
+    case we cannot serve honestly is impossible to serve dishonestly by
+    accident."""
 
 
 # Directory names that hold agent scratch/work-product (build scripts, the
@@ -1398,21 +1353,36 @@ def _gather_evidence(
                    for n in scaffold]
     base_manifest = _omission_manifest(size_notes) if size_notes else ""
     effective = _JUDGE_MAX_EVIDENCE if budget is None else budget
-    # Budget deliverables and transcript SEPARATELY. The transcript marker can
-    # then never be sliced off (so _split_evidence never silently returns ""),
-    # and the boundary-aware cut keeps the final turn whole. A tiny transcript
-    # floor is reserved so the marker + final turn survive even when deliverables
-    # are large; realistic per-family budgets (175K-1.35M) are the operative path.
     if effective is None or not transcript_text:
         blob = deliv_blob + base_manifest + (
             f"{_TRANSCRIPT_MARKER}{transcript_text}" if transcript_text else ""
         )
         return blob if effective is None else blob[:effective]
-    floor = min(
-        len(_TRANSCRIPT_MARKER) + len(transcript_text),
-        max(2000, effective // 5),
-    )
-    deliv_budget = max(0, effective - floor)
+    # The transcript is reserved FIRST and WHOLE; deliverables divide what is
+    # left. The old order was the other way round — deliverables filled to a
+    # floor of max(2000, effective//5) and the conversation took the leftover,
+    # which meant a bulky deliverable set silently bought itself room out of the
+    # agent's own conversation. Two different evidence classes then arrived cut,
+    # and the judge could not tell which cut mattered. Only one of them can be
+    # cut honestly: a deliverable block cut for budget is still NAMED in the
+    # omission manifest, so the judge answers No + TRUNCATION_AFFECTED and the
+    # scoring layer routes the criterion to Human Evaluation. A dropped stretch
+    # of conversation has no such name — the tool call that is missing from it
+    # is indistinguishable from a tool call that never happened, which is a
+    # graded fail on a run that may have done the work.
+    transcript_cost = len(_TRANSCRIPT_MARKER) + len(transcript_text)
+    if transcript_cost > effective:
+        # Context-window physics, not a policy we can budget our way out of.
+        # Cutting here would be the silent mis-grade above applied to the WHOLE
+        # conversation, so the member does not grade at all: grade_with_rubric
+        # drops it, and a council with no member left routes to the existing
+        # dead-judge artifact (score.failed.json). Honest UNGRADED beats
+        # confidently wrong.
+        raise TranscriptTooLarge(
+            f"transcript exceeds judge context: {transcript_cost} chars of "
+            f"conversation against a {effective}-char evidence budget"
+        )
+    deliv_budget = effective - transcript_cost
     if len(deliv_blob) + len(base_manifest) <= deliv_budget:
         deliv_out = deliv_blob + base_manifest
     else:
@@ -1432,10 +1402,10 @@ def _gather_evidence(
                 kept.append(block)
                 used += len(block)
             elif room > 800 and not omitted:
-                # Head+tail keep (mirrors _budget_transcript): deliverable text
-                # files often carry markup/data bulk up front and the
-                # human-readable summary at the END, so a head-only cut drops
-                # exactly the content criteria cite.
+                # Head+tail keep: deliverable text files often carry
+                # markup/data bulk up front and the human-readable summary at
+                # the END, so a head-only cut drops exactly the content
+                # criteria cite.
                 cut_mark = "\n... [truncated for evidence budget] ...\n"
                 half = (room - len(cut_mark)) // 2
                 kept.append(block[:half] + cut_mark + block[-(room - len(cut_mark) - half):])
@@ -1449,13 +1419,12 @@ def _gather_evidence(
         kept.append(_omission_manifest(size_notes + omitted)[
             : max(0, tail_room - len(note_out))])
         deliv_out = "".join(kept)
-    t_budget = effective - len(deliv_out) - len(_TRANSCRIPT_MARKER)
-    t_out = _budget_transcript(transcript_text, max(0, t_budget))
-    # Defensive final clamp: the OAuth 200K ceiling (AGENTS.md #18) is a hard gate,
-    # so the assembled evidence must NEVER exceed `effective` even if a component
-    # budget math drifts. _split_evidence still finds the marker because deliv_out
-    # + marker are budgeted to fit before the transcript tail.
-    return (deliv_out + _TRANSCRIPT_MARKER + t_out)[:effective]
+    # Defensive clamp on the DELIVERABLE side alone. The assembled evidence
+    # must never exceed `effective`, but clamping the whole blob (what this
+    # line used to do) put the transcript back inside reach of a raw slice the
+    # moment any component's arithmetic drifted. Clamping here keeps the
+    # guarantee and leaves the conversation byte-identical to its input.
+    return deliv_out[:deliv_budget] + _TRANSCRIPT_MARKER + transcript_text
 
 
 _ZERO_USAGE = {
@@ -3011,12 +2980,37 @@ def grade_with_rubric(
     # per chunk (system prompt is identical, so Sonnet cachePoint still reused).
     evidence_for_member: dict[str, str] = {}
     rubric_names = _rubric_file_names(rubrics)
+    overflowed: list[str] = []
     for m in members:
         budget = _member_evidence_budget(m.model, m.family)
-        evidence_for_member[m.model] = _gather_evidence(
-            workspace_results, transcript_text, budget=budget,
-            rubric_names=rubric_names,
-        )
+        try:
+            evidence_for_member[m.model] = _gather_evidence(
+                workspace_results, transcript_text, budget=budget,
+                rubric_names=rubric_names,
+            )
+        except TranscriptTooLarge as exc:
+            # This member's window cannot hold the conversation, and cutting it
+            # is the one thing _gather_evidence will not do. Drop the member
+            # rather than the evidence: the survivors still vote, and Sonnet —
+            # the widest window and the council's source of truth — is the last
+            # one this can ever happen to.
+            overflowed.append(f"{m.family}: {exc}")
+            logger.error(
+                "Judge member %s (%s) gets NO payload — %s. It casts no vote; "
+                "the remaining members grade this run.",
+                m.family, _short_judge_label(m.model), exc,
+            )
+    members = [m for m in members if m.model in evidence_for_member]
+    if not members:
+        # Every window overran. There is no judge left, so this is the
+        # dead-judge case the score.failed.json sentinel exists for, reached
+        # through the ordinary `error` key so _grading_failure_reason and the
+        # client score schema are untouched.
+        return {
+            "overall_score": 0.0,
+            "error": "transcript exceeds judge context (" + "; ".join(overflowed) + ")",
+            "usage": dict(_ZERO_USAGE),
+        }
 
     def _grade_chunk(chunk: list) -> dict:
         # Attachments are CHUNK-scoped: each call carries only the pixels its

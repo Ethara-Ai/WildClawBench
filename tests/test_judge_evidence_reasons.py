@@ -80,13 +80,19 @@ def test_manifest_and_duplicate_entries_carry_their_own_reasons(tmp_path):
 
 def test_prompt_states_our_cut_semantics_and_the_whole_reason_set():
     prompt = load_prompt("judge_system")
-    # Note 1 — anti-over-abstention, worded for the cut we actually make.
-    assert "the cut is made BETWEEN lines and never inside one" in prompt
-    assert '"... [truncated N lines] ..."' in prompt
+    # Note 1 — anti-over-abstention, worded for the cut we actually make. The
+    # conversation is no longer one of them, so the prompt must not describe a
+    # conversation cut at all: an absent tool call really is absent now.
+    assert "the conversation above is never shortened to fit this prompt" in prompt
+    assert "a tool call that is absent from it really is absent" in prompt
+    assert '"... [truncated for evidence budget] ..."' in prompt
     assert "the file it wrote IS the evidence" in prompt
-    # HarnessV2's in-place block clipping is not implemented here, so the prompt
-    # must not promise the judge a shortened-block shape it will never see.
+    # Shapes this harness never produces must never be promised to the judge:
+    # HarnessV2's in-place block clipping, and — since the transcript-first
+    # budget — our own former middle-drop marker.
     assert "truncated N chars of this tool block" not in prompt
+    assert "truncated N lines" not in prompt
+    assert "the cut is made BETWEEN lines" not in prompt
     # Note 2 — the closed token set, and the rule the tokens exist for.
     assert '"[reason: <token>]"' in prompt
     for token in ("not-extractable", "over-budget", "harness-scaffold",

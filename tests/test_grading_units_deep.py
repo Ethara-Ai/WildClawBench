@@ -365,19 +365,15 @@ def test_gather_evidence_budget_truncates(tmp_path):
     assert transcript == "the transcript body"
 
 
-def test_gather_evidence_tiny_budget_preserves_transcript_marker(tmp_path):
-    # Hard-clamp contract (OAuth 200K gate #18): total evidence is ALWAYS
-    # <= budget. At a pathologically small budget the marker survives and the
-    # transcript tail is non-empty (END of the final turn, so the judge never
-    # grades against "(no transcript captured)") — but never unbounded overshoot.
+def test_gather_evidence_budget_below_the_transcript_refuses_to_cut(tmp_path):
+    # A budget too small to hold the conversation used to yield a clamped
+    # fragment of it. There is no honest fragment: the member is refused a
+    # payload instead, and grade_with_rubric turns that into an UNGRADED run.
     results = tmp_path / "task_output" / "artifacts" / "results"
     results.mkdir(parents=True)
     (results / "report.md").write_text("A" * 5000, encoding="utf-8")
-    ev = grading._gather_evidence(results, "final answer here", budget=50)
-    assert len(ev) <= 50
-    assert grading._TRANSCRIPT_MARKER.strip() in ev
-    _files, transcript = grading._split_evidence(ev)
-    assert transcript  # non-empty: keeps the end of the final turn
+    with pytest.raises(grading.TranscriptTooLarge):
+        grading._gather_evidence(results, "final answer here", budget=50)
     # At a realistic budget the entire final turn survives whole.
     ev2 = grading._gather_evidence(results, "final answer here", budget=6000)
     _f2, transcript2 = grading._split_evidence(ev2)
@@ -405,60 +401,18 @@ def test_gather_evidence_split_roundtrips_through_split_evidence(tmp_path):
     assert "BODY" in files_part
 
 
-def test_budget_transcript_middle_drop_emits_marker_and_keeps_final_turn():
-    body = "\n".join(f"[user] msg {i} " + "w" * 100 for i in range(100))
-    transcript = body + "\n[FINAL ASSISTANT MESSAGE] [assistant] done"
-    out = grading._budget_transcript(transcript, 3000)
-    assert "... [truncated" in out and "lines] ..." in out
-    assert out.rstrip().endswith("done")
-    assert len(out) <= 3000
-
-
-def test_budget_transcript_spurious_early_landmark_stays_bounded():
-    filler = "\n".join(f"line {i} " + "x" * 80 for i in range(400))
-    decoy = "[FINAL ASSISTANT MESSAGE] echoed by an agent tool result"
-    real_final = "[FINAL ASSISTANT MESSAGE] [assistant] the real final answer"
-    transcript = filler + "\n" + decoy + "\n" + filler + "\n" + real_final
-    out = grading._budget_transcript(transcript, 5000)
-    assert len(out) <= 5000
-    assert "the real final answer" in out
-
-
-def test_budget_transcript_landmark_at_line_zero_stays_bounded():
-    transcript = (
-        "[FINAL ASSISTANT MESSAGE] final-para-1\nfinal-para-2\nfinal-para-3\n"
-        + "z" * 5000
-    )
-    out = grading._budget_transcript(transcript, 200)
-    assert len(out) <= 200
-
-
-def test_budget_transcript_huge_final_turn_clamped_to_budget():
-    # Final [SUBMIT TOOL OUTPUT] turn alone dwarfs the budget: must clamp to the
-    # END of that turn, never return the whole transcript (OAuth 200K gate #18).
-    head = "\n".join(f"[user] q{i} " + "a" * 50 for i in range(50))
-    big_final = "[SUBMIT TOOL OUTPUT] [toolResult] " + "Z" * 400_000 + " END_OF_OUTPUT"
-    transcript = head + "\n" + big_final
-    out = grading._budget_transcript(transcript, 175_000)
-    assert len(out) <= 175_000
-    assert out.rstrip().endswith("END_OF_OUTPUT")
-
-
-def test_budget_transcript_zero_or_negative_budget_returns_empty():
-    assert grading._budget_transcript("anything\nhere", 0) == ""
-    assert grading._budget_transcript("anything\nhere", -5) == ""
-
-
 def test_gather_evidence_never_exceeds_effective_budget(tmp_path):
     # Assembled evidence must NEVER exceed the member budget (OAuth 200K gate #18),
-    # even when both deliverables and transcript are individually huge.
+    # even when both deliverables and transcript are individually huge. The
+    # deliverable side absorbs the whole overrun; the conversation is whole.
     results = tmp_path / "task_output" / "artifacts" / "results"
     results.mkdir(parents=True)
     (results / "report.md").write_text("R" * 500_000, encoding="utf-8")
-    transcript = "\n".join(f"[user] t{i} " + "x" * 200 for i in range(3000))
+    transcript = "\n".join(f"[user] t{i} " + "x" * 200 for i in range(1000))
     transcript += "\n[FINAL ASSISTANT MESSAGE] [assistant] final"
     ev = grading._gather_evidence(results, transcript, budget=300_000)
     assert len(ev) <= 300_000
+    assert grading._split_evidence(ev)[1] == transcript
 
 
 def _png_bytes(w, h):

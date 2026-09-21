@@ -25,6 +25,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.utils import grading  # noqa: E402
@@ -185,9 +187,15 @@ def test_dedup_does_not_move_the_budget_for_input_with_no_duplicates(tmp_path):
 
 def test_assembled_evidence_never_exceeds_the_budget_with_a_duplicate_note(tmp_path):
     evidence, _ = _mirrored_tree(tmp_path)
-    for budget in (500, 2000, 4000, 6000):
-        out = grading._gather_evidence(evidence, "TRANSCRIPT " * 200, budget=budget)
+    transcript = "TRANSCRIPT " * 200
+    for budget in (4000, 6000):
+        out = grading._gather_evidence(evidence, transcript, budget=budget)
         assert len(out) <= budget, budget
+        assert grading._split_evidence(out)[1] == transcript, budget
+    # Below the conversation's own size there is nothing honest to assemble.
+    for budget in (500, 2000):
+        with pytest.raises(grading.TranscriptTooLarge):
+            grading._gather_evidence(evidence, transcript, budget=budget)
 
 
 def test_duplicate_note_is_fenced_and_the_fence_stays_length_preserving(tmp_path):
