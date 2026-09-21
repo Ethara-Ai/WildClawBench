@@ -487,10 +487,25 @@ _ROOT_SCAN_MAX_FILE_BYTES = 512_000   # skip oversized files in the root scan
 # graded the agent's .scratch notes instead (2026-09-08). A named file is
 # always worth collecting; _EXTRACT_CHAR_CAP still bounds what its text costs.
 _BINARY_MAX_COLLECT_BYTES = 8_000_000
-# Cap on extracted-text length per binary deliverable (docx/pdf). Bounds the
-# per-member evidence budget so a large extraction cannot bury report.md for the
-# smaller-context council members (Kimi 225 KB / GLM 175 KB).
+# Cap on extracted-text length per binary deliverable (docx/pdf) on the FIRST
+# assembly pass. Bounds the per-member evidence budget so a large extraction
+# cannot bury report.md for the smaller-context council members (Kimi 225 KB /
+# GLM 175 KB).
 _EXTRACT_CHAR_CAP = 100_000
+# Ceiling for the SECOND pass. The first cap is a queueing rule, not a judgment
+# about how much of a file matters: it exists so one fat extraction cannot
+# starve the files behind it. Once every other block has had its turn, leftover
+# budget is better spent on the rest of a rubric-named file than left unspent,
+# so the cap lifts to here for exactly those files. Still a ceiling: a
+# thousand-page PDF must not be able to consume a whole member budget by
+# itself, and 400K is ~34% of the widest member (Sonnet 1,175,000).
+_READMIT_EXTRACT_CEILING = 400_000
+# Floor on a re-admission. Below this the payload gains a fragment of a
+# sentence and the manifest loses a whole name, which is a worse trade for the
+# judge than leaving the room unspent.
+_READMIT_MIN_CHUNK = 200
+# Floor on the room a head+tail partial needs to be worth making at all.
+_PARTIAL_MIN_ROOM = 800
 
 # OpenClaw persona/bootstrap scaffold. `inject_persona_into_workspace`
 # (docker_utils.py:2554) docker-cp's `<task>/persona/.` onto the workspace ROOT,
@@ -614,18 +629,43 @@ def _reason(token: str) -> str:
     return f" [reason: {token}]"
 
 
-def _duplicate_note(pairs: list[tuple[str, str]]) -> str:
-    listing = "; ".join(
-        f"{dup} (identical to {first}){_reason(f'duplicate-of {first}')}"
-        for dup, first in pairs[:_DUPLICATE_NOTE_MAX_NAMES]
-    )
-    extra = len(pairs) - _DUPLICATE_NOTE_MAX_NAMES
-    return (
-        f"\n----- DUPLICATE COPIES (byte-identical, content shown once above):"
-        f" {listing}"
-        + (f" [+{extra} more]" if extra > 0 else "")
-        + " -----\n"
-    )
+def _fit_by_whole_names(render, count: int, limit: int | None) -> str:
+    """`render(k)` for the largest k <= count whose output fits `limit`.
+
+    Every name-listing note in the evidence payload shrinks through here rather
+    than through a raw character slice. A slice lands mid-filename — the live
+    case was `bench_run_pac`, a file that does not exist — and the judge then
+    reads a hallucinated name off the one structure whose whole purpose is to
+    stop it hallucinating absence. Dropping whole names degrades to the honest
+    "[+N more]" count instead."""
+    out = render(count)
+    if limit is None or len(out) <= limit:
+        return out
+    for k in range(count - 1, -1, -1):
+        out = render(k)
+        if len(out) <= limit:
+            return out
+    return ""
+
+
+def _duplicate_note(
+    pairs: list[tuple[str, str]], limit: int | None = None
+) -> str:
+    def render(k: int) -> str:
+        listing = "; ".join(
+            f"{dup} (identical to {first}){_reason(f'duplicate-of {first}')}"
+            for dup, first in pairs[:k]
+        )
+        extra = len(pairs) - k
+        return (
+            "\n----- DUPLICATE COPIES (byte-identical, content shown once above):"
+            + (f" {listing}" if listing else "")
+            + (f" [+{extra} more]" if extra > 0 else "")
+            + " -----\n"
+        )
+
+    return _fit_by_whole_names(
+        render, min(len(pairs), _DUPLICATE_NOTE_MAX_NAMES), limit)
 
 
 def _harness_excluded_rel_paths(workspace_root: Path) -> frozenset[str]:
@@ -1002,7 +1042,9 @@ def _image_dimensions(path: Path) -> tuple[int, int] | None:
     return None
 
 
-def _extract_text_deliverable(path: Path) -> str | None:
+def _extract_text_deliverable(
+    path: Path, cap: int = _EXTRACT_CHAR_CAP
+) -> str | None:
     # Stdlib-only text extraction for binary deliverables (NO python-docx/openpyxl
     # /python-pptx). OOXML formats are ZIPs of XML: .docx reads word/document.xml
     # <w:t> nodes; .xlsx reads sharedStrings + worksheet <t> nodes; .pptx reads
@@ -1018,7 +1060,7 @@ def _extract_text_deliverable(path: Path) -> str | None:
                 xml = z.read("word/document.xml")
             root = ET.fromstring(xml)
             text = "".join(n.text or "" for n in root.iter(_DOCX_W_T)).strip()
-            return text[:_EXTRACT_CHAR_CAP] or None
+            return text[:cap] or None
         if ext == ".xlsx":
             with zipfile.ZipFile(path) as z:
                 names = set(z.namelist())
@@ -1048,7 +1090,7 @@ def _extract_text_deliverable(path: Path) -> str | None:
                         if cells:
                             rows_out.append(" | ".join(cells))
             text = "\n".join(rows_out).strip()
-            return text[:_EXTRACT_CHAR_CAP] or None
+            return text[:cap] or None
         if ext == ".pptx":
             slide_parts: list[str] = []
             with zipfile.ZipFile(path) as z:
@@ -1057,7 +1099,7 @@ def _extract_text_deliverable(path: Path) -> str | None:
                         slide = ET.fromstring(z.read(name))
                         slide_parts.extend(n.text or "" for n in slide.iter(_PPTX_A_T))
             text = " ".join(p for p in slide_parts if p).strip()
-            return text[:_EXTRACT_CHAR_CAP] or None
+            return text[:cap] or None
         if ext == ".ipynb":
             # Notebooks are JSON, but raw inclusion would dump megabytes of
             # base64 image outputs into evidence. Keep cell sources + textual
@@ -1078,7 +1120,7 @@ def _extract_text_deliverable(path: Path) -> str | None:
                         if txt:
                             parts_nb.append("".join(txt if isinstance(txt, list) else [txt]))
             text = "\n".join(parts_nb).strip()
-            return text[:_EXTRACT_CHAR_CAP] or None
+            return text[:cap] or None
         if ext == ".pdf":
             try:
                 import pypdf
@@ -1086,10 +1128,24 @@ def _extract_text_deliverable(path: Path) -> str | None:
                 return None
             reader = pypdf.PdfReader(str(path))
             text = "".join((pg.extract_text() or "") for pg in reader.pages).strip()
-            return text[:_EXTRACT_CHAR_CAP] or None
+            return text[:cap] or None
     except Exception:
         return None
     return None
+
+
+def _extraction_remainder(path: Path) -> str:
+    """Extracted text beyond `_EXTRACT_CHAR_CAP`, up to the re-admission
+    ceiling, for a binary deliverable — "" for anything else.
+
+    Appending this to the file's first-pass block yields exactly the block the
+    first pass would have produced had the cap been the ceiling, which is why
+    re-admission needs no second block shape: the same marker simply gets
+    longer. NEVER raises (_extract_text_deliverable swallows)."""
+    if not _is_binary_deliverable(path):
+        return ""
+    return (_extract_text_deliverable(path, _READMIT_EXTRACT_CEILING)
+            or "")[_EXTRACT_CHAR_CAP:]
 
 
 def _deliverable_evidence_marker(path: Path) -> str | None:
@@ -1220,20 +1276,50 @@ def _in_scratch_subdir(path: Path) -> bool:
 # judge can distinguish "file was never produced" (verdict No) from "file was
 # produced but cut for budget" (No + TRUNCATION_AFFECTED — which the scoring
 # layer then routes to Human Evaluation instead of a graded fail).
-_OMISSION_MANIFEST_RESERVE = 400
+#
+# Widened from 400, which held about seven of the forty entries: the reserve is
+# what the manifest gets SHRUNK to when the queue leaves it nothing, and every
+# entry that does not fit degrades to an anonymous "[+N more]". The trade is
+# omission NAMES against deliverable BYTES, and it was measured both ways over
+# the 568 delivery-1 runs: 4,000 names 641 more omitted files across the four
+# member budgets (OAuth 10,344 -> 10,469, Kimi 5,958 -> 6,313, GLM 2,299 ->
+# 2,391, Sonnet 10,272 -> 10,341) and costs 0.02% of deliverable chars on the
+# OAuth lane and 0.4% on Kimi. A named omission is what lets the judge answer
+# No + TRUNCATION_AFFECTED instead of a graded No, so 641 names is worth
+# 9,272 bytes out of 42.5 million.
+_OMISSION_MANIFEST_RESERVE = 4_000
 _OMISSION_MANIFEST_MAX_NAMES = 40
 _SCRATCH_RANK = 3
 
 
-def _omission_manifest(names: list[str]) -> str:
-    listing = ", ".join(names[:_OMISSION_MANIFEST_MAX_NAMES])
-    extra = len(names) - _OMISSION_MANIFEST_MAX_NAMES
-    return (
-        f"\n----- EVIDENCE BUDGET NOTE: {len(names)} collected file(s)"
-        f" omitted or cut for budget: {listing}"
-        + (f" [+{extra} more]" if extra > 0 else "")
-        + " -----\n"
-    )
+def _omission_manifest(names: list[str], limit: int | None = None) -> str:
+    def render(k: int) -> str:
+        listing = ", ".join(names[:k])
+        extra = len(names) - k
+        return (
+            f"\n----- EVIDENCE BUDGET NOTE: {len(names)} collected file(s)"
+            " omitted or cut for budget:"
+            + (f" {listing}" if listing else "")
+            + (f" [+{extra} more]" if extra > 0 else "")
+            + " -----\n"
+        )
+
+    return _fit_by_whole_names(
+        render, min(len(names), _OMISSION_MANIFEST_MAX_NAMES), limit)
+
+
+def _scratch_note(names: list[str], limit: int | None = None) -> str:
+    def render(k: int) -> str:
+        listing = ", ".join(names[:k])
+        extra = len(names) - k
+        return (
+            "\n----- SCRATCH (agent work-product, not graded):"
+            + (f" {listing}" if listing else "")
+            + (f" [+{extra} more]" if extra > 0 else "")
+            + " -----\n"
+        )
+
+    return _fit_by_whole_names(render, len(names), limit)
 
 
 # F6 injection fence. Evidence is AGENT-AUTHORED text — transcripts, tool
@@ -1311,10 +1397,7 @@ def _gather_evidence(
     # the only evidence there is) but its header never claims deliverable status.
     scratch_names = [f.name for f in ordered if _rank(f) == _SCRATCH_RANK]
     drop_scratch = bool(scratch_names) and any(_rank(f) == 0 for f in ordered)
-    scratch_note = (
-        "\n----- SCRATCH (agent work-product, not graded): "
-        + ", ".join(scratch_names) + " -----\n"
-    ) if drop_scratch else ""
+    scratch_note = _scratch_note(scratch_names) if drop_scratch else ""
 
     blocks: list[tuple[Path, str]] = []
     for f in ordered:
@@ -1383,7 +1466,14 @@ def _gather_evidence(
             f"conversation against a {effective}-char evidence budget"
         )
     deliv_budget = effective - transcript_cost
-    if len(deliv_blob) + len(base_manifest) <= deliv_budget:
+    # A rubric-named binary can have text past _EXTRACT_CHAR_CAP even when its
+    # capped block fits, so "everything fits" is not the same as "there is
+    # nothing left to admit" — the fast path may only be taken when both hold,
+    # or the second pass would be unreachable in precisely the case it exists
+    # for. With no such file the two paths produce byte-identical output.
+    growable = any(f.name.lower() in named and _is_binary_deliverable(f)
+                   for f, _ in blocks)
+    if not growable and len(deliv_blob) + len(base_manifest) <= deliv_budget:
         deliv_out = deliv_blob + base_manifest
     else:
         # Cut on BLOCK boundaries and name what was cut. A raw blob slice
@@ -1391,34 +1481,124 @@ def _gather_evidence(
         # (graded No) from "file produced but cut for budget" (No +
         # TRUNCATION_AFFECTED -> Human Evaluation); the manifest carries that
         # distinction into the payload (see judge_system.md).
-        kept: list[str] = []
-        omitted: list[str] = []
+        cut_mark = "\n... [truncated for evidence budget] ...\n"
+
+        def _cut(block: str, room: int) -> str:
+            # Head+tail keep: deliverable text files often carry markup/data
+            # bulk up front and the human-readable summary at the END, so a
+            # head-only cut drops exactly the content criteria cite.
+            if len(block) <= room:
+                return block
+            half = (room - len(cut_mark)) // 2
+            return block[:half] + cut_mark + block[-(room - len(cut_mark) - half):]
+
+        emitted = [""] * len(blocks)
+        withheld = [""] * len(blocks)
         used = 0
-        reserve = (_OMISSION_MANIFEST_RESERVE + len(base_manifest)
-                   + len(scratch_note) + len(dup_note))
-        for f, block in blocks:
+        # Room held back from the queue for the notes. Clamped to an eighth of
+        # the budget because the notes are sized by how much scratch and
+        # scaffold the run produced, not by the budget: an unclamped reserve
+        # can exceed a small deliverable budget outright and then the first
+        # pass emits nothing at all.
+        reserve = min(
+            _OMISSION_MANIFEST_RESERVE + len(base_manifest)
+            + len(scratch_note) + len(dup_note),
+            max(1, deliv_budget // 8),
+        )
+        for i, (f, block) in enumerate(blocks):
             room = deliv_budget - used - reserve
             if len(block) <= room:
-                kept.append(block)
+                emitted[i] = block
                 used += len(block)
-            elif room > 800 and not omitted:
-                # Head+tail keep: deliverable text files often carry
-                # markup/data bulk up front and the human-readable summary at
-                # the END, so a head-only cut drops exactly the content
-                # criteria cite.
-                cut_mark = "\n... [truncated for evidence budget] ...\n"
-                half = (room - len(cut_mark)) // 2
-                kept.append(block[:half] + cut_mark + block[-(room - len(cut_mark) - half):])
+            elif room > _PARTIAL_MIN_ROOM and not any(withheld):
+                emitted[i] = _cut(block, room)
                 used += room
-                omitted.append(f"{f.name} (partial){_reason('over-budget')}")
+                withheld[i] = "partial"
             else:
-                omitted.append(f"{f.name}{_reason('over-budget')}")
+                withheld[i] = "omitted"
+
+        def _entries(worst: bool = False) -> list[str]:
+            return [
+                blocks[i][0].name
+                + (" (partial)" if worst or withheld[i] == "partial" else "")
+                + _reason("over-budget")
+                for i in range(len(blocks)) if withheld[i]
+            ]
+
+        # SECOND PASS. The first pass is a queue: one 100K-capped extraction per
+        # file and at most one head+tail partial, so the files behind the fat
+        # ones get their turn. That leaves budget unspent — the partial branch
+        # stops at `reserve`, and the reserve is a worst case the notes rarely
+        # fill — while rubric-NAMED content sits omitted. Spend the remainder
+        # deterministically, in the order the rubric cares about: named files
+        # first (their extraction cap lifts to _READMIT_EXTRACT_CEILING here),
+        # then other partials, then whole small omissions.
+        #
+        # Room is measured against the manifest at its LONGEST possible
+        # rendering — every withheld entry spelled "(partial)" — because
+        # re-admission can turn an "omitted" entry into a longer "(partial)"
+        # one. Costing the worst case up front is what makes "never exceeds the
+        # budget" hold without a second round of arithmetic.
+        notes_worst = (
+            scratch_note + dup_note
+            + (_omission_manifest(size_notes + _entries(worst=True))
+               if (size_notes or any(withheld)) else "")
+        )
+        room = max(0, deliv_budget - used - len(notes_worst))
+        if room > _READMIT_MIN_CHUNK:
+            full: dict[int, str] = {}
+            for i, (f, block) in enumerate(blocks):
+                is_named = f.name.lower() in named
+                if not withheld[i] and not is_named:
+                    continue
+                whole = block + (_extraction_remainder(f) if is_named else "")
+                if len(whole) > len(emitted[i]):
+                    full[i] = whole
+
+            def _readmit_key(i: int) -> tuple:
+                f = blocks[i][0]
+                if f.name.lower() in named:
+                    rank = 0
+                elif withheld[i] == "partial":
+                    rank = 1
+                else:
+                    rank = 2
+                return (rank, len(full[i]) - len(emitted[i]), f.name)
+
+            for i in sorted(full, key=_readmit_key):
+                if room <= _READMIT_MIN_CHUNK:
+                    break
+                whole = full[i]
+                if _readmit_key(i)[0] == 2:
+                    # An unnamed file nobody asked about earns re-admission only
+                    # WHOLE: half of a file the rubric never names is noise the
+                    # named files behind it would have used better.
+                    if len(whole) - len(emitted[i]) > room:
+                        continue
+                    grown = whole
+                else:
+                    grown = _cut(whole, min(len(whole), len(emitted[i]) + room))
+                gain = len(grown) - len(emitted[i])
+                if gain < _READMIT_MIN_CHUNK:
+                    continue
+                emitted[i] = grown
+                used += gain
+                room -= gain
+                withheld[i] = "" if grown == whole else "partial"
+
+        # Notes and manifest shrink by WHOLE NAMES into whatever room is left
+        # (see _fit_by_whole_names): a raw slice here is what once handed the
+        # judge "bench_run_pac".
         tail_room = max(0, deliv_budget - used)
-        note_out = (scratch_note + dup_note)[:tail_room]
-        kept.append(note_out)
-        kept.append(_omission_manifest(size_notes + omitted)[
-            : max(0, tail_room - len(note_out))])
-        deliv_out = "".join(kept)
+        scratch_out = _scratch_note(scratch_names, tail_room) if drop_scratch else ""
+        dup_room = max(0, tail_room - len(scratch_out))
+        dup_out = (_fence_evidence_text(_duplicate_note(duplicates, dup_room))
+                   if duplicates else "")
+        omitted = _entries()
+        manifest_room = max(0, dup_room - len(dup_out))
+        manifest_out = (_omission_manifest(size_notes + omitted, manifest_room)
+                        if (size_notes or omitted) else "")
+        deliv_out = "".join(emitted) + scratch_out + dup_out + manifest_out
     # Defensive clamp on the DELIVERABLE side alone. The assembled evidence
     # must never exceed `effective`, but clamping the whole blob (what this
     # line used to do) put the transcript back inside reach of a raw slice the
