@@ -78,13 +78,12 @@ class OpVerdict:
         return self.verdict in (LANDS_BUT_INVISIBLE, WOULD_ERROR, TABLE_MISSING)
 
 
-def _pk_candidates(pk: Any):
-    """Mirror ``admin_plane._pk_candidates``: a path pk is always a string, but
-    stores key rows on the pk's original type."""
-    yield pk
-    text = str(pk)
-    if text.lstrip("-").isdigit():
-        yield int(text)
+# The str-then-int pk ladder that used to sit here is gone. It mirrored a copy
+# in admin_plane, and a mirror is exactly what this module exists not to have:
+# the two could disagree about which rows a replay can reach, and the preflight
+# would then clear an op the runtime misses (or refuse one it lands). Both now
+# call Table.admin_*, so tolerance is defined once and the gate judges the
+# behaviour the container will actually have.
 
 
 class InProcessApplier(InjectApplier):
@@ -129,12 +128,8 @@ class InProcessApplier(InjectApplier):
         try:
             row_match = _ADMIN_ROW.match(suffix)
             if row_match:
-                table = store.table(row_match.group(1))
-                for cand in _pk_candidates(row_match.group(2)):
-                    row = table.get(cand)
-                    if row is not None:
-                        return row
-                return None
+                return store.table(row_match.group(1)).admin_get(
+                    row_match.group(2))[0]
             table_match = _ADMIN_TABLE.match(suffix)
             if table_match:
                 return {"rows": store.table(table_match.group(1)).rows()}
@@ -151,11 +146,11 @@ class InProcessApplier(InjectApplier):
         if store is None:
             return {"ok": False, "error": "no in-process store"}
         try:
-            handle = store.table(table)
-            for cand in _pk_candidates(pk):
-                row = handle.patch(cand, fields)
-                if row is not None:
-                    return {"ok": True, "status": 200, "body": row}
+            row, _pk, coercions = store.table(table).admin_patch(pk, fields)
+            if row is not None:
+                return self._transport_result(
+                    {"ok": True, "status": 200, "body": row,
+                     "coercions": coercions})
         except Exception as exc:  # noqa: BLE001 - StoreError and friends
             return {"ok": False, "status": 400, "error": f"{type(exc).__name__}: {exc}"}
         return {"ok": False, "status": 404, "error": f"row '{pk}' not in table '{table}'"}
@@ -168,8 +163,11 @@ class InProcessApplier(InjectApplier):
         merge_match = _ADMIN_DOC_MERGE.match(suffix)
         try:
             if table_match and isinstance(payload.get("row"), dict):
-                row = store.table(table_match.group(1)).upsert(payload["row"])
-                return {"ok": True, "status": 200, "body": row}
+                row, coercions = store.table(table_match.group(1)).admin_upsert(
+                    payload["row"])
+                return self._transport_result(
+                    {"ok": True, "status": 200, "body": row,
+                     "coercions": coercions})
             if merge_match and isinstance(payload.get("fields"), dict):
                 value = store.document(merge_match.group(1)).merge(payload["fields"])
                 return {"ok": True, "status": 200, "body": value}

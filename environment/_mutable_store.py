@@ -89,12 +89,24 @@ import csv
 import json
 import math
 import os
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 import sys
 import threading
 import time
 import uuid
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -437,6 +449,192 @@ def garbled_list_sample(value: Any) -> Optional[str]:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Admin-plane type tolerance (the AUTHORING/INJECTION plane only)
+# ---------------------------------------------------------------------------
+#
+# The seed loaders above are the only thing that ever retyped a cell. A task
+# author writing an injection does not go through them: inject_director and the
+# preflight's in-process replay both address the store through the admin plane,
+# which hands the row to Table.upsert/patch verbatim. So an author who writes pk
+# "99" against a table the loader keyed on int 99 gets a clean 404 and an
+# orphaned op, while the identically-meant int spelling lands. That is an
+# authoring trap, not a benchmark signal -- it is the willie/koji/sean/abena
+# class, where a scenario was written correctly and the harness quietly declined
+# to build the world it described.
+#
+# What follows closes it at the one place both transports already meet. Two
+# rules, both deliberately narrow:
+#
+#   1. LOOKUP bends, data never does. When an exact-type pk lookup finds
+#      nothing, the pk is compared again with both sides folded to text. The
+#      row that answers keeps the type it was loaded with; only the key we
+#      searched under changed.
+#
+#   2. A cell is retyped only when the column already shows us what it holds
+#      and the text spells that type EXACTLY. No example (empty table, mixed
+#      column), no round trip, or a container/None on either side, and the
+#      value stays exactly as authored.
+#
+# Both rules report. A coercion that fired and a coercion that was refused are
+# equally worth knowing about, because the second one is the author's remaining
+# bug and the first one is a spelling the next reader will not find in the seed.
+# Nothing here is ever fatal: a refusal leaves the payload untouched, and the
+# preflight's read-back still catches an op that cannot reach its row.
+#
+# These entry points are named ``admin_*`` on purpose. The agent-facing getters
+# call ``get``/``rows``/``find`` and are not routed through any of this -- an
+# agent that sends the wrong type still gets its 422, which is the contract the
+# benchmark grades.
+
+
+class PkMatch(NamedTuple):
+    """What a tolerant primary-key lookup found.
+
+    ``key`` is the value to address the store with -- the STORED key when a
+    fold matched, otherwise the caller's own value untouched. ``matched`` says
+    whether a row is actually there, which an upsert needs in order to tell a
+    replace from an insert. ``warning`` is populated whenever the answer was
+    reached by anything other than an exact hit, including the ambiguous case
+    where the fold matched more than one row and therefore resolved nothing.
+    """
+
+    key: Any
+    matched: bool
+    warning: Optional[Dict[str, Any]]
+
+
+def _coercion_note(fired: bool, rule: str, detail: str, **extra: Any) -> Dict[str, Any]:
+    """One WARN record for the injection timeline.
+
+    ``kind`` is the timeline's vocabulary; ``rule`` separates a primary-key
+    match from a value alignment so a reader can tell "we found your row" from
+    "we retyped your cell" without parsing prose.
+    """
+    note = {
+        "kind": "coercion" if fired else "coercion_refused",
+        "rule": rule,
+        "detail": detail,
+    }
+    note.update(extra)
+    return note
+
+
+def _notes(match: PkMatch) -> List[Dict[str, Any]]:
+    return [match.warning] if match.warning is not None else []
+
+
+def _fold(value: Any) -> Optional[str]:
+    """Text form used to compare two scalars of different types, or None.
+
+    Containers and ``None`` do not fold: there is no spelling of a dict that
+    should ever be considered equal to a stored scalar, and a null pk is the
+    load-time defect ``_populate_table`` already synthesizes around.
+    """
+    if value is None or isinstance(value, (dict, list, tuple, set)):
+        return None
+    return str(value)
+
+
+def _exact_int(text: str) -> Any:
+    """The int ``text`` spells exactly, or ``_MISSING``.
+
+    Round-trip equality is the whole test, and it is stricter than ``int()`` on
+    purpose: ``"007"`` and ``"+7"`` are both parseable and neither is 7's
+    spelling, so both stay text. Zero-padded identifiers are common enough in
+    seeds (order numbers, account codes) that silently dropping the padding
+    would be a data change wearing a type change's clothes.
+    """
+    stripped = text.strip()
+    try:
+        value = int(stripped)
+    except (TypeError, ValueError):
+        return _MISSING
+    return value if str(value) == stripped else _MISSING
+
+
+def _exact_float(text: str) -> Any:
+    """The float ``text`` spells without losing a digit, or ``_MISSING``.
+
+    ``repr`` round-tripping alone would refuse ``"1e3"``, which names 1000.0
+    exactly, so the comparison is made in Decimal against the float's own
+    shortest repr. That accepts any text naming a value the float carries
+    exactly and refuses text carrying more precision than a float can hold
+    (``"1.0000000000000000001"``), which is the lossy case this rule exists to
+    decline. Non-finite text never converts -- the seed coercers reject those
+    too, and a stored NaN breaks every comparison downstream.
+    """
+    stripped = text.strip()
+    try:
+        value = float(stripped)
+    except (TypeError, ValueError):
+        return _MISSING
+    if math.isnan(value) or math.isinf(value):
+        return _MISSING
+    try:
+        if Decimal(stripped) != Decimal(repr(value)):
+            return _MISSING
+    except (InvalidOperation, ValueError):
+        return _MISSING
+    return value
+
+
+def _exact_bool(text: str) -> Any:
+    """``"true"``/``"false"`` in any casing, or ``_MISSING``.
+
+    Deliberately narrower than :func:`strict_bool`, which also takes 1/0/yes/no
+    from seed CSVs. Here the input is JSON an author typed, and ``"1"`` against
+    a bool column is at least as likely to be a mis-aimed int as a true; a
+    coercion this module is not sure about is one it does not make.
+    """
+    token = text.strip().lower()
+    if token == "true":
+        return True
+    if token == "false":
+        return False
+    return _MISSING
+
+
+_EXACT_BY_TYPE = {int: _exact_int, float: _exact_float, bool: _exact_bool}
+
+
+def _scalar_kind(value: Any) -> Optional[type]:
+    """``value``'s scalar type, or None for containers and null.
+
+    ``bool`` is reported ahead of ``int`` because it subclasses it, and a bool
+    column that accepted ints would be exactly the wrong answer.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return bool
+    if isinstance(value, (int, float, str)):
+        return type(value)
+    return None
+
+
+def example_scalar_type(values: Iterable[Any]) -> Optional[type]:
+    """The one scalar type these values consistently carry, or None.
+
+    None means "no example to align to" and is returned for an empty column, a
+    column of all nulls, a column holding any container, and a column whose
+    rows disagree. Every one of those is a case where guessing would be the
+    module inventing a schema the seeds never declared.
+    """
+    found: Optional[type] = None
+    for value in values:
+        if value is None:
+            continue
+        kind = _scalar_kind(value)
+        if kind is None:
+            return None
+        if found is None:
+            found = kind
+        elif found is not kind:
+            return None
+    return found
+
+
 class Table:
     """A single mutable table of rows with a declared primary key.
 
@@ -627,6 +825,144 @@ class Table:
                     keep.append(pk_value)
             self._order = keep
         return n
+
+    def column_example_type(self, column: str) -> Optional[type]:
+        with self._lock:
+            values = [r[column] for r in self._rows.values() if column in r]
+        return example_scalar_type(values)
+
+    def admin_resolve_pk(self, pk_value: Any) -> PkMatch:
+        """Find the stored key an admin op means by ``pk_value``.
+
+        An exact-type hit always wins and is silent, so a correctly typed op
+        behaves exactly as it did before this method existed. Only a miss folds
+        both sides to text and looks again. A fold answering more than one
+        stored key resolves NOTHING and says so: if a table holds both 99 and
+        "99" there is no defensible way to pick, and picking would silently
+        edit whichever row we guessed.
+        """
+        with self._lock:
+            try:
+                if pk_value in self._rows:
+                    return PkMatch(pk_value, True, None)
+            except TypeError:
+                return PkMatch(pk_value, False, None)
+            fold = _fold(pk_value)
+            if fold is None:
+                return PkMatch(pk_value, False, None)
+            hits = [k for k in self._order if k in self._rows and _fold(k) == fold]
+        if not hits:
+            return PkMatch(pk_value, False, None)
+        if len(hits) > 1:
+            return PkMatch(pk_value, False, _coercion_note(
+                False, "pk",
+                f"pk {pk_value!r} folds onto {len(hits)} stored keys "
+                f"({', '.join(repr(k) for k in hits[:4])}) in "
+                f"'{self._parent.name} {self._name}'; left unresolved",
+                table=self._name))
+        return PkMatch(hits[0], True, _coercion_note(
+            True, "pk",
+            f"pk {pk_value!r} -> {hits[0]!r} "
+            f"({self._parent.name} {self._name})",
+            table=self._name, sent=pk_value, resolved=hits[0]))
+
+    def _align_cell(self, column: str, value: Any
+                    ) -> Tuple[Any, Optional[Dict[str, Any]]]:
+        example = self.column_example_type(column)
+        if example is None:
+            return value, None
+        incoming = _scalar_kind(value)
+        if incoming is None or incoming is example:
+            return value, None
+        where = f"{self._parent.name} {self._name}.{column}"
+        if incoming is not str:
+            return value, _coercion_note(
+                False, "value",
+                f"{column} {value!r} is {incoming.__name__} where the column "
+                f"holds {example.__name__}; left raw ({where})",
+                table=self._name, column=column)
+        probe = _EXACT_BY_TYPE.get(example)
+        if probe is None:
+            return value, None
+        converted = probe(value)
+        if converted is _MISSING:
+            return value, _coercion_note(
+                False, "value",
+                f"{column} {value!r} does not spell {example.__name__} "
+                f"exactly; left raw ({where})",
+                table=self._name, column=column)
+        return converted, _coercion_note(
+            True, "value",
+            f"{column} {value!r} -> {converted!r} ({where})",
+            table=self._name, column=column)
+
+    def admin_align_fields(self, fields: Row, skip: Sequence[str] = ()
+                           ) -> Tuple[Row, List[Dict[str, Any]]]:
+        """Retype each incoming scalar to the type its column already holds.
+
+        ``skip`` carries the columns whose type is settled elsewhere -- the
+        primary key on a write that matched an existing row, whose stored key
+        is a stronger answer than any example. Load-time context keys are left
+        alone because they are provenance, not data.
+        """
+        skipped = set(skip)
+        aligned: Row = {}
+        notes: List[Dict[str, Any]] = []
+        for column, value in fields.items():
+            if column in skipped or column.startswith("__") or column == "_pk":
+                aligned[column] = value
+                continue
+            aligned[column], note = self._align_cell(column, value)
+            if note is not None:
+                notes.append(note)
+        return aligned, notes
+
+    def admin_get(self, pk_value: Any
+                  ) -> Tuple[Optional[Row], List[Dict[str, Any]]]:
+        match = self.admin_resolve_pk(pk_value)
+        return self.get(match.key), _notes(match)
+
+    def admin_delete(self, pk_value: Any
+                     ) -> Tuple[bool, Any, List[Dict[str, Any]]]:
+        match = self.admin_resolve_pk(pk_value)
+        return self.delete(match.key), match.key, _notes(match)
+
+    def admin_patch(self, pk_value: Any, fields: Row
+                    ) -> Tuple[Optional[Row], Any, List[Dict[str, Any]]]:
+        """Tolerant :meth:`patch`. Returns ``(row, key_used, warnings)``."""
+        match = self.admin_resolve_pk(pk_value)
+        aligned, notes = self.admin_align_fields(fields, skip=(self._pk,))
+        # A patch body that restates the primary key must not trip the
+        # change-the-pk guard merely because it spells it the author's way;
+        # the same text naming the same row is not an attempt to move it.
+        if self._pk in aligned and _fold(aligned[self._pk]) == _fold(match.key):
+            aligned[self._pk] = match.key
+        return self.patch(match.key, aligned), match.key, _notes(match) + notes
+
+    def admin_upsert(self, row: Row) -> Tuple[Row, List[Dict[str, Any]]]:
+        """Tolerant :meth:`upsert`: replaces the row a folded pk names.
+
+        Without this an upsert carrying pk "99" inserted a SECOND row beside
+        the int-99 one the seed loaded, leaving the table holding two rows the
+        author meant as one and a getter serving whichever it reached first.
+
+        On the insert path the primary key is aligned like any other column, so
+        a new row joins its siblings' key type instead of becoming the one row
+        a correctly typed getter cannot address. It is left raw when the fold
+        was ambiguous -- aligning it there could land on one of the rows that
+        made it ambiguous.
+        """
+        if self._pk not in row:
+            raise StoreError(
+                f"upsert into '{self._name}' missing primary key '{self._pk}'"
+            )
+        match = self.admin_resolve_pk(row[self._pk])
+        align_pk = not match.matched and match.warning is None
+        aligned, notes = self.admin_align_fields(
+            row, skip=() if align_pk else (self._pk,))
+        if match.matched:
+            aligned[self._pk] = match.key
+        return self.upsert(aligned), _notes(match) + notes
 
     def _dump(self) -> Dict[str, Any]:
         with self._lock:

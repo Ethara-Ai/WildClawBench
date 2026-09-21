@@ -438,6 +438,22 @@ class _SnapshotRestoreIn(BaseModel):
     snapshot_id: str
 
 
+COERCION_HEADER = "X-Mock-Coercions"
+"""Where a write's type-tolerance WARNings ride back to the injector.
+
+A header rather than a body key on purpose: every admin write answers with the
+stored row, that row is what ``inject_director._read_back_row`` verifies against
+the service's serving vocabulary, and a ``warnings`` key folded into it would
+read as a column the getter cannot name -- the write would fail its own
+read-back. The body stays byte-identical to what it served before; a request
+that coerces nothing sets no header at all."""
+
+
+def _stamp(response: Response, warnings: List[Dict[str, Any]]) -> None:
+    if warnings:
+        response.headers[COERCION_HEADER] = json.dumps(warnings)
+
+
 def _where_to_predicate(where: Dict[str, Any]) -> Callable[[Dict[str, Any]], bool]:
     def pred(row: Dict[str, Any]) -> bool:
         for k, v in where.items():
@@ -593,82 +609,66 @@ def _build_router(store: Store, registry: _OneShotRegistry) -> APIRouter:
         except StoreError as e:
             raise HTTPException(404, str(e))
 
-    def _pk_candidates(pk: str):
-        """URL path params are always strings, but stores key rows by the pk
-        value's ORIGINAL type — tasks are authored inconsistently (etsy
-        listing_id 7102 as int in one task, "800000" as str in another).
-        Try the string form first, then the int form, so a path pk reaches
-        int-keyed rows too. Exact-match precedence keeps str-keyed stores
-        unaffected."""
-        yield pk
-        if isinstance(pk, str) and pk.lstrip("-").isdigit():
-            yield int(pk)
+    # Every row-addressed admin op below resolves its pk through
+    # Table.admin_*, which is the fleet's ONE tolerant-lookup implementation.
+    # A local str-then-int ladder used to live here and a second copy of it
+    # lived in inject_inproc; both are gone, because a ladder that resolves
+    # the pk before the store sees it also hides the coercion from the
+    # timeline -- the op lands and no one is told it was ever mis-typed.
 
     @router.get("/data/{table}/{pk}")
-    def get_row(table: str, pk: str):
-        row = None
+    def get_row(table: str, pk: str, response: Response):
         try:
-            t = store.table(table)
-            for cand in _pk_candidates(pk):
-                row = t.get(cand)
-                if row is not None:
-                    break
+            row, warnings = store.table(table).admin_get(pk)
         except StoreError as e:
             raise HTTPException(404, str(e))
         if row is None:
             raise HTTPException(404, f"row '{pk}' not in table '{table}'")
+        _stamp(response, warnings)
         return row
 
     @router.post("/data/{table}")
-    def upsert_row(table: str, body: _RowIn):
+    def upsert_row(table: str, body: _RowIn, response: Response):
         try:
             t = store.table(table)
-            before = t.get(body.row.get(t.primary_key)) if t.primary_key in body.row else None
-            row = t.upsert(body.row)
+            before = (t.admin_get(body.row[t.primary_key])[0]
+                      if t.primary_key in body.row else None)
+            row, warnings = t.admin_upsert(body.row)
         except StoreError as e:
             raise HTTPException(400, str(e))
         store.record("data.upsert", table=table, pk=row[t.primary_key],
-                     before=before, after=row)
+                     before=before, after=row, coercions=warnings or None)
+        _stamp(response, warnings)
         return row
 
     @router.patch("/data/{table}/{pk}")
-    def patch_row(table: str, pk: str, body: _PatchIn):
-        row = None
-        before = None
-        used_pk = pk
+    def patch_row(table: str, pk: str, body: _PatchIn, response: Response):
         try:
             t = store.table(table)
-            for cand in _pk_candidates(pk):
-                before = t.get(cand)
-                row = t.patch(cand, body.fields)
-                if row is not None:
-                    used_pk = cand
-                    break
+            before = t.admin_get(pk)[0]
+            row, used_pk, warnings = t.admin_patch(pk, body.fields)
         except StoreError as e:
             raise HTTPException(400, str(e))
         if row is None:
             raise HTTPException(404, f"row '{pk}' not in table '{table}'")
-        store.record("data.patch", table=table, pk=used_pk, before=before, after=row)
+        store.record("data.patch", table=table, pk=used_pk, before=before,
+                     after=row, coercions=warnings or None)
+        _stamp(response, warnings)
         return row
 
     @router.delete("/data/{table}/{pk}")
-    def delete_row(table: str, pk: str):
-        ok = False
-        before = None
-        used_pk = pk
+    def delete_row(table: str, pk: str, response: Response):
         try:
             t = store.table(table)
-            for cand in _pk_candidates(pk):
-                before = t.get(cand)
-                ok = t.delete(cand)
-                if ok:
-                    used_pk = cand
-                    break
+            before = t.admin_get(pk)[0]
+            ok, used_pk, warnings = t.admin_delete(pk)
         except StoreError as e:
             raise HTTPException(400, str(e))
         if not ok:
             raise HTTPException(404, f"row '{pk}' not in table '{table}'")
-        store.record("data.delete", table=table, pk=used_pk, before=before)
+        store.record("data.delete", table=table, pk=used_pk, before=before,
+                     coercions=warnings or None)
+        _stamp(response, warnings)
         return {"deleted": used_pk}
 
     @router.post("/data/{table}/bulk")
@@ -720,33 +720,42 @@ def _build_router(store: Store, registry: _OneShotRegistry) -> APIRouter:
         return value
 
     @router.post("/inject/raw")
-    def inject_raw(body: _InjectIn):
+    def inject_raw(body: _InjectIn, response: Response = None):
         results = []
+        batch: List[Dict[str, Any]] = []
         for op in body.operations:
             kind = op.get("op")
             try:
                 if kind == "data.upsert":
                     t = store.table(op["table"])
-                    before = t.get(op["row"].get(t.primary_key)) if t.primary_key in op["row"] else None
-                    row = t.upsert(op["row"])
+                    before = (t.admin_get(op["row"][t.primary_key])[0]
+                              if t.primary_key in op["row"] else None)
+                    row, warnings = t.admin_upsert(op["row"])
+                    batch.extend(warnings)
                     store.record("data.upsert", table=op["table"],
                                  pk=row[t.primary_key], before=before, after=row,
-                                 source="inject.raw")
-                    results.append({"ok": True, "op": kind, "row": row})
+                                 source="inject.raw", coercions=warnings or None)
+                    results.append({"ok": True, "op": kind, "row": row,
+                                    "coercions": warnings})
                 elif kind == "data.patch":
                     t = store.table(op["table"])
-                    before = t.get(op["pk"])
-                    row = t.patch(op["pk"], op["fields"])
-                    store.record("data.patch", table=op["table"], pk=op["pk"],
-                                 before=before, after=row, source="inject.raw")
-                    results.append({"ok": row is not None, "op": kind, "row": row})
+                    before = t.admin_get(op["pk"])[0]
+                    row, used_pk, warnings = t.admin_patch(op["pk"], op["fields"])
+                    batch.extend(warnings)
+                    store.record("data.patch", table=op["table"], pk=used_pk,
+                                 before=before, after=row, source="inject.raw",
+                                 coercions=warnings or None)
+                    results.append({"ok": row is not None, "op": kind, "row": row,
+                                    "coercions": warnings})
                 elif kind == "data.delete":
                     t = store.table(op["table"])
-                    before = t.get(op["pk"])
-                    ok = t.delete(op["pk"])
-                    store.record("data.delete", table=op["table"], pk=op["pk"],
-                                 before=before, source="inject.raw")
-                    results.append({"ok": ok, "op": kind})
+                    before = t.admin_get(op["pk"])[0]
+                    ok, used_pk, warnings = t.admin_delete(op["pk"])
+                    batch.extend(warnings)
+                    store.record("data.delete", table=op["table"], pk=used_pk,
+                                 before=before, source="inject.raw",
+                                 coercions=warnings or None)
+                    results.append({"ok": ok, "op": kind, "coercions": warnings})
                 elif kind == "data.update_where":
                     t = store.table(op["table"])
                     n = t.update_where(_where_to_predicate(op.get("where", {})),
@@ -781,6 +790,8 @@ def _build_router(store: Store, registry: _OneShotRegistry) -> APIRouter:
                                     "error": f"unknown op '{kind}'"})
             except StoreError as e:
                 results.append({"ok": False, "op": kind, "error": str(e)})
+        if response is not None:
+            _stamp(response, batch)
         return {"results": results}
 
     @router.post("/inject/one_shot")
@@ -808,7 +819,7 @@ def _build_router(store: Store, registry: _OneShotRegistry) -> APIRouter:
         return {"cleared": n}
 
     @router.post("/scenario/apply")
-    def apply_scenario(body: Dict[str, Any]):
+    def apply_scenario(body: Dict[str, Any], response: Response = None):
         """Apply a named DriftScenario.
 
         Currently scenarios are pass-through to ``inject/raw``: the body must
@@ -820,7 +831,7 @@ def _build_router(store: Store, registry: _OneShotRegistry) -> APIRouter:
         name = body.get("name", "unnamed")
         ops = body.get("operations", [])
         store.record("scenario.begin", scenario=name, ops=len(ops))
-        out = inject_raw(_InjectIn(operations=ops))
+        out = inject_raw(_InjectIn(operations=ops), response)
         store.record("scenario.end", scenario=name)
         return {"scenario": name, **out}
 

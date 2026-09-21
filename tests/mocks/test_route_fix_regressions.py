@@ -423,7 +423,14 @@ def test_linkedin_injected_post_counts_reach_the_public_get(monkeypatch):
     """The willie R9 op, replayed verbatim: an admin-plane upsert of a post row
     naming all three counters. It used to land on keys no getter read, so the
     injector's serving-shape check called all three orphans and the agent never
-    saw them. Cleans up after itself -- the store is per-process and shared."""
+    saw them. Cleans up after itself -- the store is per-process and shared.
+
+    The op writes its counters as TEXT, which is how the task authored them.
+    That used to reach the store verbatim and survive only because this
+    service's projection happens to int() what it serves; a sibling service
+    without that habit served the string. The admin plane now aligns a cell to
+    the type its column already holds, so the row is stored the way a seeded
+    row is stored and the projection is no longer what rescues it."""
     monkeypatch.setenv("MOCK_ADMIN_ENABLED", "1")
     monkeypatch.setenv("MOCK_ADMIN_ALLOWLIST", "")
     row = {
@@ -441,7 +448,9 @@ def test_linkedin_injected_post_counts_reach_the_public_get(monkeypatch):
         try:
             stored = c.get(f"/admin/data/posts/{row['id']}").json()
             assert {"like_count", "comment_count", "share_count"} <= set(stored)
-            assert stored["like_count"] == "12", "the store keeps what was written"
+            assert stored["like_count"] == 12, "aligned to the column's own type"
+            assert stored["commentary"] == row["commentary"], "text stays text"
+            assert stored["id"] == row["id"], "the pk is not retyped"
 
             # ... and the projection serves it as the int every seeded post
             # serves, so an injected row is not tellable from a seeded one.

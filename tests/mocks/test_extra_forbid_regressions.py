@@ -360,17 +360,23 @@ def test_paypal_capture_takes_an_empty_body_but_rejects_an_unknown_key(paypal):
     assert _unknown_key_reported(r, "payment_sauce"), r.text
 
 
+def _merge_request(**overrides):
+    row = {"id": 6099, "iid": 99, "project_id": 101, "title": "Forbid probe",
+           "description": "", "state": "opened", "source_branch": "feature/probe",
+           "target_branch": "main", "author": "amelia-ortega",
+           "assignee": "jonas-pereira", "merge_status": "can_be_merged",
+           "draft": False, "created_at": "2026-05-18T11:00:00.000Z",
+           "updated_at": "2026-05-25T14:00:00.000Z", "merged_at": ""}
+    row.update(overrides)
+    return row
+
+
 def test_gitlab_merge_takes_no_body_but_rejects_one(gitlab):
-    _reseed(gitlab, "gitlab_data", "merge_requests",
-            # ints, not strings: the loader coerces these three and the lookup
-            # compares `m["iid"] == int(mr_iid)`, so a raw upsert must match the
-            # coerced shape rather than the seed-file shape.
-            {"id": 6099, "iid": 99, "project_id": 101, "title": "Forbid probe",
-             "description": "", "state": "opened", "source_branch": "feature/probe",
-             "target_branch": "main", "author": "amelia-ortega",
-             "assignee": "jonas-pereira", "merge_status": "can_be_merged",
-             "draft": False, "created_at": "2026-05-18T11:00:00.000Z",
-             "updated_at": "2026-05-25T14:00:00.000Z", "merged_at": ""})
+    # ints, not strings: merge_requests registers no row_coercer, and the
+    # lookup compares `m["iid"] == int(mr_iid)`, so a RAW upsert -- the
+    # un-tolerant path this helper uses -- must still match the coerced shape.
+    # The admin plane no longer requires that of an author; see the test below.
+    _reseed(gitlab, "gitlab_data", "merge_requests", _merge_request())
     route = "/api/v4/projects/101/merge_requests/99/merge"
 
     r = gitlab.put(route, json={"squash": True})
@@ -378,6 +384,41 @@ def test_gitlab_merge_takes_no_body_but_rejects_one(gitlab):
     assert _unknown_key_reported(r, "squash"), r.text
 
     assert gitlab.put(route).status_code == 200
+
+
+def test_gitlab_merge_request_injected_in_seed_shape_is_still_reachable(gitlab):
+    """The int trap the test above works around, proven closed on the admin path.
+
+    `merge_requests` carries no row_coercer, so before this contract an author
+    injecting `iid: "99"` -- the shape the seed CSV holds and the shape a task
+    is written in -- put a string in the column `merge_merge_request` compares
+    with `int(mr_iid)`. The row existed, every read served it, and the merge
+    route answered "not found in project" forever. That is the authoring-side
+    defect, not an agent-facing one, so it is closed here and nowhere else:
+    the route's own 404 for a genuinely absent iid is asserted unchanged.
+    """
+    store = data_module(gitlab.app, "gitlab_data")._store
+    table = store.table("merge_requests")
+
+    row, notes = table.admin_upsert(_merge_request(
+        id="6099", iid="99", project_id="101", draft="false"))
+
+    assert row["iid"] == 99 and isinstance(row["iid"], int)
+    assert row["project_id"] == 101
+    assert row["draft"] is False
+    assert row["id"] == 6099, "the stored row keeps the pk type it was loaded with"
+    assert [n["kind"] for n in notes] == ["coercion"] * 4
+
+    assert gitlab.put("/api/v4/projects/101/merge_requests/99/merge").status_code == 200
+    assert table.get(6099)["state"] == "merged"
+
+
+def test_gitlab_merge_still_refuses_an_iid_that_is_not_there(gitlab):
+    _reseed(gitlab, "gitlab_data", "merge_requests", _merge_request())
+
+    r = gitlab.put("/api/v4/projects/101/merge_requests/4242/merge")
+
+    assert "not found" in r.text.lower(), r.text
 
 
 # --- the fidelity exceptions, pinned AS exceptions -------------------------

@@ -572,6 +572,13 @@ _SERVICE_RESOLUTION = {
 # scenario does not want surfacing at the top of a recency sweep).
 INJECT_MTIME_KEY = "mtime"
 
+# Response header the admin plane uses to report a write whose types it had to
+# reconcile (or declined to). Must match environment/admin_plane.COERCION_HEADER;
+# the two files cannot import each other -- one runs on the harness host, the
+# other inside the mock container -- so the literal is duplicated deliberately
+# and pinned by a test that asserts the two constants are equal.
+ADMIN_COERCION_HEADER = "X-Mock-Coercions"
+
 # Op-envelope control keys that must never be treated as row field values when
 # the whole-body branch of _extract_fields falls through. INJECT_MTIME_KEY is
 # listed alongside its siblings so an API op that carries one is not mutated
@@ -635,6 +642,7 @@ class InjectApplier:
         # api -> {table -> primary_key} as declared by each store via
         # /admin/tables. Lazily filled by _table_pk.
         self._pk_cache: Dict[str, Dict[str, str]] = {}
+        self._coercions: List[Dict[str, Any]] = []
 
     # -- public API ---------------------------------------------------------
 
@@ -1084,6 +1092,24 @@ class InjectApplier:
                 continue
         return full
 
+    @staticmethod
+    def _coercions_of(response) -> List[Dict[str, Any]]:
+        """Type-tolerance WARNings the admin plane attached to a write.
+
+        They arrive on a header rather than in the body because the body is the
+        stored row, and the read-back judges that row against the service's
+        serving vocabulary -- a warnings key inside it would read as a column no
+        getter can name. A malformed header is dropped rather than raised on:
+        this is commentary about a write that already happened."""
+        raw = response.headers.get(ADMIN_COERCION_HEADER, "")
+        if not raw:
+            return []
+        try:
+            parsed = json.loads(raw)
+        except ValueError:
+            return []
+        return [n for n in parsed if isinstance(n, dict)] if isinstance(parsed, list) else []
+
     def _admin_patch(self, api: str, table: str, pk: str, fields: Dict[str, Any]) -> Dict[str, Any]:
         base = self._urls.get(api)
         if not base:
@@ -1095,8 +1121,10 @@ class InjectApplier:
                 headers=self._headers(), timeout=5.0,
             )
             ctype = r.headers.get("content-type", "")
-            return {"ok": r.status_code < 300, "status": r.status_code,
-                    "body": r.json() if ctype.startswith("application/json") else r.text[:200]}
+            return self._transport_result({
+                "ok": r.status_code < 300, "status": r.status_code,
+                "coercions": self._coercions_of(r),
+                "body": r.json() if ctype.startswith("application/json") else r.text[:200]})
         except requests.RequestException as exc:
             return {"ok": False, "error": str(exc)}
 
@@ -1108,8 +1136,10 @@ class InjectApplier:
             r = self._session.post(base.rstrip("/") + suffix, json=payload,
                                    headers=self._headers(), timeout=5.0)
             ctype = r.headers.get("content-type", "")
-            return {"ok": r.status_code < 300, "status": r.status_code,
-                    "body": r.json() if ctype.startswith("application/json") else r.text[:200]}
+            return self._transport_result({
+                "ok": r.status_code < 300, "status": r.status_code,
+                "coercions": self._coercions_of(r),
+                "body": r.json() if ctype.startswith("application/json") else r.text[:200]})
         except requests.RequestException as exc:
             return {"ok": False, "error": str(exc)}
 
@@ -1149,7 +1179,7 @@ class InjectApplier:
                "path": path, "silent": silent, "via": "apply_as_api",
                "ok": True, "status": "applied", "verified": True,
                "http": inner.get("status_code")}
-        self._append({"type": "inject.api", **rec, "ts": time.time()})
+        self._append_api(rec)
         return rec
 
     def _list_tables(self, api: str) -> List[str]:
@@ -1385,8 +1415,7 @@ class InjectApplier:
         else:
             rec.update(ok=False, status="unresolved",
                        reason=f"unsupported admin-plane replay: {method} {path}")
-        self._append({"type": "inject.api", **rec, "ts": time.time()},
-                     ui_values=ui_values)
+        self._append_api(rec, ui_values=ui_values)
         return rec
 
     def _table_pk(self, api: str, table: str) -> Optional[str]:
@@ -1463,6 +1492,7 @@ class InjectApplier:
                     bag = self._row_bag(row)
                     before = self._touched(row, set_)
                     res = self._patch_row(api, table, row, set_, fallback_pk=pk)
+                    self._drop_path_roundtrip(spec.get("pk"))
                     rec.update(table=table, pk=pk, ok=bool(res.get("ok")),
                                http=res.get("status"), before=before,
                                status="applied" if res.get("ok") else "failed")
@@ -1499,6 +1529,7 @@ class InjectApplier:
                         first_pk = self._row_pk(api, table, row)
                         first_keys = set(bag)
                     res = self._patch_row(api, table, row, set_)
+                    self._drop_path_roundtrip(self._row_pk(api, table, row))
                     matched += 1
                     ok += 1 if res.get("ok") else 0
                 rec.update(table=table, matched=matched, patched=ok,
@@ -1525,6 +1556,7 @@ class InjectApplier:
                 pk = row.get(pk_field)
                 existed = self._admin_get(api, f"/admin/data/{table}/{pk}") if pk else None
                 res = self._admin_post(api, f"/admin/data/{table}", {"row": row})
+                self._drop_path_roundtrip(pk)
                 rec.update(table=table, pk=pk, ok=bool(res.get("ok")), http=res.get("status"),
                            before=None if not isinstance(existed, dict) else "exists",
                            after=pk,
@@ -1557,8 +1589,7 @@ class InjectApplier:
             rec.update(ok=False, status="error", reason=str(exc))
         # Show the post-injection values in the pane when the op captured them.
         _after = rec.get("after")
-        self._append({"type": "inject.api", **rec, "ts": time.time()},
-                     ui_values=_after if isinstance(_after, dict) else None)
+        self._append_api(rec, ui_values=_after if isinstance(_after, dict) else None)
         return rec
 
     def _admin_doc_set(self, api: str, doc: str, path: List[Any], value: Any) -> Dict[str, Any]:
@@ -1615,7 +1646,7 @@ class InjectApplier:
                "path": op.get("path"), "silent": silent}
         if not api or api not in self._urls:
             rec.update(ok=False, status="unresolved", reason=f"no admin URL for {api}")
-            self._append({"type": "inject.api", **rec, "ts": time.time()})
+            self._append_api(rec)
             return rec
         # Explicit admin-op form (the unambiguous representation): the op carries
         # an ``admin`` block naming the exact store table/document, pk/where/path,
@@ -1649,7 +1680,7 @@ class InjectApplier:
             else:
                 reason = "could not locate target row in live store"
             rec.update(ok=False, status="unresolved", reason=reason)
-            self._append({"type": "inject.api", **rec, "ts": time.time()})
+            self._append_api(rec)
             return rec
         table, pk, fields, unmapped = resolved
         rec.update(table=table, pk=pk, fields=list(fields.keys()))
@@ -1658,6 +1689,7 @@ class InjectApplier:
                  if isinstance(row_before, dict) else None)
         before = self._touched(row_before, fields)
         result = self._admin_patch(api, table, pk, fields)
+        self._drop_path_roundtrip(pk)
         # `result` carries {"ok", "status": <int http code>, ...}. Historically
         # rec.update(result) clobbered `status` with the int so the string
         # "applied"/"failed" branch below never fired — REST-path recs carried
@@ -1681,7 +1713,7 @@ class InjectApplier:
                        reason=f"unmapped fields dropped: {sorted(unmapped)}")
         # Persist only field KEYS (rec["fields"]); ship the injected VALUES to
         # the Data Injection pane display-only via ui_values.
-        self._append({"type": "inject.api", **rec, "ts": time.time()}, ui_values=fields)
+        self._append_api(rec, ui_values=fields)
         return rec
 
     def _resolve_target(self, api: str, op: Dict[str, Any]
@@ -1841,6 +1873,59 @@ class InjectApplier:
         return mapped, unmapped
 
     # -- timeline -----------------------------------------------------------
+
+    def _transport_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """Buffer the type-tolerance WARNings a write reported, return it intact.
+
+        Both transports funnel their returns through here so the admin plane's
+        HTTP header and the in-process call report coercions the same way, and
+        so the bulk paths -- update_where patches row by row and discards each
+        result -- cannot drop a warning on the floor."""
+        notes = result.get("coercions")
+        if notes:
+            self._coercions.extend(notes)
+        return result
+
+    def _drop_path_roundtrip(self, authored_pk: Any) -> None:
+        """Forget the pk WARN when only the URL turned the key into text.
+
+        Three of the admin plane's row ops address their row through the URL
+        path, and a path component is always a string -- an op that authored
+        ``pk: 99`` cannot send an int no matter how right it is. The store
+        correctly reports folding "99" back to 99, but that fold undid the
+        transport, not the author, and reporting it would put a WARN beside
+        every correctly-typed op against every int-keyed table in the fleet.
+
+        An op that authored the pk as TEXT is left alone: "99" resolving to 99
+        is the authoring mismatch this whole path exists to surface."""
+        if isinstance(authored_pk, str):
+            return
+        self._coercions = [
+            n for n in self._coercions
+            if not (n.get("rule") == "pk" and n.get("resolved") == authored_pk
+                    and n.get("sent") == str(authored_pk))
+        ]
+
+    def _append_api(self, rec: Dict[str, Any], *, ui_values=None) -> None:
+        """Write one ``inject.api`` record, preceded by its coercion WARNings.
+
+        The WARNings are separate entries rather than a field on the op record
+        because they are about the OP'S PAYLOAD, not its outcome: an op can
+        succeed and still have been retyped on the way in, and a reader
+        auditing why a store holds int 99 under a task that wrote "99" needs to
+        find that as its own line."""
+        notes, self._coercions = self._coercions, []
+        for note in notes:
+            self._append({
+                "type": "inject.coercion",
+                "level": "WARN",
+                "id": rec.get("id"),
+                "service": rec.get("service"),
+                "admin_op": rec.get("admin_op") or rec.get("method"),
+                **note,
+            })
+        self._append({"type": "inject.api", **rec, "ts": time.time()},
+                     ui_values=ui_values)
 
     def _append(self, entry: Dict[str, Any], *, ui_values=None) -> None:
         entry.setdefault("ts", time.time())
