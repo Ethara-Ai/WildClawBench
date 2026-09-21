@@ -229,14 +229,15 @@ def get_content(content_id):
     return _content_view(p)
 
 
-def create_content(title, space_key, body="", parent_id=None, created_by="apiuser"):
+def create_content(title, space_key, body="", parent_id=None, created_by="apiuser",
+                   content_type="page"):
     if not _find_space(space_key):
         return {"error": f"No space with key: {space_key}"}
     if parent_id and not _find_page(parent_id):
         return {"error": f"No parent content with id: {parent_id}"}
     page = {
         "id": _new_page_id(),
-        "type": "page",
+        "type": content_type or "page",
         "status": "current",
         "title": title,
         "space_key": space_key,
@@ -250,10 +251,25 @@ def create_content(title, space_key, body="", parent_id=None, created_by="apiuse
     return _content_view(page)
 
 
-def update_content(content_id, title=None, body=None, version_number=None):
+def update_content(content_id, title=None, body=None, version_number=None,
+                   content_type=None):
+    """Apply the named edits to a page, bumping its version only if one lands.
+
+    The version bump is inside `if changes` for the reason the route guard
+    alone cannot cover: `type` and a restated `version` are declared fields, so
+    a body carrying nothing else passes the guard and still has to collect no
+    change here. An unconditional bump fabricates a revision -- and because
+    this number is what an optimistic-concurrency check compares against, the
+    fabricated one also makes the caller's next well-formed write conflict.
+    """
     page = _find_page(content_id)
     if not page:
         return {"error": f"No content with id: {content_id}"}
+    if content_type is not None and content_type != page["type"]:
+        return {
+            "error": f"Cannot change content type from {page['type']} to {content_type}",
+            "invalid": True,
+        }
     expected = page["version"] + 1
     if version_number is not None and version_number != expected:
         return {
@@ -265,8 +281,9 @@ def update_content(content_id, title=None, body=None, version_number=None):
         changes["title"] = title
     if body is not None:
         changes["body"] = body
-    changes["version"] = expected
-    _store_patch("pages", page["id"], changes)
+    if changes:
+        changes["version"] = expected
+        _store_patch("pages", page["id"], changes)
     return _content_view({**page, **changes})
 
 

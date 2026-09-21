@@ -50,6 +50,12 @@ FRESHDESK_TICKET = "/api/v2/tickets/70001"
 CF_ZONE = "/client/v4/zones/zone1aaaa1111bbbb2222cccc3333dddd"
 CF_DNS_RECORD = f"{CF_ZONE}/dns_records/rec0001aaaa"
 GL_ISSUE = "/api/v4/projects/101/issues/1"
+HS_CONTACTS = "/crm/v3/objects/contacts"
+HS_DEALS = "/crm/v3/objects/deals"
+HS_CONTACT = f"{HS_CONTACTS}/201"
+HS_DEAL = f"{HS_DEALS}/401"
+CONFLUENCE_CONTENT = "/wiki/rest/api/content"
+CONFLUENCE_PAGE = f"{CONFLUENCE_CONTENT}/100101"
 
 
 def _client(api_name: str) -> TestClient:
@@ -99,6 +105,17 @@ CONTRACTS = [
      {"Content": "203.0.113.88"}, {}, 400),
     ("gitlab-api", "PUT", GL_ISSUE,
      {"Title": "wrong case"}, {}, 400),
+
+    # The two survivors the extended checker caught once the W3 three closed.
+    # hubspot's empty body is {"properties": {}} rather than {} on purpose: its
+    # writable surface is the free-form map one level down, which is why the
+    # guard reads the map and not the model's fields.
+    ("hubspot-api", "PATCH", HS_CONTACT,
+     {"Properties": {"firstname": "wrong case"}}, {"properties": {}}, 400),
+    ("hubspot-api", "PATCH", HS_DEAL,
+     {"Properties": {"dealname": "wrong case"}}, {"properties": {}}, 400),
+    ("confluence-api", "PUT", CONFLUENCE_PAGE,
+     {"Title": "wrong case"}, {}, 400),
 ]
 
 CONTRACT_IDS = [f"{api}-{method}-{path}" for api, method, path, _, _, _ in CONTRACTS]
@@ -134,11 +151,46 @@ MTIME_LIARS = [
 MTIME_PARAMS = ("api,module,table,create_path,create_body,pk_at,path_at,"
                 "read_tmpl,stamp,pinned,writes,at,value")
 
+#: The same lie on the two survivors. They need a wider schema than MTIME_LIARS
+#: gives: hubspot has no table to pin through (its rows are the module lists the
+#: guard reports as UNMIGRATED_STORE) and confluence serves `version.number` out
+#: of a row field called `version`. Hence `where` ("table:<name>" or
+#: "list:<module attribute>") and a `pin_at` distinct from `stamp`.
+#:
+#: (api, data module, where, create path, create body, id field in the create
+#:  response, read path template, served stamp, dotted row field to pin,
+#:  the pinned past value, an update that lands, where it lands, its value)
+STAMP_LIARS = [
+    ("hubspot-api", "hubspot_data", "list:_contacts", HS_CONTACTS,
+     {"properties": {"firstname": "Contract", "lastname": "Fixture",
+                     "email": "contract.fixture@orbit-labs.com"}},
+     "id", HS_CONTACTS + "/{id}",
+     "properties.lastmodifieddate", "properties.lastmodifieddate",
+     "2026-01-05T09:00:00.000Z",
+     {"properties": {"firstname": "Renamed"}}, "properties.firstname", "Renamed"),
+    ("hubspot-api", "hubspot_data", "list:_deals", HS_DEALS,
+     {"properties": {"dealname": "Contract fixture", "amount": "100"}},
+     "id", HS_DEALS + "/{id}",
+     "properties.lastmodifieddate", "properties.lastmodifieddate",
+     "2026-01-05T09:00:00.000Z",
+     {"properties": {"dealname": "Renamed"}}, "properties.dealname", "Renamed"),
+    ("confluence-api", "confluence_data", "table:pages", CONFLUENCE_CONTENT,
+     {"title": "Contract fixture", "space": {"key": "ENG"},
+      "body": {"storage": {"value": "seed body", "representation": "storage"}}},
+     "id", CONFLUENCE_CONTENT + "/{id}",
+     "version.number", "version", 7,
+     {"title": "Contract fixture renamed"}, "title", "Contract fixture renamed"),
+]
+
+STAMP_PARAMS = ("api,module,where,create_path,create_body,pk_at,read_tmpl,"
+                "stamp,pin_at,pinned,writes,at,value")
+
 
 @pytest.fixture(scope="module")
 def clients():
     opened: dict[str, TestClient] = {}
-    for api in sorted({c[0] for c in CONTRACTS} | {c[0] for c in MTIME_LIARS}):
+    for api in sorted({c[0] for c in CONTRACTS} | {c[0] for c in MTIME_LIARS}
+                      | {c[0] for c in STAMP_LIARS}):
         client = _client(api)
         client.__enter__()
         opened[api] = client
@@ -322,6 +374,113 @@ def test_gitlab_put_restating_the_same_state_does_not_move_updated_at(clients):
     after = gl.get(GL_ISSUE).json()
     assert after["state"] == seeded["state"]
     assert after["updated_at"] == seeded["updated_at"]
+
+
+def _pin_row_value(mod, where, pk, dotted, value):
+    """Write `dotted` on the row identified by `pk` back to a fixed past value.
+
+    Two shapes, because the two services store rows differently. "table:<name>"
+    goes through the shared store the way `_pinned_row` does. "list:<attr>"
+    reaches hubspot's module-level list directly -- that service's contacts and
+    deals are the UNMIGRATED_STORE rows the lost-write guard reports, so there
+    is no registered table to patch, and migrating it is deliberately not this
+    wave's work. Reaching the list is exactly what its own handlers do.
+    """
+    kind, name = where.split(":", 1)
+    head, _, leaf = dotted.rpartition(".")
+    if kind == "list":
+        row = next((r for r in getattr(mod, name) if r["id"] == pk), None)
+        assert row is not None, f"{name} has no row {pk}"
+        (_dig(row, head) if head else row)[leaf] = value
+        return
+    target = mod._store.table(name).get(pk)
+    assert target is not None, f"table {name} has no row {pk}"
+    if head:
+        nested = _dig(target, head)
+        nested[leaf] = value
+        assert mod._store.table(name).patch(pk, {head.split(".")[0]: target[head.split(".")[0]]})
+    else:
+        assert mod._store.table(name).patch(pk, {leaf: value}) is not None
+
+
+def _stamped_row(clients, api, module, where, create_path, create_body, pk_at,
+                 read_tmpl, pin_at, pinned):
+    client = clients[api]
+    created = client.post(create_path, json=create_body)
+    assert created.status_code in (200, 201), created.text
+    pk = _dig(created.json(), pk_at)
+    _pin_row_value(data_module(client.app, module), where, pk, pin_at, pinned)
+    return client, read_tmpl.format(id=pk)
+
+
+@pytest.mark.parametrize(STAMP_PARAMS, STAMP_LIARS,
+                         ids=[f"{c[0]}-{c[2]}" for c in STAMP_LIARS])
+def test_survivor_update_leaves_its_stamp_alone_on_a_body_naming_nothing(
+        clients, api, module, where, create_path, create_body, pk_at,
+        read_tmpl, stamp, pin_at, pinned, writes, at, value):
+    """hubspot moved lastmodifieddate and updatedAt on an empty properties map;
+    confluence bumped version.number on an empty {}, which is worse than a moved
+    clock -- it fabricates a revision the next concurrency check has to match."""
+    client, read = _stamped_row(clients, api, module, where, create_path,
+                                create_body, pk_at, read_tmpl, pin_at, pinned)
+    before = client.get(read)
+    assert before.status_code == 200, before.text
+    assert _dig(before.json(), stamp) == pinned
+    empty = {"properties": {}} if api == "hubspot-api" else {}
+    refused = client.request("PATCH" if api == "hubspot-api" else "PUT",
+                             read, json=empty)
+    assert refused.status_code == 400, refused.text
+    after = client.get(read)
+    assert _dig(after.json(), stamp) == pinned
+    assert after.json() == before.json()
+
+
+@pytest.mark.parametrize(STAMP_PARAMS, STAMP_LIARS,
+                         ids=[f"{c[0]}-{c[2]}" for c in STAMP_LIARS])
+def test_survivor_update_still_moves_its_stamp_when_a_field_lands(
+        clients, api, module, where, create_path, create_body, pk_at,
+        read_tmpl, stamp, pin_at, pinned, writes, at, value):
+    """The other half: refusing the empty body must not have cost these routes
+    the bump a real write is supposed to produce."""
+    client, read = _stamped_row(clients, api, module, where, create_path,
+                                create_body, pk_at, read_tmpl, pin_at, pinned)
+    r = client.request("PATCH" if api == "hubspot-api" else "PUT", read, json=writes)
+    assert r.status_code == 200, r.text
+    after = client.get(read)
+    assert _dig(after.json(), at) == value
+    assert _dig(after.json(), stamp) != pinned
+
+
+def test_hubspot_patch_stamps_both_clocks_from_one_reading(clients):
+    """update_contact called `_now()` twice, so a write straddling a second
+    boundary left lastmodifieddate and updatedAt disagreeing about when it
+    happened. Both now come from a single reading."""
+    hs = clients["hubspot-api"]
+    created = hs.post(HS_CONTACTS, json={"properties": {"firstname": "Clock"}})
+    assert created.status_code == 201, created.text
+    read = f"{HS_CONTACTS}/{created.json()['id']}"
+    assert hs.patch(read, json={"properties": {"lastname": "Reading"}}).status_code == 200
+    contact = hs.get(read).json()
+    assert contact["properties"]["lastmodifieddate"] == contact["updatedAt"]
+
+
+def test_confluence_put_restating_declared_fields_does_not_bump_the_version(clients):
+    """confluence's second lie, found sweeping its other mutating routes.
+    `type` and `version` are declared fields, so the route guard passes a body
+    carrying only them; only the data layer can see that neither collected a
+    change. Same shape as the gitlab state_event case above."""
+    cf = clients["confluence-api"]
+    created = cf.post(CONFLUENCE_CONTENT, json={"title": "Sweep fixture",
+                                                "space": {"key": "ENG"}})
+    assert created.status_code == 201, created.text
+    read = f"{CONFLUENCE_CONTENT}/{created.json()['id']}"
+    at = cf.get(read).json()["version"]["number"]
+    assert cf.put(read, json={"type": "page"}).status_code == 200
+    assert cf.get(read).json()["version"]["number"] == at
+    assert cf.put(read, json={"version": {"number": at + 1}}).status_code == 200
+    assert cf.get(read).json()["version"]["number"] == at
+    assert cf.put(read, json={"type": "blogpost"}).status_code == 400
+    assert cf.get(read).json()["version"]["number"] == at
 
 
 def test_github_patch_applies_title_and_state_and_keeps_body(clients):

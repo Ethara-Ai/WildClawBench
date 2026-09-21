@@ -25,6 +25,34 @@ except ModuleNotFoundError as _shared_plane_err:  # standalone run without the s
 app = FastAPI(title="HubSpot CRM API (Mock)", version="v3")
 install_tracker(app)
 install_admin_plane(app, store=hubspot_data._store)
+
+
+def _nothing_to_update(body, writable):
+    """A 400 naming the writable fields, or None when the body names one.
+
+    Without this an update whose every field parsed as absent answers 200 over
+    an untouched resource, which a caller cannot tell from a successful write.
+
+    HubSpot's writable surface sits one level below the model. Every object
+    route takes the same fixed {"properties": {...}} envelope, so
+    `type(body).model_fields` is the single name `properties` and
+    `model_dump(exclude_none=True)` on a `{}` body comes back as
+    `{"properties": {}}` -- non-empty, and useless as the test. This helper
+    reads the map instead, and takes the names its caller can act on rather
+    than deriving them from the model. The refusal text is the fleet's
+    verbatim string so the class stays greppable across the seven services
+    that carry it.
+
+    The 400 is the fleet rule rather than a vendor quote: HubSpot documents no
+    behaviour for a PATCH whose properties map is empty.
+    """
+    if body.properties:
+        return None
+    return JSONResponse(status_code=400, content={
+        "error": "no updatable field supplied; expected one of "
+                 + ", ".join(sorted(writable))})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -58,6 +86,9 @@ def create_contact(body: ObjectBody):
 
 @app.patch("/crm/v3/objects/contacts/{contact_id}")
 def update_contact(contact_id: str, body: ObjectBody):
+    refusal = _nothing_to_update(body, hubspot_data.CONTACT_PROPERTIES)
+    if refusal is not None:
+        return refusal
     result = hubspot_data.update_contact(contact_id, body.properties)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
@@ -101,6 +132,9 @@ def create_deal(body: ObjectBody):
 
 @app.patch("/crm/v3/objects/deals/{deal_id}")
 def update_deal(deal_id: str, body: ObjectBody):
+    refusal = _nothing_to_update(body, hubspot_data.DEAL_PROPERTIES)
+    if refusal is not None:
+        return refusal
     result = hubspot_data.update_deal(deal_id, body.properties)
     if "error" in result:
         status = 404 if result.get("category") == "OBJECT_NOT_FOUND" else 400

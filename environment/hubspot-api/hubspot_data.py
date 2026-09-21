@@ -64,6 +64,13 @@ _COMPANY_PROPS = ["name", "domain", "industry", "city", "state",
 _DEAL_PROPS = ["dealname", "pipeline", "dealstage", "amount", "closedate",
                "dealtype", "createdate", "lastmodifieddate"]
 
+#: Named by the route layer's nothing-to-update 400. The stamps are excluded on
+#: purpose: the properties map is free-form so the mock would accept them, but
+#: advertising them would invite a caller to overwrite what this module stamps.
+_SERVER_STAMPS = ("createdate", "lastmodifieddate")
+CONTACT_PROPERTIES = tuple(p for p in _CONTACT_PROPS if p not in _SERVER_STAMPS)
+DEAL_PROPERTIES = tuple(p for p in _DEAL_PROPS if p not in _SERVER_STAMPS)
+
 
 # ---------------------------------------------------------------------------
 # Load + coerce into HubSpot object shape
@@ -185,9 +192,12 @@ def update_contact(contact_id, properties):
     c = _find(_contacts, contact_id)
     if not c:
         return {"error": f"Contact {contact_id} not found", "category": "OBJECT_NOT_FOUND"}
-    c["properties"].update({k: v for k, v in (properties or {}).items()})
-    c["properties"]["lastmodifieddate"] = _now()
-    c["updatedAt"] = _now()
+    _changes = {k: v for k, v in (properties or {}).items()}
+    if _changes:
+        now = _now()
+        _changes["lastmodifieddate"] = now
+        c["properties"].update(_changes)
+        c["updatedAt"] = now
     return _public(c)
 
 
@@ -260,9 +270,12 @@ def update_deal(deal_id, properties):
         if not _valid_stage(pipeline_id, props["dealstage"]):
             return {"error": f"Invalid stage {props['dealstage']} for pipeline {pipeline_id}",
                     "category": "VALIDATION_ERROR"}
-    d["properties"].update(props)
-    d["properties"]["lastmodifieddate"] = _now()
-    d["updatedAt"] = _now()
+    _changes = dict(props)
+    if _changes:
+        now = _now()
+        _changes["lastmodifieddate"] = now
+        d["properties"].update(_changes)
+        d["updatedAt"] = now
     return _public(d)
 
 
