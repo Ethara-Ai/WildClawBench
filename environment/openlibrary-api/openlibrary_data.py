@@ -118,15 +118,28 @@ def _coerce_subjects(rows):
 
 
 
-_authors_by_id = {a["author_id"]: a for a in _authors_rows()}
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _author_by_id(author_id):
+    """Look the author up in the store, per call.
+
+    This was a module-level dict comprehension over _authors_rows(), which
+    Table.rows() answers with deep copies -- so it froze the seed at import and
+    every route reading it served that snapshot forever. An injected author
+    landed in the store and GET /authors/{id}.json went on answering 200 with
+    the old value, which is worse than a dropped write: the agent is told the
+    read succeeded.
+    """
+    for a in _authors_rows():
+        if a["author_id"] == author_id:
+            return a
+    return None
+
+
 def _author_name(author_id):
-    a = _authors_by_id.get(author_id)
+    a = _author_by_id(author_id)
     return a["name"] if a else "Unknown"
 
 
@@ -247,7 +260,7 @@ def get_isbn(isbn):
 # ---------------------------------------------------------------------------
 
 def get_author(author_id):
-    a = _authors_by_id.get(author_id)
+    a = _author_by_id(author_id)
     if not a:
         return {"error": f"Author {author_id} not found"}
     return {
@@ -263,7 +276,7 @@ def get_author(author_id):
 
 
 def get_author_works(author_id):
-    if author_id not in _authors_by_id:
+    if _author_by_id(author_id) is None:
         return {"error": f"Author {author_id} not found"}
     works = [w for w in _works_rows() if w["author_id"] == author_id]
     entries = []

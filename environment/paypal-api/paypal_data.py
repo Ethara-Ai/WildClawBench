@@ -276,6 +276,38 @@ def capture_order(order_id):
 
 
 # ---------------------------------------------------------------------------
+# Captures
+# ---------------------------------------------------------------------------
+
+# A capture was only ever reachable as the echo of the call that made it, so a
+# seeded one -- and any drift against it -- had no reader at all. PayPal shows
+# one at GET /v2/payments/captures/{capture_id}
+# (developer.paypal.com/docs/api/payments/v2/#captures_get).
+
+def _serialize_capture(c):
+    """The Show-captured-payment shape.
+
+    order_id is flat on the row, and PayPal publishes it under
+    supplementary_data.related_ids -- the only place a real client reads it.
+    """
+    return {
+        "id": c["id"],
+        "status": c["status"],
+        "amount": c["amount"],
+        "final_capture": c["final_capture"],
+        "create_time": c["create_time"],
+        "supplementary_data": {"related_ids": {"order_id": c["order_id"]}},
+    }
+
+
+def get_capture(capture_id):
+    c = _find(_captures_rows(), capture_id)
+    if not c:
+        return {"error": f"Capture {capture_id} not found"}
+    return _serialize_capture(c)
+
+
+# ---------------------------------------------------------------------------
 # Refunds
 # ---------------------------------------------------------------------------
 

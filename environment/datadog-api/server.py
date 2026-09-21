@@ -58,6 +58,28 @@ def query_metrics(
     return result
 
 
+# --- Metric metadata ---
+
+@app.get("/api/v1/metrics")
+def list_active_metrics(
+    from_: int = Query(..., alias="from"),
+    host: Optional[str] = None,
+    tag_filter: Optional[str] = None,
+):
+    result = datadog_data.list_metrics(from_, host=host, tag_filter=tag_filter)
+    if "error" in result:
+        return JSONResponse(status_code=400, content=result)
+    return result
+
+
+@app.get("/api/v1/metrics/{metric_name}")
+def get_metric_metadata(metric_name: str):
+    result = datadog_data.get_metric(metric_name)
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result
+
+
 # --- Monitors ---
 
 @app.get("/api/v1/monitor")

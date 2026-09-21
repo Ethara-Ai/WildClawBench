@@ -364,6 +364,13 @@ def list_services(namespace):
     return _list_envelope("ServiceList", svcs)
 
 
+def get_service(namespace, name):
+    for s in _services_rows():
+        if s["namespace"] == namespace and s["name"] == name:
+            return _service_obj(s)
+    return {"error": f"service {name} not found in namespace {namespace}"}
+
+
 # ---------------------------------------------------------------------------
 # Nodes
 # ---------------------------------------------------------------------------

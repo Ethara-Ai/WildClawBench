@@ -29,6 +29,21 @@ def health():
     return {"status": "ok"}
 
 
+# --- Organizations ---
+
+@app.get("/api/0/organizations/")
+def list_organizations():
+    return sentry_data.list_organizations()
+
+
+@app.get("/api/0/organizations/{org_slug}/")
+def get_organization(org_slug: str):
+    result = sentry_data.get_organization(org_slug)
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result
+
+
 # --- Projects ---
 
 @app.get("/api/0/organizations/{org_slug}/projects/")

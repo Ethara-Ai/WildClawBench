@@ -138,3 +138,15 @@ def delete_dns_record(zone_id: str, record_id: str):
 @app.get("/client/v4/zones/{zone_id}/firewall/rules")
 def list_firewall_rules(zone_id: str):
     return _respond(cloudflare_data.list_firewall_rules(zone_id))
+
+
+# --- Page rules ---
+
+@app.get("/client/v4/zones/{zone_id}/pagerules")
+def list_page_rules(zone_id: str, status: Optional[str] = None):
+    return _respond(cloudflare_data.list_page_rules(zone_id, status=status))
+
+
+@app.get("/client/v4/zones/{zone_id}/pagerules/{pagerule_id}")
+def get_page_rule(zone_id: str, pagerule_id: str):
+    return _respond(cloudflare_data.get_page_rule(zone_id, pagerule_id))

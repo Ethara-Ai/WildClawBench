@@ -146,6 +146,40 @@ def _in_range(ts, from_date, to_date):
 
 
 # ---------------------------------------------------------------------------
+# Raw event export
+# ---------------------------------------------------------------------------
+
+# events_counts aggregates the table away -- it publishes per-day tallies, so no
+# column of an individual event survives into a response and drift against one
+# is unreadable. Mixpanel's raw export is the endpoint that does serve the row:
+# GET /api/2.0/export (docs.mixpanel.com/reference/raw-event-export), one event
+# per line as JSONL. event_id is published as $insert_id, which is the key
+# Mixpanel itself uses to identify a single event.
+
+def list_events(from_date=None, to_date=None, event=None, limit=None):
+    wanted = {e.strip() for e in event.split(",") if e.strip()} if event else set()
+    out = []
+    for e in _events_rows():
+        if not _in_range(e["time"], from_date, to_date):
+            continue
+        if wanted and e["event"] not in wanted:
+            continue
+        out.append({
+            "event": e["event"],
+            "properties": {
+                "$insert_id": e["event_id"],
+                "distinct_id": e["distinct_id"],
+                "time": e["time"],
+                **e["properties"],
+            },
+        })
+    out.sort(key=lambda r: r["properties"]["time"])
+    if limit is not None:
+        out = out[: max(0, limit)]
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Ingestion
 # ---------------------------------------------------------------------------
 

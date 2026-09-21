@@ -204,6 +204,31 @@ def _serialize_firewall(r):
     }
 
 
+def _serialize_page_rule(r):
+    """The published shape of a Page Rule, per Cloudflare's own model.
+
+    The seed keeps the rule flat -- one `target` string and one
+    `setting`/`value` pair -- because that is what a page rule almost always
+    is. The vendor publishes both as lists of objects
+    (https://developers.cloudflare.com/api/resources/page_rules/methods/get/),
+    so the flat columns are lifted into the one-element lists a real client
+    indexes into. `modified_on` is absent for the same reason it is absent from
+    _serialize_firewall: the table does not carry it, and answering with
+    created_on under a second name would be inventing a value.
+    """
+    return {
+        "id": r["id"],
+        "targets": [{
+            "target": "url",
+            "constraint": {"operator": "matches", "value": r["target"]},
+        }],
+        "actions": [{"id": r["setting"], "value": r["value"]}],
+        "priority": r["priority"],
+        "status": r["status"],
+        "created_on": r["created_on"],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Zones
 # ---------------------------------------------------------------------------
@@ -314,5 +339,35 @@ def list_firewall_rules(zone_id):
     results = [r for r in _firewall_rows() if r["zone_id"] == zone_id]
     results.sort(key=lambda r: r["priority"])
     return _ok([_serialize_firewall(r) for r in results])
+
+
+# ---------------------------------------------------------------------------
+# Page rules
+# ---------------------------------------------------------------------------
+
+# Cloudflare serves these at GET /zones/{zone_id}/pagerules and
+# /pagerules/{pagerule_id} (developers.cloudflare.com/api/resources/page_rules).
+# The table was registered and loaded with neither route, so every column landed
+# in the store and no caller could read one back. The miss reuses this service's
+# generic 1003 rather than quoting a code: the DNS routes cite 81044 because
+# Cloudflare documents it, and it publishes no page-rule equivalent.
+
+def list_page_rules(zone_id, status=None):
+    if not _zone_exists(zone_id):
+        return _err(f"Zone {zone_id} not found", code=1003, status=404)
+    results = [r for r in _page_rules_rows() if r["zone_id"] == zone_id]
+    if status:
+        results = [r for r in results if r["status"] == status]
+    results.sort(key=lambda r: r["priority"])
+    return _ok([_serialize_page_rule(r) for r in results])
+
+
+def get_page_rule(zone_id, pagerule_id):
+    if not _zone_exists(zone_id):
+        return _err(f"Zone {zone_id} not found", code=1003, status=404)
+    for r in _page_rules_rows():
+        if r["zone_id"] == zone_id and r["id"] == pagerule_id:
+            return _ok(_serialize_page_rule(r))
+    return _err(f"Page Rule {pagerule_id} not found", code=1003, status=404)
 
 _store.eager_load()

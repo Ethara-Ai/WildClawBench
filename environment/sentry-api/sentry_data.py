@@ -184,6 +184,44 @@ def _serialize_release(r):
 # Projects
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Organizations
+# ---------------------------------------------------------------------------
+
+# Every route here is scoped by {org_slug} and none of them published the
+# organization, so the table validated requests and was never served. Sentry
+# lists them at GET /api/0/organizations/ and shows one at
+# GET /api/0/organizations/{organization_id_or_slug}/
+# (docs.sentry.io/api/organizations/). id is a string and status is an object
+# on both, which is what a real client reads.
+
+def _serialize_organization(o):
+    return {
+        "id": str(o["id"]),
+        "slug": o["slug"],
+        "name": o["name"],
+        "status": {"id": o["status"], "name": o["status"]},
+        "dateCreated": o["date_created"],
+    }
+
+
+def list_organizations():
+    results = list(_organizations_rows())
+    results.sort(key=lambda o: o["date_created"])
+    return [_serialize_organization(o) for o in results]
+
+
+def get_organization(org_slug):
+    for o in _organizations_rows():
+        if o["slug"] == org_slug or str(o["id"]) == org_slug:
+            return _serialize_organization(o)
+    return {"error": f"Organization {org_slug} not found"}
+
+
+# ---------------------------------------------------------------------------
+# Projects
+# ---------------------------------------------------------------------------
+
 def list_org_projects(org_slug):
     if not _org_exists(org_slug):
         return {"error": f"Organization {org_slug} not found"}

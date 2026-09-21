@@ -241,6 +241,51 @@ def query_metrics(from_ts, to_ts, query):
 
 
 # ---------------------------------------------------------------------------
+# Metric metadata
+# ---------------------------------------------------------------------------
+
+# query_metrics can only publish a row the caller already named, so a metric
+# nobody guesses is unreachable. Datadog's own discovery pair closes that:
+# GET /api/v1/metrics?from= lists the active names and
+# GET /api/v1/metrics/{metric_name} returns the metadata object
+# (docs.datadoghq.com/api/latest/metrics/). `host` and `tag_filter` are the
+# vendor's filters and are answered off `scope` and `tags`, which is how those
+# two columns become readable at all.
+
+def list_metrics(from_ts, host=None, tag_filter=None):
+    try:
+        from_ts = int(from_ts)
+    except (TypeError, ValueError):
+        return {"error": "from must be a unix timestamp"}
+    results = list(_metrics_rows())
+    if host:
+        results = [m for m in results if m["scope"] == f"host:{host}"]
+    if tag_filter:
+        results = [m for m in results if tag_filter in m["tags"]]
+    return {
+        "from": str(from_ts),
+        "metrics": sorted({m["metric"] for m in results}),
+    }
+
+
+def get_metric(metric_name):
+    for m in _metrics_rows():
+        if m["metric"] == metric_name:
+            # Datadog returns null for metadata that was never submitted, and
+            # this table carries a column for exactly one of these fields.
+            return {
+                "description": None,
+                "integration": None,
+                "per_unit": None,
+                "short_name": m["metric"].rsplit(".", 1)[-1],
+                "statsd_interval": None,
+                "type": None,
+                "unit": m["unit"],
+            }
+    return {"error": f"Metric {metric_name} not found"}
+
+
+# ---------------------------------------------------------------------------
 # Monitors
 # ---------------------------------------------------------------------------
 

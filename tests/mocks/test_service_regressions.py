@@ -12,6 +12,7 @@ which is exactly what `POST /admin/data/{table}` calls in admin_plane.py.
 from __future__ import annotations
 
 import base64
+import json
 
 import pytest
 
@@ -961,3 +962,182 @@ def test_whatsapp_refuses_a_messaging_product_that_is_not_whatsapp(whatsapp):
                         json={"messaging_product": "sms", "status": "read",
                               "message_id": message})
     assert bad.status_code == 400, bad.text
+
+
+# ---------------------------------------------------------------------------
+# The unserved-table wave: a table registered in the store with no route that
+# reads it. The write lands, the gate's observability check degrades to
+# comparing the store against itself, and the agent can never see the drift.
+# Each lock writes through the store -- which is what POST /admin/data/{table}
+# calls -- and then asserts the value comes back over HTTP, because the store
+# was never the thing that lied.
+# ---------------------------------------------------------------------------
+
+CF_ZONE = "zone1aaaa1111bbbb2222cccc3333dddd"
+
+
+@pytest.fixture(scope="module")
+def cloudflare():
+    with _client("cloudflare-api") as c:
+        yield c
+
+
+def test_cloudflare_page_rules_are_served_in_the_vendor_shape(cloudflare):
+    """The table was loaded and coerced with neither of Cloudflare's two read
+    routes, so every column was write-only. The flat target/setting/value
+    columns publish as the lists a real client indexes into."""
+    mod = _data_module(cloudflare.app, "cloudflare_data")
+    mod._store.table("page_rules").patch("pr0001aaaa", {"value": "bypass"})
+    listed = cloudflare.get(f"/client/v4/zones/{CF_ZONE}/pagerules")
+    assert listed.status_code == 200, listed.text
+    rule = listed.json()["result"][0]
+    assert rule["actions"][0] == {"id": "cache_level", "value": "bypass"}
+    assert rule["targets"][0] == {
+        "target": "url",
+        "constraint": {"operator": "matches",
+                       "value": "*.orbit-labs.com/static/*"},
+    }
+    one = cloudflare.get(f"/client/v4/zones/{CF_ZONE}/pagerules/pr0001aaaa")
+    assert one.status_code == 200, one.text
+    assert one.json()["result"]["actions"][0]["value"] == "bypass"
+    assert one.json()["result"]["priority"] == 1
+
+
+def test_cloudflare_page_rule_misses_travel_in_the_envelope(cloudflare):
+    miss = cloudflare.get(f"/client/v4/zones/{CF_ZONE}/pagerules/pr-nope")
+    assert miss.status_code == 404, miss.text
+    assert miss.json()["success"] is False
+    assert miss.json()["errors"][0]["code"] == 1003
+    zone = cloudflare.get("/client/v4/zones/nosuchzone/pagerules")
+    assert zone.status_code == 404, zone.text
+
+
+def test_datadog_metrics_are_discoverable_and_carry_their_unit(datadog):
+    """query_metrics can only answer for a metric the caller already named, so
+    a metric nobody guesses had no reader. Datadog's own discovery pair does."""
+    mod = _data_module(datadog.app, "datadog_data")
+    mod._store.table("metrics").patch("trace.http.request.errors|",
+                                      {"unit": "millisecond"})
+    listed = datadog.get("/api/v1/metrics", params={"from": 1700000000})
+    assert listed.status_code == 200, listed.text
+    assert "trace.http.request.errors" in listed.json()["metrics"]
+    assert listed.json()["from"] == "1700000000"
+    meta = datadog.get("/api/v1/metrics/trace.http.request.errors")
+    assert meta.status_code == 200, meta.text
+    assert meta.json()["unit"] == "millisecond"
+    assert meta.json()["short_name"] == "errors"
+    assert datadog.get("/api/v1/metrics/no.such.metric").status_code == 404
+    assert datadog.get("/api/v1/metrics").status_code == 422
+
+
+def test_datadog_metric_scope_moves_list_membership(datadog):
+    """`host` is Datadog's own filter on this route, and answering it off the
+    scope column is what makes that column readable at all."""
+    mod = _data_module(datadog.app, "datadog_data")
+    mod._store.table("metrics").patch("system.disk.in_use|",
+                                      {"scope": "host:regression-01"})
+    hit = datadog.get("/api/v1/metrics",
+                      params={"from": 1700000000, "host": "regression-01"})
+    assert hit.json()["metrics"] == ["system.disk.in_use"]
+
+
+def test_kubernetes_service_is_readable_by_name(kubernetes):
+    """The list route existed and the single-resource read did not, so a
+    service could only be seen by walking its whole namespace."""
+    mod = _data_module(kubernetes.app, "kubernetes_data")
+    mod._store.table("services").patch("prod/api-gateway",
+                                       {"cluster_ip": "10.96.12.99"})
+    one = kubernetes.get("/api/v1/namespaces/prod/services/api-gateway")
+    assert one.status_code == 200, one.text
+    assert one.json()["kind"] == "Service"
+    assert one.json()["spec"]["clusterIP"] == "10.96.12.99"
+    assert one.json()["metadata"]["namespace"] == "prod"
+    miss = kubernetes.get("/api/v1/namespaces/prod/services/nope")
+    assert miss.status_code == 404, miss.text
+
+
+@pytest.fixture(scope="module")
+def mixpanel():
+    with _client("mixpanel-api") as c:
+        yield c
+
+
+def test_mixpanel_export_serves_the_individual_event(mixpanel):
+    """/api/2.0/events aggregates the table away into per-day tallies, so no
+    column of one event survived into a response. The raw export serves the
+    row, one JSON object per line."""
+    mod = _data_module(mixpanel.app, "mixpanel_data")
+    mod._store.table("events").patch("evt-0001",
+                                     {"distinct_id": "user-regression"})
+    r = mixpanel.get("/api/2.0/export",
+                     params={"from_date": "2025-05-01", "to_date": "2025-05-31"})
+    assert r.status_code == 200, r.text
+    rows = [json.loads(line) for line in r.text.splitlines()]
+    hit = [e for e in rows if e["properties"]["$insert_id"] == "evt-0001"]
+    assert hit, r.text[:400]
+    assert hit[0]["properties"]["distinct_id"] == "user-regression"
+    assert hit[0]["event"] == "Signup"
+    assert mixpanel.get("/api/2.0/export").status_code == 422
+
+
+@pytest.fixture(scope="module")
+def openlibrary():
+    with _client("openlibrary-api") as c:
+        yield c
+
+
+def test_openlibrary_author_route_reads_the_live_store(openlibrary):
+    """_authors_by_id was a module-level dict built from Table.rows(), which
+    answers with deep copies -- so it froze the seed at import and the route
+    served that snapshot forever. An injected author landed and
+    GET /authors/{id}.json went on answering 200 with the old value, which is
+    worse than a dropped write: the agent is told the read succeeded."""
+    mod = _data_module(openlibrary.app, "openlibrary_data")
+    read = "/authors/OL26320A.json"
+    assert openlibrary.get(read).json()["bio"] != "Rewritten by drift."
+    mod._store.table("authors").patch("OL26320A", {"bio": "Rewritten by drift.",
+                                                   "name": "J. R. R. Drifted"})
+    served = openlibrary.get(read)
+    assert served.status_code == 200, served.text
+    assert served.json()["bio"] == "Rewritten by drift."
+    assert served.json()["name"] == "J. R. R. Drifted"
+    works = openlibrary.get("/authors/OL26320A/works.json")
+    assert works.status_code == 200, works.text
+    assert openlibrary.get("/authors/OL99999A.json").status_code == 404
+
+
+def test_paypal_capture_is_readable_on_its_own_route(paypal_svc):
+    """A capture was only ever the echo of the call that made it, so a seeded
+    one had no reader. order_id publishes where PayPal puts it."""
+    mod = _data_module(paypal_svc.app, "paypal_data")
+    mod._store.table("captures").patch("CAP_3C679384HN8401234",
+                                       {"status": "PENDING"})
+    one = paypal_svc.get("/v2/payments/captures/CAP_3C679384HN8401234")
+    assert one.status_code == 200, one.text
+    body = one.json()
+    assert body["status"] == "PENDING"
+    assert body["amount"] == {"currency_code": "USD", "value": "49.99"}
+    assert body["final_capture"] is True
+    assert body["supplementary_data"]["related_ids"]["order_id"] == \
+        "ORDER-5O190127TN364715T"
+    assert paypal_svc.get("/v2/payments/captures/CAP_NOPE").status_code == 404
+
+
+def test_sentry_organization_is_served_by_its_own_routes(sentry):
+    """Every route on this service is scoped by {org_slug} and none of them
+    published the organization, so the table validated requests and was never
+    read back. id is a string and status is an object, as Sentry serves them."""
+    mod = _data_module(sentry.app, "sentry_data")
+    mod._store.table("organizations").patch(1, {"name": "Orbit Drifted",
+                                                "status": "pending_deletion"})
+    listed = sentry.get("/api/0/organizations/")
+    assert listed.status_code == 200, listed.text
+    assert listed.json()[0]["name"] == "Orbit Drifted"
+    assert listed.json()[0]["id"] == "1"
+    one = sentry.get("/api/0/organizations/orbit-labs/")
+    assert one.status_code == 200, one.text
+    assert one.json()["status"] == {"id": "pending_deletion",
+                                    "name": "pending_deletion"}
+    assert one.json()["dateCreated"] == "2024-01-10T10:00:00.000Z"
+    assert sentry.get("/api/0/organizations/1/").json()["slug"] == "orbit-labs"
+    assert sentry.get("/api/0/organizations/nope/").status_code == 404

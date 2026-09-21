@@ -97,6 +97,16 @@ def capture_order(order_id: str, body: CaptureBody = CaptureBody()):
     return result
 
 
+# --- Captures ---
+
+@app.get("/v2/payments/captures/{capture_id}")
+def get_capture(capture_id: str):
+    result = paypal_data.get_capture(capture_id)
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result
+
+
 # --- Refunds ---
 
 class RefundCreateBody(BaseModel):

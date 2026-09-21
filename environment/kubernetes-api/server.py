@@ -109,6 +109,14 @@ def list_services(ns: str):
     return result
 
 
+@app.get("/api/v1/namespaces/{ns}/services/{name}")
+def get_service(ns: str, name: str):
+    result = kubernetes_data.get_service(ns, name)
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result
+
+
 # --- Nodes ---
 
 @app.get("/api/v1/nodes")

@@ -3,8 +3,10 @@
 Implements a subset of the Mixpanel ingestion + query API surface.
 """
 
+import json
+
 from fastapi import FastAPI, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, Dict, Any
 
@@ -62,6 +64,21 @@ def events(
     to_date: Optional[str] = Query(None),
 ):
     return mixpanel_data.events_counts(event=event, from_date=from_date, to_date=to_date)
+
+
+@app.get("/api/2.0/export")
+def export_events(
+    from_date: str = Query(...),
+    to_date: str = Query(...),
+    event: Optional[str] = None,
+    limit: Optional[int] = Query(None, ge=1, le=100000),
+):
+    rows = mixpanel_data.list_events(
+        from_date=from_date, to_date=to_date, event=event, limit=limit)
+    return PlainTextResponse(
+        "\n".join(json.dumps(r) for r in rows),
+        media_type="application/x-ndjson",
+    )
 
 
 # --- Funnels ---
