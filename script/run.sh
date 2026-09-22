@@ -92,6 +92,7 @@ USE_TESTS=0              # 0 = rubric-only (Channel A dropped, review §1); 1 = 
 USE_LITELLM=1            # 1 = --litellm, 0 = omit
 USE_MOCK_STACK=1         # 1 = --mock-stack, 0 = omit
 USE_CLAUDE_OAUTH=0       # 1 = --use-claude-oauth (route opus through OAuth bridge), 0 = Bedrock
+JUDGE_PROVIDER=""        # "" = judge follows the agent lane; oauth|bedrock = dual-provider
 USE_TUI=0                # 1 = --tui (full-screen Textual live dashboard)
 SKIP_PREFLIGHT=0         # 1 = skip docker/agent-image/mock-image/.env checks
 PARALLEL_REPS=0          # 1 = run all K reps of a (task,model) concurrently, 0 = sequential
@@ -115,7 +116,7 @@ USAGE
   bash script/run.sh --task TASK --model MODEL --reps K       # flag form
   bash script/run.sh --bulk TASKS_FILE [--model M] [--reps K] # bulk: tasks sequential, models parallel per task
   bash script/run.sh --input-dir DIR -P N [--reps K]          # run every task under DIR, N in parallel (failure-isolated)
-  bash script/run.sh --regrade RUN_DIR [--rubric PATH]        # re-judge existing run; overwrites score.json
+  bash script/run.sh --regrade RUN_DIR [--rubric PATH] [--judge-provider oauth|bedrock]
 
 COMMON FLAGS
   -t, --task PATH           Task directory (e.g. input/alden-croft_MB)
@@ -128,6 +129,7 @@ COMMON FLAGS
   --no-subagents            Force sub-agent spawning OFF (model never granted sessions_spawn)
   -R, --regrade DIR         Re-run judge phase only against an existing run dir
       --rubric PATH         Override rubric for --regrade
+      --judge-provider P    Judge lane provider (oauth|bedrock); default: same as the agent
   -h, --help                Show this help and exit
 
 EXAMPLES
@@ -152,6 +154,12 @@ EXAMPLES
   # Regrade an existing run:
   bash script/run.sh --regrade output/openclaw/amanda_hayes_01/trajectories/claude-opus-4.7/run_1
 
+  # Agent on the Claude Max subscription, rubric graded on Bedrock Sonnet:
+  bash script/run.sh --input-dir input_batch --parallel-tasks 6 --use-claude-oauth --judge-provider bedrock
+
+  # Re-judge an oversize transcript that failed the 700K OAuth evidence ceiling:
+  bash script/run.sh --regrade output/openclaw/yves_quinn/trajectories/claude-opus-4.7/run_1 --judge-provider bedrock
+
 ADVANCED
       --backend NAME        Agent backend (default: openclaw)
       --thinking LEVEL      Thinking budget (default: xhigh; e.g. medium|high|xhigh)
@@ -161,6 +169,15 @@ ADVANCED
       --no-mock-stack       Disable mock-stack docker fleet
       --use-claude-oauth    Route opus through Claude Code OAuth bridge (Max plan) instead of Bedrock;
                             requires WCB_CC_ACCOUNT_POOL pointing at OAuth credential JSON file(s)
+      --judge-provider P    Grade the rubric on a DIFFERENT provider than the agent ran on
+                            (oauth|bedrock). Default: the judge follows the agent lane, and
+                            behaviour is identical to not passing this flag at all.
+                            --use-claude-oauth --judge-provider bedrock is the recommended
+                            shape: agent on the subscription, judge on Bedrock Sonnet at the
+                            full 1,175,000-char evidence budget instead of the 700,000-char
+                            OAuth ceiling. BOTH lanes' credentials must be present; both are
+                            checked before the trajectory runs. Carried to every -P worker.
+                            Also valid with --regrade. Env: WCB_JUDGE_AUTH_PROVIDER.
       --no-bundle           Skip auto-repackage to output_bundle/ after each task
       --bundle-root DIR     Destination for auto-bundle (default: output_bundle; env: KENSEI_BUNDLE_ROOT)
       --parallel-reps       Run all K reps of a (task,model) CONCURRENTLY (default: sequential)
@@ -440,12 +457,34 @@ preflight_env_file() {
     fi
 
     local missing=()
-    if [[ "${WCB_AUTH_PROVIDER:-bedrock}" != "oauth" ]]; then
+    # A run has TWO auth lanes and either can need Bedrock: the agent, or a
+    # judge placed there by --judge-provider while the agent stays on OAuth.
+    local judge_lane="${JUDGE_PROVIDER:-}"
+    [[ -n "$judge_lane" ]] || judge_lane="${WCB_AUTH_PROVIDER:-bedrock}"
+    if [[ "${WCB_AUTH_PROVIDER:-bedrock}" != "oauth" ]] || [[ "$judge_lane" == "bedrock" ]]; then
         for key in KENSEI_AWS_BEARER_TOKEN KENSEI_AWS_REGION; do
             if ! grep -qE "^${key}=.+" .env; then
                 missing+=("$key")
             fi
         done
+    fi
+    if [[ "$judge_lane" == "bedrock" ]] && ! grep -qE "^JUDGE_COUNCIL_SONNET_ARN=.+" .env; then
+        missing+=("JUDGE_COUNCIL_SONNET_ARN")
+    fi
+    # The cc-bridge co-tenant secret is a JUDGE credential when the judge alone
+    # is on OAuth: bootstrap_sidecar.py generates one in a SUBPROCESS, so a
+    # generated secret dies with it and the host-side judge would send an empty
+    # header to a bridge that rejects it. Only a .env value survives.
+    if [[ "$judge_lane" == "oauth" ]] && [[ "${USE_CLAUDE_OAUTH:-0}" != "1" ]] \
+       && ! grep -qE "^WCB_CC_BRIDGE_SECRET=.+" .env; then
+        missing+=("WCB_CC_BRIDGE_SECRET")
+    fi
+    # JUDGE_MAX_EVIDENCE short-circuits the per-family evidence table entirely,
+    # so a box carrying it grades at that number whatever the judge lane is --
+    # including the oversize transcripts --judge-provider bedrock exists to
+    # rescue. Not fatal, but never silent.
+    if grep -qE "^JUDGE_MAX_EVIDENCE=.+" .env; then
+        log::warn "JUDGE_MAX_EVIDENCE is set in .env: it overrides the per-family evidence budget on BOTH lanes"
     fi
     if (( ${#missing[@]} > 0 )); then
         log::warn ".env missing/empty: ${missing[*]} (Bedrock calls will fail if not set elsewhere)"
@@ -636,10 +675,19 @@ bootstrap_shared_sidecar() {
     # reach it via 127.0.0.1. Auto-export the judge env only when the OAuth
     # path is active so Bedrock judging is left untouched otherwise. The judge's
     # own family=='sonnet' gate + x-wcb-bridge-secret still apply downstream.
-    if [[ -n "$WCB_SHARED_CC_BRIDGE_HOST_URL" && "${USE_CLAUDE_OAUTH:-0}" == "1" ]]; then
+    if [[ -n "$WCB_SHARED_CC_BRIDGE_HOST_URL" ]] \
+       && { [[ "${USE_CLAUDE_OAUTH:-0}" == "1" ]] || [[ "$JUDGE_PROVIDER" == "oauth" ]]; }; then
         export KENSEI_JUDGE_OAUTH_BRIDGE_URL="$WCB_SHARED_CC_BRIDGE_HOST_URL"
         export KENSEI_JUDGE_USE_LITELLM=1
-        log::ok "Sonnet judge -> OAuth bridge $WCB_SHARED_CC_BRIDGE_HOST_URL"
+        # Exported for an OAuth AGENT too even when the judge is on Bedrock: the
+        # agent's own wiring and the host-port diagnostics read it. Harmless --
+        # judge_litellm's gate asks the JUDGE lane and returns empty, which is
+        # exactly the provider isolation working.
+        if [[ "$JUDGE_PROVIDER" == "bedrock" ]]; then
+            log::ok "cc-bridge up for the AGENT; Sonnet judge -> Bedrock (--judge-provider bedrock)"
+        else
+            log::ok "Sonnet judge -> OAuth bridge $WCB_SHARED_CC_BRIDGE_HOST_URL"
+        fi
     fi
 
     # Install teardown trap that fires on normal exit + Ctrl-C + SIGTERM,
@@ -718,6 +766,7 @@ run_one() {
     (( USE_LITELLM == 1 )) && cmd+=(--litellm)
     (( USE_MOCK_STACK == 1 )) && cmd+=(--mock-stack)
     (( USE_CLAUDE_OAUTH == 1 )) && cmd+=(--use-claude-oauth)
+    [[ -n "$JUDGE_PROVIDER" ]] && cmd+=(--judge-auth-provider "$JUDGE_PROVIDER")
     if (( USE_TESTS == 1 )); then
         cmd+=(--generate-tests --testgen-max-attempts 3 --execute-tests --testexec-timeout 600)
     fi
@@ -761,12 +810,21 @@ run_regrade() {
     local run_dir="$1"
     shift
     local rubric_override=""
+    local judge_override=""
     while (( $# > 0 )); do
         case "$1" in
             --rubric)
                 rubric_override="${2:-}"
                 if [[ -z "$rubric_override" ]]; then
                     log::err "--rubric requires a path argument"
+                    return 2
+                fi
+                shift 2
+                ;;
+            --judge-auth-provider)
+                judge_override="${2:-}"
+                if [[ -z "$judge_override" ]]; then
+                    log::err "--judge-auth-provider requires a value (oauth|bedrock)"
                     return 2
                 fi
                 shift 2
@@ -794,9 +852,11 @@ run_regrade() {
     log::kv "Run dir" "$run_dir"
     log::kv "Log file" "$log_file"
     [[ -n "$rubric_override" ]] && log::kv "Rubric override" "$rubric_override"
+    [[ -n "$judge_override" ]] && log::kv "Judge provider" "$judge_override"
 
     local cmd=(python3 script/regrade.py --run "$run_dir")
     [[ -n "$rubric_override" ]] && cmd+=(--rubric "$rubric_override")
+    [[ -n "$judge_override" ]] && cmd+=(--judge-auth-provider "$judge_override")
 
     "${cmd[@]}" 2>&1 | tee "$log_file"
     local rc=${PIPESTATUS[0]}
@@ -1106,6 +1166,13 @@ parse_args() {
             --no-litellm)         USE_LITELLM=0; shift ;;
             --no-mock-stack)      USE_MOCK_STACK=0; shift ;;
             --use-claude-oauth)   USE_CLAUDE_OAUTH=1; shift ;;
+            --judge-provider)
+                [[ -n "${2:-}" ]] || { log::err "$1 requires a value (oauth|bedrock)"; exit 2; }
+                case "$2" in
+                    oauth|bedrock) JUDGE_PROVIDER="$2" ;;
+                    *) log::err "--judge-provider must be oauth or bedrock, got: $2"; exit 2 ;;
+                esac
+                shift 2 ;;
             --no-bundle)          AUTO_BUNDLE=0; shift ;;
             --bundle-root)        BUNDLE_ROOT="$2"; shift 2 ;;
             --stream)             STREAM=1; shift ;;
@@ -1194,6 +1261,13 @@ run_parallel_tasks() {
     (( USE_LITELLM == 0 ))    && wargs+=(--no-litellm)
     (( USE_MOCK_STACK == 0 )) && wargs+=(--no-mock-stack)
     (( USE_CLAUDE_OAUTH == 1 )) && wargs+=(--use-claude-oauth)
+    # MANDATORY. The child is a fresh `bash $SELF`; it re-runs parse_args and
+    # JUDGE_PROVIDER is a global, not exported. Without this line a -P N run
+    # puts the parent's judge on one provider and every child's back on the
+    # agent's -- a whole batch silently mis-laned with no error. The
+    # WCB_JUDGE_AUTH_PROVIDER export below covers it by inheritance too; both,
+    # because relying on inheritance alone breaks the moment anything scrubs env.
+    [[ -n "$JUDGE_PROVIDER" ]] && wargs+=(--judge-provider "$JUDGE_PROVIDER")
     (( USE_TESTS == 0 ))      && wargs+=(--no-tests)
     (( JUDGE_COUNCIL == 0 ))  && wargs+=(--no-judge-council)
     (( AUTO_BUNDLE == 0 ))    && wargs+=(--no-bundle)
@@ -1264,9 +1338,24 @@ run_parallel_tasks() {
 main() {
     parse_args "$@"
 
+    # The judge lane, decided before ANY other step: preflight_env_file checks
+    # it, bootstrap_shared_sidecar reads it out of the environment to decide
+    # whether the cc-bridge is needed for a judge the agent does not share, and
+    # every forked worker inherits it. An explicitly exported value from the
+    # caller's shell is honoured -- that is a deliberate operator act, unlike
+    # WCB_STREAM which run.sh must suppress for correctness under fan-out -- but
+    # it is logged, so a stale one is never silent.
+    if [[ -n "$JUDGE_PROVIDER" ]]; then
+        export WCB_JUDGE_AUTH_PROVIDER="$JUDGE_PROVIDER"
+    elif [[ -n "${WCB_JUDGE_AUTH_PROVIDER:-}" ]]; then
+        JUDGE_PROVIDER="$WCB_JUDGE_AUTH_PROVIDER"
+        log::info "judge lane from environment: WCB_JUDGE_AUTH_PROVIDER=$JUDGE_PROVIDER"
+    fi
+
     # --regrade short-circuits everything else.
     if [[ "$MODE" == "regrade" ]]; then
         preflight_env_file || exit 1
+        [[ -n "$JUDGE_PROVIDER" ]] && REGRADE_EXTRA+=(--judge-auth-provider "$JUDGE_PROVIDER")
         run_regrade "$REGRADE_DIR" ${REGRADE_EXTRA[@]+"${REGRADE_EXTRA[@]}"}
         exit $?
     fi
