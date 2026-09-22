@@ -333,25 +333,40 @@ class TestJudgeCouncilStamp:
 # ===========================================================================
 
 
-def test_provider_env_vars_are_assigned_in_exactly_one_place_each():
+def test_lane_variables_are_only_ever_assigned_by_an_entry_point():
     """B.6's hard rule, mechanically enforced: never swap a lane variable around
-    a judge call. At --parallel > 1 the worker threads share os.environ, so a
-    temporary swap would corrupt a sibling task's agent lane."""
+    a judge call. At --parallel > 1 the worker threads share one os.environ, so
+    a temporary swap would corrupt a sibling task's agent lane -- which is the
+    whole reason the judge lane is a SECOND variable rather than a reassignment
+    of the first.
+
+    The invariant is not a head count, it is WHERE. src/ is the library those
+    worker threads run inside and must only ever READ; the two CLI entry points
+    resolve once, before any worker exists, and never write again.
+    """
     root = Path(__file__).resolve().parents[1]
-    files = sorted(root.glob("src/**/*.py")) + sorted(root.glob("eval/*.py")) + \
-        sorted(root.glob("script/*.py"))
-    agent_sites, judge_sites = [], []
-    for f in files:
+    entry_points = {"eval/run_batch.py", "script/regrade.py"}
+    sites: dict[str, list[str]] = {}
+    for f in sorted(root.glob("src/**/*.py")) + sorted(root.glob("eval/*.py")) + \
+            sorted(root.glob("script/*.py")):
+        rel = f.relative_to(root).as_posix()
         for i, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
             stripped = line.strip()
-            if stripped.startswith("#"):
+            if stripped.startswith("#") or "=" not in stripped:
                 continue
-            if "os.environ[PROVIDER_ENV_VAR]" in stripped and "=" in stripped:
-                agent_sites.append(f"{f.relative_to(root)}:{i}")
-            if "os.environ[JUDGE_PROVIDER_ENV_VAR]" in stripped and "=" in stripped:
-                judge_sites.append(f"{f.relative_to(root)}:{i}")
-    assert len(agent_sites) <= 2, agent_sites
-    assert len(judge_sites) <= 2, judge_sites
+            for var in ("PROVIDER_ENV_VAR", "JUDGE_PROVIDER_ENV_VAR"):
+                if stripped.startswith(f"os.environ[{var}]"):
+                    sites.setdefault(rel, []).append(f"{var}:{i}")
+
+    library_writes = {k: v for k, v in sites.items() if k.startswith("src/")}
+    assert library_writes == {}, (
+        f"src/ must never WRITE a lane variable, only read it: {library_writes}"
+    )
+    assert set(sites) <= entry_points, f"unexpected writer: {set(sites) - entry_points}"
+    run_batch = sites.get("eval/run_batch.py", [])
+    assert sorted(v.split(":")[0] for v in run_batch) == [
+        "JUDGE_PROVIDER_ENV_VAR", "PROVIDER_ENV_VAR"
+    ], run_batch
 
 
 def test_judge_is_always_non_streaming_on_both_lanes(clean_env, monkeypatch):

@@ -344,3 +344,169 @@ def test_pass_summary_encoder_is_byte_aligned_with_the_batch_writer(tmp_path):
     # whole-file diffs depending on who wrote last.
     doc = {"model": "claude", "runs": 1, "per_run": [], "note": "café"}
     assert bps._pass_summary_text(doc) == json.dumps(doc, indent=2)
+
+
+# ===========================================================================
+# Dual-provider: the judge lane is a free, per-regrade choice
+# ===========================================================================
+
+
+class TestRegradeJudgeLane:
+    """A regrade re-runs only Channel B. The trajectory is a fixed artifact on
+    disk and its cost is a historical fact, so the provider the judge grades on
+    is chosen per invocation and never read back from the stored stamp."""
+
+    @staticmethod
+    def _usage(run_dir, **extra):
+        import json as _json
+        usage = {
+            "cost_usd": 0.5, "input_tokens": 10, "output_tokens": 5,
+            "cache_read_tokens": 0, "cache_write_tokens": 0,
+            "total_tokens": 15, "request_count": 1,
+            "auth_provider": "oauth",
+            "sources": {"agent": {
+                "input_tokens": 10, "output_tokens": 5,
+                "cache_read_tokens": 0, "cache_write_tokens": 0,
+                "total_tokens": 15, "request_count": 1, "cost_usd": 0.5,
+            }},
+        }
+        usage.update(extra)
+        (run_dir / "usage.json").write_text(_json.dumps(usage), encoding="utf-8")
+
+    @staticmethod
+    def _judge_scores(cost=0.0):
+        return {"usage": {
+            "input_tokens": 20_000, "output_tokens": 1_000,
+            "cache_read_tokens": 0, "cache_write_tokens": 0,
+            "total_tokens": 21_000, "request_count": 1, "cost_usd": cost,
+            "per_member": {"sonnet": {
+                "model": "claude-sonnet-4-6",
+                "input_tokens": 20_000, "output_tokens": 1_000,
+                "cache_read_tokens": 0, "cache_write_tokens": 0,
+                "total_tokens": 21_000, "request_count": 1,
+                "cost_usd": cost, "cost_priced_ok": True, "ok": True,
+            }},
+        }}
+
+    def _run_dir(self, tmp_path):
+        d = tmp_path / "output" / "openclaw" / "task" / "trajectories" / "m" / "run_1"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    def test_honours_the_judge_provider_independent_of_the_stored_stamp(
+        self, tmp_path, monkeypatch
+    ):
+        import json as _json
+        import sys
+        from pathlib import Path as _P
+
+        sys.path.insert(0, str(_P(__file__).resolve().parents[1]))
+        import script.regrade as regrade_mod
+
+        run_dir = self._run_dir(tmp_path)
+        self._usage(run_dir)
+        regrade_mod._update_usage_json(run_dir, self._judge_scores(1.25), "bedrock")
+        out = _json.loads((run_dir / "usage.json").read_text(encoding="utf-8"))
+        assert out["auth_provider"] == "oauth", "the trajectory's route is history"
+        assert out["judge_auth_provider"] == "bedrock"
+        assert out["sources"]["judge"]["cost_usd"] == 1.25
+
+    def test_regrading_back_onto_the_agent_lane_clears_the_stale_stamp(
+        self, tmp_path
+    ):
+        import json as _json
+        import sys
+        from pathlib import Path as _P
+
+        sys.path.insert(0, str(_P(__file__).resolve().parents[1]))
+        import script.regrade as regrade_mod
+
+        run_dir = self._run_dir(tmp_path)
+        self._usage(run_dir, judge_auth_provider="bedrock")
+        regrade_mod._update_usage_json(run_dir, self._judge_scores(0.0), "oauth")
+        out = _json.loads((run_dir / "usage.json").read_text(encoding="utf-8"))
+        assert "judge_auth_provider" not in out, (
+            "a same-lane regrade left a stamp claiming a judge lane it no longer "
+            "has, beside rows freshly repriced on the other one"
+        )
+        assert out["sources"]["judge"]["cost_usd"] > 0.0, "prepaid judge must not be $0"
+
+    def test_only_judge_sources_are_repriced(self, tmp_path):
+        import json as _json
+        import sys
+        from pathlib import Path as _P
+
+        sys.path.insert(0, str(_P(__file__).resolve().parents[1]))
+        import script.regrade as regrade_mod
+
+        run_dir = self._run_dir(tmp_path)
+        self._usage(run_dir)
+        regrade_mod._update_usage_json(run_dir, self._judge_scores(0.0), "oauth")
+        out = _json.loads((run_dir / "usage.json").read_text(encoding="utf-8"))
+        assert out["sources"]["agent"]["cost_usd"] == 0.5, "agent cost is historical"
+
+    def test_a_bedrock_judge_keeps_its_recorded_cost(self, tmp_path):
+        import json as _json
+        import sys
+        from pathlib import Path as _P
+
+        sys.path.insert(0, str(_P(__file__).resolve().parents[1]))
+        import script.regrade as regrade_mod
+
+        run_dir = self._run_dir(tmp_path)
+        self._usage(run_dir)
+        regrade_mod._update_usage_json(run_dir, self._judge_scores(1.2345), "bedrock")
+        out = _json.loads((run_dir / "usage.json").read_text(encoding="utf-8"))
+        assert out["sources"]["judge"]["cost_usd"] == 1.2345
+
+    def test_regrade_pins_both_lanes_into_env_so_all_six_gates_agree(
+        self, tmp_path, monkeypatch
+    ):
+        """The live 2026-09-22 failure: regrade never exported WCB_AUTH_PROVIDER,
+        so the roster filter and the no-fallback guard inferred OAUTH from .env
+        while the bridge-URL gate read the var raw and answered "not oauth". An
+        image-bearing regrade was dead on arrival from that disagreement."""
+        import sys
+        from pathlib import Path as _P
+
+        sys.path.insert(0, str(_P(__file__).resolve().parents[1]))
+        import script.regrade as regrade_mod
+        from src.utils import auth_provider as ap
+        from src.utils import judge_litellm
+
+        for k in ("WCB_AUTH_PROVIDER", "WCB_JUDGE_AUTH_PROVIDER"):
+            monkeypatch.delenv(k, raising=False)
+        monkeypatch.setenv("WCB_USE_CLAUDE_OAUTH", "1")
+        monkeypatch.setenv("WCB_CC_ACCOUNT_POOL", "/pool/a.json")
+        monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:8787")
+
+        agent, judge = regrade_mod._resolve_lanes()
+        assert agent == ap.OAUTH and judge == ap.OAUTH
+        assert judge_litellm._judge_oauth_bridge_url() == "http://127.0.0.1:8787"
+        assert ap.resolve_judge_provider() == ap.OAUTH
+
+    def test_an_explicit_judge_lane_wins_over_the_inferred_agent_lane(
+        self, tmp_path, monkeypatch
+    ):
+        import sys
+        from pathlib import Path as _P
+
+        sys.path.insert(0, str(_P(__file__).resolve().parents[1]))
+        import script.regrade as regrade_mod
+        from src.utils import auth_provider as ap
+        from src.utils import judge_litellm
+
+        monkeypatch.delenv("WCB_AUTH_PROVIDER", raising=False)
+        monkeypatch.setenv("WCB_USE_CLAUDE_OAUTH", "1")
+        monkeypatch.setenv("WCB_CC_ACCOUNT_POOL", "/pool/a.json")
+        monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:8787")
+        monkeypatch.setenv("WCB_JUDGE_AUTH_PROVIDER", ap.BEDROCK)
+
+        agent, judge = regrade_mod._resolve_lanes()
+        assert (agent, judge) == (ap.OAUTH, ap.BEDROCK)
+        assert judge_litellm._judge_oauth_bridge_url() == ""
+
+        from src.utils import grading
+        arn = ("bedrock/arn:aws:bedrock:ap-south-1:1:"
+               "application-inference-profile/sonnet")
+        assert grading._member_evidence_budget(arn, "sonnet") == 1_175_000

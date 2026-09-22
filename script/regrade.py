@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -32,7 +33,14 @@ from script.backfill_pass_summary import (  # noqa: E402
     _ctrf_test_result,
     write_pass_summary,
 )
-from src.utils.auth_provider import resolve_provider  # noqa: E402
+from src.utils.auth_provider import (  # noqa: E402
+    JUDGE_PROVIDER_ENV_VAR,
+    OAUTH,
+    PROVIDER_ENV_VAR,
+    resolve_judge_provider,
+    resolve_provider,
+)
+from src.utils.oauth_pricing import reprice_oauth_sources  # noqa: E402
 from src.utils.grading import (  # noqa: E402
     grade_with_rubric,
     grading_failure_reason,
@@ -45,7 +53,33 @@ _USAGE_KEYS = (
 )
 
 
-def _update_usage_json(run_dir: Path, scores: dict) -> None:
+def _resolve_lanes() -> tuple[str, str]:
+    """Pin both lanes into os.environ for the duration of this regrade.
+
+    A regrade never set WCB_AUTH_PROVIDER at all, so every gate that reads it
+    RAW answered "not oauth" while every gate that calls resolve_provider()
+    inferred OAUTH from .env -- the roster filter and the no-fallback guard on
+    one answer, the bridge-URL gate on the other. A regrade of an image-bearing
+    run was guaranteed dead by that disagreement: pixels force the LiteLLM
+    transport, and when it failed the guard forbade the urllib path that would
+    have worked. Exporting the resolved value makes all six gates agree.
+
+    The judge lane is a free, per-regrade choice: the trajectory is a fixed
+    artifact on disk and only Channel B re-runs. It is resolved from THIS
+    invocation's flag or environment and NEVER read back from the stored
+    auth_provider, which describes the trajectory and is preserved.
+    """
+    agent_provider = resolve_provider()
+    os.environ[PROVIDER_ENV_VAR] = agent_provider
+    judge_provider = resolve_judge_provider()
+    os.environ[JUDGE_PROVIDER_ENV_VAR] = judge_provider
+    return agent_provider, judge_provider
+
+
+def _update_usage_json(run_dir: Path, scores: dict,
+                       judge_provider: str | None = None) -> None:
+    if judge_provider is None:
+        judge_provider = resolve_judge_provider()
     usage_path = run_dir / "usage.json"
     if not usage_path.is_file():
         print(f"[regrade] no usage.json at {usage_path}; skipping usage update", file=sys.stderr)
@@ -61,12 +95,31 @@ def _update_usage_json(run_dir: Path, scores: dict) -> None:
     new_judge = dict(scores.get("usage") or {})
     sources["judge"] = new_judge
 
+    # The new judge rows were produced by THIS regrade's judge lane, so they are
+    # priced by THIS regrade's judge provider. Agent sources are a historical
+    # fact and are never touched — oauth_route is hard False here for that
+    # reason, not because the agent was on Bedrock.
+    reprice_oauth_sources(
+        {"judge": sources["judge"]},
+        model=str(usage.get("model") or ""),
+        oauth_route=False,
+        judge_oauth_route=(judge_provider == OAUTH),
+    )
+
     combined = recompute_combined(sources, task_id=run_dir.parents[2].name)
     out = {k: combined[k] for k in _USAGE_KEYS}
     # The run's own route, not this regrade's. A pre-provenance usage.json has
     # no such record, so it falls back to the provider this process is
     # configured for — the same env var that decided how the judge just ran.
     out["auth_provider"] = usage.get("auth_provider") or resolve_provider()
+    if judge_provider != out["auth_provider"]:
+        out["judge_auth_provider"] = judge_provider
+    else:
+        # A same-lane regrade must clear a stale stamp, or a mixed run regraded
+        # back onto its agent's provider keeps claiming a judge lane it no
+        # longer has, beside freshly repriced rows from the other one.
+        usage.pop("judge_auth_provider", None)
+        out.pop("judge_auth_provider", None)
     out["sources"] = sources
     for k, v in usage.items():
         if k not in out and k != "sources":
@@ -176,6 +229,7 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
     if not run_dir.is_dir():
         raise SystemExit(f"run_dir does not exist or is not a directory: {run_dir}")
 
+    agent_provider, judge_provider = _resolve_lanes()
     task_id = _derive_task_id(run_dir)
     rubric_path = _find_rubric_path(task_id, rubric_override)
     prompt_path = _find_prompt_path(task_id)
@@ -193,7 +247,8 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
     print(f"[regrade] rubric       = {rubric_path} ({len(rubrics)} criteria)", file=sys.stderr)
     print(f"[regrade] results_dir  = {results_dir}", file=sys.stderr)
     print(f"[regrade] transcript   = {len(transcript_text):,} chars", file=sys.stderr)
-    print(f"[regrade] judge        = council", file=sys.stderr)
+    print(f"[regrade] judge        = council on {judge_provider}"
+          f" (agent lane: {agent_provider})", file=sys.stderr)
     print(f"[regrade] grading …", file=sys.stderr)
 
     # Provenance: tee every grading/judge log line (call starts, token
@@ -303,7 +358,7 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
     else:
         print(f"[regrade] wrote {score_path}", file=sys.stderr)
 
-    _update_usage_json(run_dir, scores)
+    _update_usage_json(run_dir, scores, judge_provider)
     return scores
 
 
@@ -338,12 +393,24 @@ def main() -> int:
     )
     parser.add_argument("--run", required=True, help="path to run dir (output/<backend>/<task>/trajectories/<model>/run_N)")
     parser.add_argument("--rubric", default=None, help="override rubric path (default: input/<task>/rubric.json)")
+    parser.add_argument(
+        "--judge-auth-provider", dest="judge_auth_provider",
+        choices=("oauth", "bedrock"), default=None,
+        help="Provider for THIS regrade's judge lane. Default: whatever this "
+             "process resolves for the agent. The trajectory is a fixed "
+             "artifact, so the judge provider is a free per-regrade choice — "
+             "'bedrock' grades at the 1,175,000-char sonnet budget instead of "
+             "the 700,000-char OAuth ceiling. The stored auth_provider "
+             "describes the trajectory and is preserved either way.",
+    )
     parser.add_argument("--quiet", action="store_true", help="suppress final summary table")
     args = parser.parse_args()
 
     run_dir = Path(args.run).resolve()
     rubric_override = Path(args.rubric).resolve() if args.rubric else None
 
+    if args.judge_auth_provider:
+        os.environ[JUDGE_PROVIDER_ENV_VAR] = args.judge_auth_provider
     scores = regrade(run_dir, rubric_override=rubric_override)
     if not args.quiet:
         _print_summary(scores)
