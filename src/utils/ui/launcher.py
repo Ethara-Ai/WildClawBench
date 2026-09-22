@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from src.utils.auth_provider import (
     BEDROCK,
     FAMILY_ENV_VARS,
+    JUDGE_PROVIDER_ENV_VAR,
     OAUTH,
     PROVIDERS,
     AuthProviderError,
@@ -296,10 +297,16 @@ def provider_env_overrides(config: Dict[str, Any]) -> Dict[str, str]:
     the user picked here. Under Bedrock the OAuth vars are explicitly forced OFF
     rather than merely omitted: a stale WCB_USE_CLAUDE_OAUTH=1 in the shell (left
     by `source script/wcb login`) would otherwise silently win.
+
+    The judge lane gets the same discipline. The TUI has no dual-provider
+    affordance, so a WCB_JUDGE_AUTH_PROVIDER exported in the operator's shell
+    would silently split every launch from it -- with none of run.sh's log line
+    to say so. It is cleared unless the config asks for it.
     """
     provider = config.get("auth_provider")
     account = config.get("oauth_account")
     judge = _judge_members_override(config)
+    judge_lane = {JUDGE_PROVIDER_ENV_VAR: str(config.get("judge_auth_provider") or "")}
 
     if provider == BEDROCK:
         return {
@@ -307,14 +314,16 @@ def provider_env_overrides(config: Dict[str, Any]) -> Dict[str, str]:
             "WCB_USE_CLAUDE_OAUTH": "0",
             "WCB_CC_ACCOUNT_POOL": "",
             **judge,
+            **judge_lane,
         }
 
     if account in (None, "", _OAUTH_NONE):
-        return {"WCB_AUTH_PROVIDER": provider, **judge} if provider else {}
+        return {"WCB_AUTH_PROVIDER": provider, **judge, **judge_lane} if provider else {}
     out = {
         "WCB_USE_CLAUDE_OAUTH": "1",
         "WCB_CC_ACCOUNT_POOL": account,
         **judge,
+        **judge_lane,
     }
     if provider:
         out["WCB_AUTH_PROVIDER"] = str(provider)
