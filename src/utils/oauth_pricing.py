@@ -279,13 +279,25 @@ def _reprice(entry: MutableMapping[str, Any], *names: Any) -> Optional[float]:
 
 
 def reprice_oauth_sources(
-    sources: MutableMapping[str, Any], *, model: str = "", oauth_route: bool = False
+    sources: MutableMapping[str, Any], *, model: str = "", oauth_route: bool = False,
+    judge_oauth_route: bool | None = None,
 ) -> list[str]:
     """Recompute the OAuth-routed usage sources from token counts, in place.
 
-    ``oauth_route`` is the only gate, and it is the run's routing flag, not a
-    guess from the shape of a price. On a Bedrock run this returns immediately
-    and every figure is byte-identical to what the harness recorded.
+    TWO gates, because the agent and the judge may run on different providers
+    (WCB_JUDGE_AUTH_PROVIDER). ``oauth_route`` covers the agent lane and
+    ``judge_oauth_route`` the judge lane; ``None`` means "same as the agent",
+    which reproduces the single-gate behaviour byte for byte for every existing
+    caller. Both are the run's routing flags, not guesses from the shape of a
+    price. On a Bedrock run this returns immediately and every figure is
+    byte-identical to what the harness recorded.
+
+    Splitting them is lane PURITY, not a dollar correction: both rate cards
+    carry the same published sonnet numbers (oauth_pricing.SONNET_RATES mirrors
+    grading._FAMILY_RATES["sonnet"]), so a sonnet judge prices the same either
+    way today. It matters the moment a lane's card diverges -- a GLM or Kimi
+    member enlisted on a Bedrock judge, or a bridge model override -- and it
+    keeps the ledger honest about which provider each number describes.
 
     On an OAuth run the agent and every judge member are repriced off the card
     whatever they recorded, because what they recorded is not one convention:
@@ -297,18 +309,21 @@ def reprice_oauth_sources(
 
     Never raises: usage bookkeeping must not be able to fail a completed run.
     """
+    if judge_oauth_route is None:
+        judge_oauth_route = oauth_route
+
     repriced: list[str] = []
-    if not oauth_route:
+    if not (oauth_route or judge_oauth_route):
         return repriced
     try:
         agent = sources.get("agent")
-        if isinstance(agent, MutableMapping):
+        if oauth_route and isinstance(agent, MutableMapping):
             cost = _reprice(agent, model)
             if cost is not None:
                 repriced.append(f"agent({model})=${cost}")
 
         judge = sources.get("judge")
-        if isinstance(judge, MutableMapping):
+        if judge_oauth_route and isinstance(judge, MutableMapping):
             per_member = judge.get("per_member")
             member_total = 0.0
             priced_any = False
