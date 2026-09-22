@@ -2005,8 +2005,39 @@ def _bedrock_region_for(arn: str) -> str:
     return os.environ.get("KENSEI_AWS_REGION") or os.environ.get("AWS_REGION", "ap-south-1")
 
 
+_CONVERSE_IMAGE_FORMATS = {
+    "image/png": "png",
+    "image/jpeg": "jpeg",
+    "image/gif": "gif",
+    "image/webp": "webp",
+}
+
+
+def _converse_user_content(user: str, images: list[dict] | None) -> list[dict]:
+    """Converse content blocks for the user turn, images first then the text.
+
+    Ordering matches the LiteLLM lane and Anthropic's vision guidance: the
+    text block's closing "produce exactly N verdicts" instruction must be the
+    LAST thing the model reads, or verdict lists stop short (koji 2026-09-06,
+    31/40 and 11/36 with the output budget unused).
+
+    `source.bytes` is the base64 STRING on the REST wire -- the SDKs take raw
+    bytes and encode them, we are already holding the encoded form.
+    """
+    blocks: list[dict] = []
+    for img in images or []:
+        fmt = _CONVERSE_IMAGE_FORMATS.get(str(img.get("media_type") or "").strip().lower())
+        b64 = str(img.get("b64") or "")
+        if not fmt or not b64:
+            continue
+        blocks.append({"image": {"format": fmt, "source": {"bytes": b64}}})
+    blocks.append({"text": user})
+    return blocks
+
+
 def _call_judge_bedrock(
-    arn: str, system: str, user: str, family: str | None = None
+    arn: str, system: str, user: str, family: str | None = None,
+    images: list[dict] | None = None,
 ) -> tuple[str, dict]:
     import urllib.request, urllib.parse, urllib.error
     from src.utils.bedrock_eventstream import iter_eventstream
@@ -2036,7 +2067,9 @@ def _call_judge_bedrock(
             system_blocks = [{"text": system}]
         body = json.dumps({
             "system": system_blocks,
-            "messages": [{"role": "user", "content": [{"text": user}]}],
+            "messages": [
+                {"role": "user", "content": _converse_user_content(user, images)}
+            ],
             "inferenceConfig": infer,
         }).encode()
         req = urllib.request.Request(
@@ -2302,6 +2335,16 @@ def _arn_from_model(model: str) -> str:
     return m
 
 
+def _is_bedrock_judge_model(model: str) -> bool:
+    """Mirrors the urllib dispatcher's own routing test in `_call_one_judge`."""
+    m = (model or "").strip()
+    return (
+        m.partition("/")[0] == "bedrock"
+        or m.startswith("arn:aws:bedrock:")
+        or ":application-inference-profile/" in m
+    )
+
+
 def _judge_use_litellm() -> bool:
     """Master toggle for the LiteLLM-backed judge path. Mirrors
     `judge_litellm.judge_use_litellm()` but is duplicated here so the env check
@@ -2398,12 +2441,15 @@ def _call_one_judge(
     # LiteLLM call) means a missing dep, a misconfigured env, a network blip,
     # or a LiteLLM-internal regression all degrade gracefully to the production
     # path without losing the verdict.
-    # F4b: a call that carries pixels MUST take the LiteLLM transport — it is
-    # the only one that builds a multimodal user turn. `_call_judge_bedrock` and
-    # `_call_judge_openai` have no `images` parameter at all, so under the
-    # default (flag-off) configuration every attached image was collected,
-    # base64'd, paid for in _collect_image_attachments, and then dropped on the
-    # floor while the judge was told the pixels were authoritative evidence.
+    # F4b: a call that carries pixels takes the LiteLLM transport, which builds
+    # a multimodal user turn for either lane. `_call_judge_openai` still has no
+    # `images` parameter, so under the default (flag-off) configuration every
+    # attached image was collected, base64'd, paid for in
+    # _collect_image_attachments, and then dropped on the floor while the judge
+    # was told the pixels were authoritative evidence. `_call_judge_bedrock` now
+    # carries them too (Converse image blocks), so the fallback below is no
+    # longer a silent downgrade for a Bedrock-shaped judge — which is what makes
+    # a Bedrock judge usable on a host that has no litellm installed at all.
     # This is unconditional, not flag-gated: `images` is non-empty only for a
     # vision-capable member on an image-bearing chunk (`_will_receive_pixels`).
     # BOTH lanes verified to carry the blocks: the Bedrock lane routes the same
@@ -2452,11 +2498,12 @@ def _call_one_judge(
                 "Judge LiteLLM path failed for %s: %s — falling back to direct urllib path",
                 _short_judge_label(m), str(exc)[:200],
             )
-            if images:
-                # The urllib lane below cannot carry pixels. A text-only verdict
-                # still beats abstaining the whole chunk ("grading must NEVER
-                # fail because LiteLLM had a bad day"), but it is a silent
-                # downgrade of image-content criteria unless it is said out loud.
+            if images and not _is_bedrock_judge_model(m):
+                # Only the Bedrock lane below can carry pixels (Converse image
+                # blocks). An OpenAI-shaped judge still grades text-only, which
+                # beats abstaining the whole chunk ("grading must NEVER fail
+                # because LiteLLM had a bad day"), but it is a silent downgrade
+                # of image-content criteria unless it is said out loud.
                 logger.warning(
                     "Judge %s loses %d attached image(s) on the urllib fallback "
                     "— image-content criteria grade from the presence-only "
@@ -2467,12 +2514,12 @@ def _call_one_judge(
 
     head = m.partition("/")[0]
     if head == "bedrock":
-        return _call_judge_bedrock(m.partition("/")[2], system, user, family)
+        return _call_judge_bedrock(m.partition("/")[2], system, user, family, images)
     if head == "openai":
         return _call_judge_openai(m.partition("/")[2] or m, system, user)
     if m.startswith("arn:aws:bedrock:") or ":application-inference-profile/" in m:
         # Bare (unprefixed) Bedrock ARN — route to Bedrock instead of OpenAI.
-        return _call_judge_bedrock(m, system, user, family)
+        return _call_judge_bedrock(m, system, user, family, images)
     # Unknown/unprefixed id: treat as an OpenAI model name (e.g. "gpt-5.5").
     return _call_judge_openai(m, system, user)
 

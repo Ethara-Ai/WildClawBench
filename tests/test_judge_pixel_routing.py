@@ -61,8 +61,8 @@ def transports(monkeypatch):
     fake.call_judge_via_litellm = _call_via_litellm
     _install_fake_judge_litellm(monkeypatch, fake)
 
-    def _bedrock(model, system, user, family=None):
-        seen["bedrock"].append({"family": family, "model": model})
+    def _bedrock(model, system, user, family=None, images=None):
+        seen["bedrock"].append({"family": family, "model": model, "images": images})
         return (_VERDICT, dict(grading._ZERO_USAGE))
 
     def _openai(model, system, user):
@@ -106,8 +106,39 @@ def test_litellm_flag_on_still_routes_everyone_through_litellm(
     assert transports["bedrock"] == []
 
 
-def test_pixel_loss_on_the_litellm_fallback_is_logged(monkeypatch, caplog):
-    """If LiteLLM dies we still grade (text-only) rather than abstain — loudly."""
+def test_pixels_ride_the_bedrock_fallback_when_litellm_dies(monkeypatch, caplog):
+    """If LiteLLM dies the Bedrock lane still grades WITH the pixels.
+
+    It used to grade text-only and say so. On a host with no litellm installed
+    at all -- which is every harness host, per requirements.txt -- that made the
+    fallback the ONLY path an image-bearing Bedrock judge could take, so every
+    such chunk silently lost its evidence."""
+    fake = types.ModuleType("src.utils.judge_litellm")
+
+    def _boom(**kwargs):
+        raise RuntimeError("litellm had a bad day")
+
+    fake.call_judge_via_litellm = _boom
+    _install_fake_judge_litellm(monkeypatch, fake)
+    monkeypatch.setattr(grading, "_member_max_output_tokens", lambda *a, **k: 8192)
+    seen: dict = {}
+
+    def _bedrock(model, system, user, family=None, images=None):
+        seen["images"] = images
+        return (_VERDICT, dict(grading._ZERO_USAGE))
+
+    monkeypatch.setattr(grading, "_call_judge_bedrock", _bedrock)
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "bedrock")
+    monkeypatch.delenv("WCB_JUDGE_AUTH_PROVIDER", raising=False)
+    with caplog.at_level("WARNING"):
+        raw, _ = grading._call_one_judge(_SONNET, "sys", "user", "sonnet", _IMG)
+    assert raw == _VERDICT
+    assert seen["images"] == _IMG
+    assert "loses 1 attached image" not in caplog.text
+
+
+def test_pixel_loss_is_still_logged_for_a_non_bedrock_judge(monkeypatch, caplog):
+    """_call_judge_openai has no images parameter, so that downgrade stays loud."""
     fake = types.ModuleType("src.utils.judge_litellm")
 
     def _boom(**kwargs):
@@ -117,13 +148,14 @@ def test_pixel_loss_on_the_litellm_fallback_is_logged(monkeypatch, caplog):
     _install_fake_judge_litellm(monkeypatch, fake)
     monkeypatch.setattr(grading, "_member_max_output_tokens", lambda *a, **k: 8192)
     monkeypatch.setattr(
-        grading, "_call_judge_bedrock",
-        lambda model, system, user, family=None: (_VERDICT, dict(grading._ZERO_USAGE)),
+        grading, "_call_judge_openai",
+        lambda model, system, user: (_VERDICT, dict(grading._ZERO_USAGE)),
     )
     monkeypatch.setenv("WCB_AUTH_PROVIDER", "bedrock")
     monkeypatch.delenv("WCB_JUDGE_AUTH_PROVIDER", raising=False)
+    monkeypatch.setenv("KENSEI_JUDGE_USE_LITELLM", "1")
     with caplog.at_level("WARNING"):
-        raw, _ = grading._call_one_judge(_SONNET, "sys", "user", "sonnet", _IMG)
+        raw, _ = grading._call_one_judge("openai/gpt-5.5", "sys", "user", "sonnet", _IMG)
     assert raw == _VERDICT
     assert "loses 1 attached image" in caplog.text
 
