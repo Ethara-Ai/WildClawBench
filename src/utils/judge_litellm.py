@@ -66,13 +66,36 @@ def _judge_oauth_bridge_url() -> str:
     http://127.0.0.1:<port>), the sonnet judge's litellm.completion is pointed
     at the host-published cc-bridge instead of Bedrock.
 
-    Provider-gated: returns empty string when the active auth provider is NOT
+    Lane-gated: returns empty string when the JUDGE lane's provider is NOT
     OAuth, preventing Bedrock runs from accidentally routing the Sonnet judge
     through the OAuth bridge even when KENSEI_JUDGE_OAUTH_BRIDGE_URL is set
     in .env (provider isolation — see docs/ISSUE_oauth_bedrock_entanglement.md
-    CP-4)."""
-    from src.utils.auth_provider import OAUTH, PROVIDER_ENV_VAR
-    if os.environ.get(PROVIDER_ENV_VAR, "").strip().lower() != OAUTH:
+    CP-4). The judge lane defaults to the agent's, so CP-4 is preserved
+    verbatim; with WCB_JUDGE_AUTH_PROVIDER=bedrock on an OAuth agent the gate
+    now closes deliberately rather than incidentally, which is what stops the
+    700,000-char OAuth evidence clamp from firing on a Bedrock judge.
+
+    Resolution is env-only ON PURPOSE (resolve_judge_provider_env_only, not
+    resolve_judge_provider): this gate has always been a RAW read of
+    WCB_AUTH_PROVIDER, and applying resolve_provider's inference from
+    WCB_USE_CLAUDE_OAUTH + WCB_CC_ACCOUNT_POOL would flip every process that
+    never exports the var — script/regrade.py above all — from "not oauth" to
+    "oauth".
+
+    TOTAL: never raises. A typo'd WCB_JUDGE_AUTH_PROVIDER reads as "not oauth"
+    here and is rejected loudly at startup instead, because two of this
+    function's callers swallow exceptions (grading._member_evidence_budget,
+    grading._effective_judge_model) and a third is reached from inside an
+    exception handler — a raise would fail OPEN on a misconfiguration."""
+    from src.utils.auth_provider import (
+        OAUTH,
+        AuthProviderError,
+        resolve_judge_provider_env_only,
+    )
+    try:
+        if resolve_judge_provider_env_only() != OAUTH:
+            return ""
+    except AuthProviderError:
         return ""
     return (os.environ.get("KENSEI_JUDGE_OAUTH_BRIDGE_URL") or "").strip()
 

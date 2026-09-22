@@ -58,12 +58,14 @@ def _clean_env_and_state(monkeypatch):
         "KENSEI_JUDGE_HEADROOM_TARGET_RATIO",
         "KENSEI_JUDGE_HEADROOM_PROTECT_RECENT",
         "KENSEI_JUDGE_HEADROOM_MIN_TOKENS",
+        "KENSEI_JUDGE_OAUTH_BRIDGE_URL",
         # Provider selection: judge routing is now provider-scoped (the urllib
         # fallback is Bedrock-only), so a developer .env carrying
         # WCB_USE_CLAUDE_OAUTH=1 would otherwise flip these tests' expectations
         # depending on whose machine they run on. Cleared => resolves to
         # bedrock; tests that care set their own value explicitly.
         "WCB_AUTH_PROVIDER",
+        "WCB_JUDGE_AUTH_PROVIDER",
         "WCB_USE_CLAUDE_OAUTH",
         "WCB_CC_ACCOUNT_POOL",
     ):
@@ -689,6 +691,11 @@ def _explode_litellm(monkeypatch, exc):
 def test_oauth_run_reraises_instead_of_falling_back_to_bedrock(monkeypatch):
     monkeypatch.setenv("KENSEI_JUDGE_USE_LITELLM", "true")
     monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
+    # A bridge URL must be present for this to be a BRIDGE failure. Without one
+    # the judge lane has nothing to dial at all and _assert_judge_lane_reachable
+    # refuses earlier -- a different, also-correct abort, pinned by
+    # tests/test_dual_provider_judge_lane.py::test_oauth_judge_without_a_bridge_fails_loud.
+    monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:34567")
     boom = RuntimeError("BedrockException - Authentication failed")
     _explode_litellm(monkeypatch, boom)
     bedrock = mock.MagicMock(return_value=("text", {}))
