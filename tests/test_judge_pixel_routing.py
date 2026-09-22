@@ -120,7 +120,8 @@ def test_pixel_loss_on_the_litellm_fallback_is_logged(monkeypatch, caplog):
         grading, "_call_judge_bedrock",
         lambda model, system, user, family=None: (_VERDICT, dict(grading._ZERO_USAGE)),
     )
-    monkeypatch.setattr(grading.auth_provider, "resolve_provider", lambda: "bedrock")
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "bedrock")
+    monkeypatch.delenv("WCB_JUDGE_AUTH_PROVIDER", raising=False)
     with caplog.at_level("WARNING"):
         raw, _ = grading._call_one_judge(_SONNET, "sys", "user", "sonnet", _IMG)
     assert raw == _VERDICT

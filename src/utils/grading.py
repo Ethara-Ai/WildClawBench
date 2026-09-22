@@ -247,9 +247,25 @@ def _member_evidence_budget(model: str, family: str | None = None) -> int | None
         base = min(_FAMILY_EVIDENCE[fam][0], _AWS_EDGE_BODY_CAP)
         if fam == "sonnet":
             try:
+                from . import auth_provider as _ap
                 from . import judge_litellm
 
-                if judge_litellm._judge_oauth_bridge_url():
+                # Two conditions, both required: the judge LANE must be on OAuth
+                # AND a bridge URL must actually resolve. The bridge-URL test
+                # alone was the yves_quinn root cause -- script/run.sh:639 exports
+                # KENSEI_JUDGE_OAUTH_BRIDGE_URL whenever the AGENT is on OAuth,
+                # regardless of where the judge grades, so a Bedrock judge was
+                # clamped to the 700,000-char OAuth ceiling and two 787,562 /
+                # 710,802-char transcripts raised TranscriptTooLarge into
+                # score.failed.json instead of grading at the sonnet family's
+                # 1,175,000. The first conjunct is redundant by construction
+                # after the bridge gate's own re-key; it is written out so the
+                # property tested here is "OAuth cap iff the judge lane is
+                # OAuth", not a transitive consequence of another function.
+                if (
+                    _ap.resolve_judge_provider_env_only() == _ap.OAUTH
+                    and judge_litellm._judge_oauth_bridge_url()
+                ):
                     return min(base, _judge_oauth_max_evidence())
             except Exception:
                 pass
@@ -315,9 +331,11 @@ def council_members() -> list[CouncilMember]:
     Precedence: JUDGE_COUNCIL_MEMBERS ("family=arn" CSV) overrides the per-family
     JUDGE_COUNCIL_{SONNET,GLM,KIMI}_ARN vars. Unset per-family vars are dropped.
 
-    The roster is then restricted to the families the *selected auth provider*
-    can serve (src/utils/auth_provider.py). This is load-bearing for provider
-    isolation: run_batch calls load_dotenv() at import, so on an OAuth run all
+    The roster is then restricted to the families the *JUDGE lane's provider*
+    can serve (src/utils/auth_provider.py) -- which defaults to the agent's, so
+    a single-provider run filters exactly as it always did. This is load-bearing
+    for provider isolation: run_batch calls load_dotenv() at import, so on an
+    OAuth run all
     three JUDGE_COUNCIL_*_ARN values are still present in env, and without this
     filter the Kimi and GLM members would go straight to Bedrock via
     _call_judge_bedrock -- silently billing the provider the operator opted out
@@ -335,14 +353,14 @@ def council_members() -> list[CouncilMember]:
             if val:
                 out.append(CouncilMember(family=fam, model=val))  # type: ignore[arg-type]
 
-    provider = auth_provider.resolve_provider()
+    provider = auth_provider.resolve_judge_provider()
     allowed = set(auth_provider.available_judge_families(provider))
     filtered = [m for m in out if m.family in allowed]
 
     if out and filtered and len(filtered) < len(out):
         import logging as _logging
         _logging.getLogger(__name__).warning(
-            "Judge council: %d→%d members under provider %r (dropped: %s)",
+            "Judge council: %d→%d members under judge provider %r (dropped: %s)",
             len(out), len(filtered), provider,
             sorted({m.family for m in out} - {m.family for m in filtered}),
         )
@@ -352,13 +370,33 @@ def council_members() -> list[CouncilMember]:
         # grade_with_rubric report overall_score=0.0 with a generic error, which
         # reads as "the agent failed" rather than "your council is misconfigured".
         raise RuntimeError(
-            f"auth provider {provider!r} supports judge families "
+            f"judge-lane auth provider {provider!r} supports judge families "
             f"{sorted(allowed)}, but the configured council is "
             f"{sorted({m.family for m in out})} -- no usable judge remains. "
             f"Configure {', '.join(var for fam, var in _FAMILY_ENV_VARS if fam in allowed)} "
-            f"or select a different auth provider."
+            f"or select a different auth provider "
+            f"(--auth-provider / --judge-auth-provider)."
         )
     return filtered
+
+
+def _judge_council_lane_stamp() -> dict[str, str]:
+    """`{"judge_auth_provider": <p>}` on a mixed run, `{}` otherwise.
+
+    ADDITIVE + CONDITIONAL (docs/NEW_FIELDS_REFERENCE.md): a single-provider run
+    produces a judge_council block byte-shape-identical to before dual-provider
+    mode existed. Shared by BOTH judge_council builders -- the single-chunk one
+    and the chunk-merge one -- because a large transcript (the yves shape, the
+    one this feature exists for) only ever goes through the merge path, and a
+    stamp on one builder alone would be absent from exactly the runs that need
+    it most.
+    """
+    try:
+        agent = auth_provider.resolve_provider()
+        judge = auth_provider.resolve_judge_provider()
+    except Exception:  # noqa: BLE001 - provenance must never fail a grade
+        return {}
+    return {"judge_auth_provider": judge} if auth_provider.lanes_differ(agent, judge) else {}
 
 
 def _judge_system_prompt() -> str:
@@ -1791,6 +1829,12 @@ def _judge_cost_usd(
     # cost is derived from, so one run's dollars are comparable end to end and
     # with a Bedrock run. Recording $0 here instead made a regraded judge free
     # while the identical batch-graded judge carried list-price dollars.
+    # Lane-keyed THROUGH the bridge gate: _judge_oauth_bridge_url() answers for
+    # the JUDGE lane, so a judge moved to Bedrock prices off _FAMILY_RATES below
+    # instead of the bridge model's card. Both cards carry the same published
+    # sonnet numbers, so the figure is identical for a sonnet judge either way --
+    # the split matters only if a bridge model override or a non-sonnet family
+    # ever diverges.
     if family == "sonnet":
         try:
             from . import judge_litellm  # local import: avoid import-time cost
@@ -2292,6 +2336,43 @@ def _will_receive_pixels(member: "CouncilMember", images: list[dict] | None) -> 
     return (getattr(member, "family", "") or "") in _VISION_JUDGE_FAMILIES
 
 
+def _assert_judge_lane_reachable(family: str | None) -> None:
+    """Refuse to grade a sonnet member on OAuth that has no bridge to dial.
+
+    Without this the failure mode is not an error at all: with no bridge URL
+    the override block in judge_litellm is skipped, the completion goes out as
+    `bedrock/arn:...` + aws_region_name, and the judge silently grades on the
+    provider the operator took it off -- billed, unlogged, and invisible in
+    every artifact. CP-infinity forbids crossing that boundary in either
+    direction, so this raises and the member is recorded as failed (honest
+    UNGRADED) rather than quietly answered by the wrong provider.
+
+    Only `sonnet` is checked because it is the only family with an OAuth route
+    (judge_litellm sends `family == "sonnet"` through the bridge); a glm/kimi
+    member on an OAuth lane is already dropped by council_members().
+    """
+    if family != "sonnet":
+        return
+    try:
+        if auth_provider.resolve_judge_provider() != auth_provider.OAUTH:
+            return
+        from . import judge_litellm
+        if judge_litellm._judge_oauth_bridge_url():
+            return
+    except auth_provider.AuthProviderError:
+        raise
+    except Exception:  # noqa: BLE001 - a broken probe must not block grading
+        return
+    raise RuntimeError(
+        "judge lane is OAuth but no cc-bridge URL resolved "
+        "(KENSEI_JUDGE_OAUTH_BRIDGE_URL is empty), so the sonnet judge has "
+        "nothing to dial. Refusing to grade: the call would otherwise go "
+        "straight to Bedrock under the ARN, billing the provider this run "
+        "opted out of. Start the bridge (script/run.sh does this for you), or "
+        "set WCB_JUDGE_AUTH_PROVIDER=bedrock to grade on Bedrock on purpose."
+    )
+
+
 def _call_one_judge(
     model: str, system: str, user: str, family: str | None = None,
     images: list[dict] | None = None,
@@ -2306,6 +2387,8 @@ def _call_one_judge(
     m = (model or "").strip()
     if not m:
         raise RuntimeError("empty judge model id")
+
+    _assert_judge_lane_reachable(family)
 
     # LiteLLM-backed path (opt-in via KENSEI_JUDGE_USE_LITELLM). On ANY exception
     # we fall through to the urllib direct-provider path below — this is the
@@ -2350,12 +2433,18 @@ def _call_one_judge(
             # credential the run never intended to use, and every criterion
             # then abstains (rubric-zero) for a reason nothing in the output
             # names. Re-raise so the real error is what the operator sees.
-            # Same reasoning as council_members()'s provider filter above.
-            if auth_provider.resolve_provider() == auth_provider.OAUTH:
+            # Same reasoning as council_members()'s provider filter above. Keyed
+            # on the JUDGE lane, which defaults to the agent's: a judge the
+            # operator explicitly moved to Bedrock may still fall through to the
+            # urllib transport below, because that crosses no provider boundary
+            # (same ARN, same bearer, different wire) and grading must never die
+            # of a transport choice. A judge on OAuth never may.
+            if auth_provider.resolve_judge_provider() == auth_provider.OAUTH:
                 logger.error(
-                    "Judge LiteLLM path failed for %s under the OAuth provider: %s "
-                    "— NOT falling back to Bedrock (opted out). Check the cc-bridge "
-                    "at KENSEI_JUDGE_OAUTH_BRIDGE_URL.",
+                    "Judge LiteLLM path failed for %s under the OAuth JUDGE "
+                    "provider: %s — NOT falling back to Bedrock (opted out). "
+                    "Check the cc-bridge at KENSEI_JUDGE_OAUTH_BRIDGE_URL, or "
+                    "WCB_JUDGE_AUTH_PROVIDER if you meant to grade elsewhere.",
                     _short_judge_label(m), str(exc)[:200],
                 )
                 raise
@@ -2647,7 +2736,18 @@ def _effective_judge_model(model: str, family: str) -> str:
     member routes through the Claude Max OAuth bridge, judge_litellm overrides
     the request model to the anthropic model and pops the Bedrock region, so
     the endpoint is anthropic — not Bedrock. Returns that effective anthropic
-    id (bare, no 'anthropic/' prefix); otherwise the raw member id."""
+    id (bare, no 'anthropic/' prefix); otherwise the raw member id.
+
+    Lane-keyed THROUGH the bridge gate, so on a mixed run (agent oauth, judge
+    bedrock) the sonnet member is recorded as its Bedrock ARN — exactly what a
+    plain Bedrock run records, and what it truly dialled. The artifact VALUE
+    therefore changes when the judge lane moves: score.json's
+    judge_council.{members,surviving} and sources.judge.per_member.sonnet.model
+    carry the ARN instead of 'claude-sonnet-4-6', and finance_api._readable_model
+    maps that to the stable family key 'sonnet'. Deliberate: naming the bridge
+    model for a call that never touched the bridge would be a false stamp, and
+    normalising every Bedrock run to a family label instead would rewrite
+    artifacts for runs that have nothing to do with this feature."""
     if family == "sonnet":
         try:
             from . import judge_litellm  # local import: avoid import-time cost
@@ -3067,6 +3167,7 @@ def _grade_council(
             "headroom_enabled": headroom_enabled,
             "headroom_tokens_saved_total": headroom_tokens_saved_total,
             "headroom_per_member": headroom_per_member,
+            **_judge_council_lane_stamp(),
         },
         "truncation_flags": truncation_flags,
         "abstention_flags": abstention_flags,
@@ -3232,6 +3333,7 @@ def _merge_batched_grades(rubrics: list, members: list, chunk_results: list) -> 
             "headroom_per_member": headroom_per_member,
             "rubric_batch_size": _rubric_batch_size(),
             "rubric_batches": len(chunk_results),
+            **_judge_council_lane_stamp(),
         },
         "truncation_flags": sorted(truncation_flags),
         "abstention_flags": sorted(abstention_flags),
