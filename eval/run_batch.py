@@ -1328,6 +1328,25 @@ def _aggregate_headroom(log_dir: str) -> dict | None:
     }
 
 
+def _lane_routes(args=None) -> tuple[bool, bool]:
+    """``(agent_oauth_route, judge_oauth_route)`` for this run.
+
+    Derived from the RESOLVED providers, not from ``config.use_claude_oauth``.
+    The expression this replaces read a raw .env boolean, so
+    ``--auth-provider oauth`` without WCB_USE_CLAUDE_OAUTH in .env stamped
+    ``auth_provider: "bedrock"`` into usage.json and skipped OAuth imputation
+    entirely -- a silent cost error that script/run.sh has masked since it
+    always passes --use-claude-oauth. On every run.sh path the two agree, so
+    existing artifacts are unchanged; only the direct-invocation and TUI cases
+    where they disagreed are corrected.
+
+    Called with no args from the task loop: main() exported both lane variables
+    before any worker existed and nothing writes them afterwards, so these are
+    pure reads and safe on a thread at --parallel > 1.
+    """
+    return resolve_provider(args) == OAUTH, resolve_judge_provider(args) == OAUTH
+
+
 def save_usage(
     output_dir: Path,
     result: dict,
@@ -1339,6 +1358,7 @@ def save_usage(
     preflight_usage: dict | None = None,
     model: str = "",
     oauth_route: bool = False,
+    judge_oauth_route: bool | None = None,
 ) -> dict:
     """Write usage.json with per-source breakdown (agent + testgen + judge + preflight)."""
     agent_usage = dict(usage)
@@ -1363,7 +1383,8 @@ def save_usage(
     from src.utils.oauth_pricing import reprice_oauth_sources
 
     repriced = reprice_oauth_sources(
-        sources, model=model, oauth_route=oauth_route
+        sources, model=model, oauth_route=oauth_route,
+        judge_oauth_route=judge_oauth_route,
     )
     if repriced:
         logger.info("[%s] OAuth cost estimate: %s", task_id, ", ".join(repriced))
@@ -1376,6 +1397,16 @@ def save_usage(
     # signal and the judge member's model string (bare id vs Bedrock ARN) is too
     # indirect to be the only marker.
     out["auth_provider"] = OAUTH if oauth_route else BEDROCK
+    # ADDITIVE + CONDITIONAL: present only when the lanes genuinely differ, so a
+    # single-provider run's usage.json keeps its exact key set. `auth_provider`
+    # keeps naming the AGENT lane -- script/regrade.py and every external audit
+    # already read it as "the trajectory's route". usage.json is copied verbatim
+    # into the client bundle, so this reaches the bundle without touching
+    # repackage_to_bundle.py and report.json gains nothing.
+    _judge_route = oauth_route if judge_oauth_route is None else judge_oauth_route
+    _judge_provider = OAUTH if _judge_route else BEDROCK
+    if _judge_provider != out["auth_provider"]:
+        out["judge_auth_provider"] = _judge_provider
     out["sources"] = sources
     for k, v in agent_usage.items():
         if k not in out and k not in _USAGE_NUMERIC_KEYS and k != "cost_usd":
@@ -2537,7 +2568,10 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         _report = _attribute_per_message_cost(
             traj, _USAGE_LOG_PATH,
             str((agent_usage or {}).get("__run_key__", "") or ""),
-            oauth_route=bool(getattr(config, "use_claude_oauth", False)),
+            # Per-message attribution is AGENT tokens only (rows are selected by
+            # the agent's run_key), so it takes the agent lane's route and must
+            # never take the judge's.
+            oauth_route=_lane_routes()[0],
             model=model_type,
             agent_finished_ts=_agent_finished_ts(agent_usage),
             run_dir=output_dir)
@@ -3928,13 +3962,15 @@ def run_single_task(
             # root causes (rubric-block failures, output.json write races). Do not remove.
             logger.warning("[%s] trajectory build failed: %s", task_id, exc, exc_info=True)
 
+        _agent_oauth_route, _judge_oauth_route = _lane_routes()
         result = save_usage(
             output_dir, result, usage, task_id,
             testgen_usage=task.get("__testgen_usage__"),
             judge_usage=result.get("__judge_usage__"),
             preflight_usage=usage.get("__preflight__"),
             model=model,
-            oauth_route=bool(getattr(config, "use_claude_oauth", False)),
+            oauth_route=_agent_oauth_route,
+            judge_oauth_route=_judge_oauth_route,
         )
 
         # Runs after save_usage so judge_lines can be built from the per-member
@@ -3950,7 +3986,7 @@ def run_single_task(
                     model_name=model,
                     usage=result.get("usage"),
                     output_dir=output_dir,
-                    oauth_route=bool(getattr(config, "use_claude_oauth", False)),
+                    oauth_route=_agent_oauth_route,
                 )
             except Exception as exc:
                 logger.warning("[%s] finance usage reporting failed: %s", task_id, exc)
