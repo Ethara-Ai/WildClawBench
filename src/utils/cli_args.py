@@ -121,6 +121,20 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         "to WCB_AUTH_PROVIDER=<p>.",
     )
     parser.add_argument(
+        "--judge-auth-provider",
+        dest="judge_auth_provider",
+        choices=["oauth", "bedrock"],
+        default=None,
+        help="Authentication provider for the JUDGE lane ONLY. Default: the "
+        "same provider the agent runs on. Set it to grade on a different "
+        "provider than the agent ran on, e.g. --auth-provider oauth "
+        "--judge-auth-provider bedrock (agent on the Claude Max "
+        "subscription, rubric graded on Bedrock Sonnet at the full "
+        "1,175,000-char evidence budget). There is still NO fallback "
+        "between providers on either lane. Equivalent to "
+        "WCB_JUDGE_AUTH_PROVIDER=<p>.",
+    )
+    parser.add_argument(
         "--use-claude-oauth",
         dest="use_claude_oauth",
         action="store_true",

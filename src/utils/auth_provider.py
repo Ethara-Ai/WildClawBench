@@ -52,6 +52,14 @@ PROVIDERS: tuple[str, ...] = (OAUTH, BEDROCK)
 #: live, by design -- sees the same provider the CLI/TUI selected.
 PROVIDER_ENV_VAR = "WCB_AUTH_PROVIDER"
 
+#: Env var carrying the JUDGE lane's provider. UNSET means "same as the agent
+#: lane", so dual-provider mode is opt-in and every gate keeps the value it had
+#: before this var existed. Read LIVE (never cached) by
+#: ``grading.council_members`` and ``judge_litellm._judge_oauth_bridge_url``,
+#: exactly like PROVIDER_ENV_VAR, because both run on worker threads long after
+#: ``main()``'s frame is gone.
+JUDGE_PROVIDER_ENV_VAR = "WCB_JUDGE_AUTH_PROVIDER"
+
 _PROVIDER_LABELS: dict[str, str] = {
     OAUTH: "OAuth (Claude Max subscription)",
     BEDROCK: "AWS Bedrock",
@@ -153,6 +161,102 @@ def resolve_provider(
     ).strip():
         return OAUTH
     return BEDROCK
+
+
+def resolve_judge_provider_env_only(
+    env: Optional[Mapping[str, str]] = None,
+) -> Optional[str]:
+    """Resolve the JUDGE lane from env alone, with NO legacy inference.
+
+    Precedence: ``WCB_JUDGE_AUTH_PROVIDER`` -> ``WCB_AUTH_PROVIDER`` -> None.
+
+    This is the exact contract ``judge_litellm._judge_oauth_bridge_url`` has
+    always had (a RAW read of ``WCB_AUTH_PROVIDER``), extended by one var in
+    front. ``resolve_provider``'s step-4 inference from
+    ``WCB_USE_CLAUDE_OAUTH`` + ``WCB_CC_ACCOUNT_POOL`` is deliberately NOT
+    applied: a process that never exported ``WCB_AUTH_PROVIDER``
+    (``script/regrade.py``, the OAuth drills, any direct
+    ``grading.grade_with_rubric`` import) must keep resolving to "not oauth"
+    exactly as it did before this function existed. Inferring there would
+    re-arm the 700,000-char OAuth evidence clamp on the regrade path.
+    """
+    env = os.environ if env is None else env
+    from_judge = normalize_provider(env.get(JUDGE_PROVIDER_ENV_VAR))
+    if from_judge:
+        return from_judge
+    return normalize_provider(env.get(PROVIDER_ENV_VAR))
+
+
+def resolve_judge_provider(
+    args: Any = None,
+    env: Optional[Mapping[str, str]] = None,
+) -> str:
+    """Resolve the provider the JUDGE lane runs under.
+
+    Precedence (first hit wins):
+      1. explicit ``--judge-auth-provider`` on *args*
+      2. ``WCB_JUDGE_AUTH_PROVIDER`` in *env*
+      3. the AGENT provider (``resolve_provider(args, env)``)
+
+    Step 3 is the byte-identical-when-unset contract for the gates that
+    ALREADY call ``resolve_provider()`` today (the council roster filter and
+    the judge's no-fallback guard). Gates that today read env RAW must use
+    ``resolve_judge_provider_env_only`` instead -- see its docstring.
+    """
+    env = os.environ if env is None else env
+    explicit = normalize_provider(getattr(args, "judge_auth_provider", None))
+    if explicit:
+        return explicit
+    from_env = normalize_provider(env.get(JUDGE_PROVIDER_ENV_VAR))
+    if from_env:
+        return from_env
+    return resolve_provider(args, env)
+
+
+def lanes_differ(agent_provider: str, judge_provider: str) -> bool:
+    """Single source of truth for "is this a mixed run"."""
+    return agent_provider != judge_provider
+
+
+def validate_judge_provider_auth(
+    judge_provider: str, agent_provider: str, config: Any
+) -> None:
+    """Assert the JUDGE lane's credentials are present, before any agent spend.
+
+    Delegates to ``validate_provider_auth`` and re-raises with the lane named,
+    so an operator reading the abort knows which half of a mixed run is
+    misconfigured. A run whose judge cannot authenticate produces an expensive
+    trajectory and then ``score.failed.json``.
+    """
+    try:
+        validate_provider_auth(judge_provider, config)
+    except AuthProviderError as exc:
+        raise AuthProviderError(
+            f"JUDGE lane provider {judge_provider!r} ({provider_label(judge_provider)}) "
+            f"is unauthenticated while the AGENT lane runs on {agent_provider!r}. "
+            f"{exc} Refusing to spend a trajectory that cannot be graded. "
+            f"Unset {JUDGE_PROVIDER_ENV_VAR} to put the judge back on the agent's "
+            f"provider."
+        ) from exc
+
+    if (
+        judge_provider == OAUTH
+        and lanes_differ(agent_provider, judge_provider)
+        and not str(getattr(config, "cc_bridge_secret", "") or "").strip()
+    ):
+        # The cc-bridge's co-tenant guard is a JUDGE-lane credential whenever the
+        # judge alone is on OAuth: eval/bootstrap_sidecar.py runs in a subprocess,
+        # so a secret it generates itself dies with that subprocess and the
+        # host-side judge then sends `x-wcb-bridge-secret: ""` and is rejected.
+        # Only an explicit .env value survives into this process.
+        raise AuthProviderError(
+            f"JUDGE lane provider 'oauth' on a {agent_provider!r} agent requires "
+            f"WCB_CC_BRIDGE_SECRET to be set in .env: the cc-bridge is started by "
+            f"a subprocess, so an auto-generated secret never reaches the host-side "
+            f"judge and every grading call would be rejected by the bridge's "
+            f"co-tenant guard. Set WCB_CC_BRIDGE_SECRET=<hex> in .env. "
+            f"Not falling back to AWS Bedrock."
+        )
 
 
 def validate_provider_auth(provider: str, config: Any) -> None:

@@ -22,9 +22,13 @@ from src.utils.auth_provider import (
     AuthProviderError,
     available_judge_families,
     filter_judge_families,
+    lanes_differ,
     normalize_provider,
+    resolve_judge_provider,
+    resolve_judge_provider_env_only,
     resolve_provider,
     served_trajectory_models,
+    validate_judge_provider_auth,
     validate_judge_selection,
     validate_model_for_provider,
     validate_provider_auth,
@@ -32,6 +36,7 @@ from src.utils.auth_provider import (
 
 _PROVIDER_ENV = [
     "WCB_AUTH_PROVIDER",
+    "WCB_JUDGE_AUTH_PROVIDER",
     "WCB_USE_CLAUDE_OAUTH",
     "WCB_CC_ACCOUNT_POOL",
     "JUDGE_COUNCIL_MEMBERS",
@@ -53,6 +58,7 @@ def _cfg(**kw):
     """A Config-shaped stub. Only attribute access is used by this module."""
     base = dict(
         cc_account_pool="",
+        cc_bridge_secret="deadbeef",
         aws_bearer_token="",
         bedrock_inference_arn="",
         bedrock_sonnet_arn="",
@@ -344,3 +350,111 @@ class TestCouncilIsolation:
             _arns.delenv(k, raising=False)
         _arns.setenv("WCB_AUTH_PROVIDER", BEDROCK)
         assert council_members() == []
+
+
+# ===========================================================================
+# Judge-lane provider (dual-provider mode)
+# ===========================================================================
+
+
+def _jargs(**kw):
+    base = dict(auth_provider=None, use_claude_oauth=None, judge_auth_provider=None)
+    base.update(kw)
+    return SimpleNamespace(**base)
+
+
+class TestJudgeProviderResolution:
+    def test_unset_judge_provider_is_the_agent_provider(self, clean_env):
+        for agent in (OAUTH, BEDROCK):
+            clean_env.setenv("WCB_AUTH_PROVIDER", agent)
+            assert resolve_judge_provider(_jargs()) == agent
+            assert resolve_judge_provider(_jargs()) == resolve_provider(_jargs())
+
+    def test_unset_judge_provider_follows_the_agent_flag(self, clean_env):
+        assert resolve_judge_provider(_jargs(auth_provider=BEDROCK)) == BEDROCK
+        assert resolve_judge_provider(_jargs(use_claude_oauth=True)) == OAUTH
+
+    def test_unset_judge_provider_follows_legacy_inference(self, clean_env):
+        clean_env.setenv("WCB_USE_CLAUDE_OAUTH", "1")
+        clean_env.setenv("WCB_CC_ACCOUNT_POOL", "/pool/a.json")
+        assert resolve_judge_provider(_jargs()) == OAUTH
+
+    def test_explicit_flag_beats_env_and_agent(self, clean_env):
+        clean_env.setenv("WCB_JUDGE_AUTH_PROVIDER", OAUTH)
+        clean_env.setenv("WCB_AUTH_PROVIDER", OAUTH)
+        assert resolve_judge_provider(_jargs(judge_auth_provider=BEDROCK)) == BEDROCK
+
+    def test_env_beats_agent_provider(self, clean_env):
+        clean_env.setenv("WCB_AUTH_PROVIDER", OAUTH)
+        clean_env.setenv("WCB_JUDGE_AUTH_PROVIDER", BEDROCK)
+        assert resolve_judge_provider(_jargs()) == BEDROCK
+        assert resolve_provider(_jargs()) == OAUTH
+
+    def test_typo_raises_not_infers(self, clean_env):
+        with pytest.raises(AuthProviderError, match="unknown auth provider"):
+            resolve_judge_provider(_jargs(judge_auth_provider="bedrok"))
+        clean_env.setenv("WCB_JUDGE_AUTH_PROVIDER", "bedrok")
+        with pytest.raises(AuthProviderError, match="unknown auth provider"):
+            resolve_judge_provider(_jargs())
+
+    def test_lanes_differ_predicate(self):
+        assert lanes_differ(OAUTH, BEDROCK) is True
+        assert lanes_differ(BEDROCK, OAUTH) is True
+        assert lanes_differ(OAUTH, OAUTH) is False
+        assert lanes_differ(BEDROCK, BEDROCK) is False
+
+
+class TestJudgeProviderEnvOnly:
+    """The RAW-read resolver. Oracle REQUIRED #3: judge_litellm's bridge gate
+    was a raw WCB_AUTH_PROVIDER read, so it must NOT gain resolve_provider()'s
+    legacy inference -- that would re-arm the 700K OAuth evidence clamp on
+    script/regrade.py, which never exports WCB_AUTH_PROVIDER."""
+
+    def test_unset_everything_is_none(self, clean_env):
+        assert resolve_judge_provider_env_only() is None
+
+    def test_legacy_inference_is_NOT_applied(self, clean_env):
+        clean_env.setenv("WCB_USE_CLAUDE_OAUTH", "1")
+        clean_env.setenv("WCB_CC_ACCOUNT_POOL", "/pool/a.json")
+        assert resolve_provider(_jargs()) == OAUTH
+        assert resolve_judge_provider_env_only() is None
+
+    def test_raw_agent_var_is_honoured(self, clean_env):
+        clean_env.setenv("WCB_AUTH_PROVIDER", OAUTH)
+        assert resolve_judge_provider_env_only() == OAUTH
+
+    def test_judge_var_beats_agent_var(self, clean_env):
+        clean_env.setenv("WCB_AUTH_PROVIDER", OAUTH)
+        clean_env.setenv("WCB_JUDGE_AUTH_PROVIDER", BEDROCK)
+        assert resolve_judge_provider_env_only() == BEDROCK
+
+
+class TestValidateJudgeProviderAuth:
+    def test_names_the_lane(self, clean_env):
+        with pytest.raises(AuthProviderError) as exc:
+            validate_judge_provider_auth(OAUTH, BEDROCK, _cfg(cc_account_pool=""))
+        msg = str(exc.value)
+        assert "JUDGE lane" in msg
+        assert "WCB_JUDGE_AUTH_PROVIDER" in msg
+        assert "Not falling back" in msg
+
+    def test_bedrock_missing_creds_named(self, clean_env):
+        with pytest.raises(AuthProviderError) as exc:
+            validate_judge_provider_auth(BEDROCK, OAUTH, _cfg())
+        msg = str(exc.value)
+        assert "KENSEI_AWS_BEARER_TOKEN" in msg
+        assert "KENSEI_BEDROCK_MODEL_ARN" in msg
+
+    def test_oauth_judge_on_bedrock_agent_requires_bridge_secret(self, clean_env):
+        cfg = _cfg(cc_account_pool="/pool/a.json", cc_bridge_secret="")
+        with pytest.raises(AuthProviderError, match="WCB_CC_BRIDGE_SECRET"):
+            validate_judge_provider_auth(OAUTH, BEDROCK, cfg)
+
+    def test_same_lane_oauth_does_not_require_bridge_secret(self, clean_env):
+        cfg = _cfg(cc_account_pool="/pool/a.json", cc_bridge_secret="")
+        validate_judge_provider_auth(OAUTH, OAUTH, cfg)
+
+    def test_happy_path_is_silent(self, clean_env):
+        validate_judge_provider_auth(
+            BEDROCK, OAUTH, _cfg(aws_bearer_token="t", bedrock_inference_arn="arn:x")
+        )
