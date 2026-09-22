@@ -655,6 +655,19 @@ def call_judge_via_litellm(
     }
     if region:
         completion_kwargs["aws_region_name"] = region
+        # Hand LiteLLM the bearer EXPLICITLY, don't hope it finds the env var.
+        # litellm's bedrock handler resolves boto credentials first and only
+        # then looks for a bearer; on a box with an instance role and no keys
+        # (every EC2 harness host) it happily SigV4-signs with that role and
+        # Bedrock answers "Authentication failed" for a credential the run
+        # never intended to use. `api_key` is the documented first branch of
+        # get_request_headers, so passing it takes the Authorization: Bearer
+        # path -- the same credential, and the same result, as the urllib
+        # transport in grading._call_judge_bedrock. Without this a judge on
+        # Bedrock cannot grade an image-bearing chunk at all: pixels force this
+        # transport, and this transport could not authenticate.
+        if _bearer:
+            completion_kwargs["api_key"] = _bearer
 
     # OAuth-bridge route: send the sonnet judge to the cc-bridge (Claude Max
     # subscription) instead of Bedrock. Transparent Anthropic-Messages proxy,
