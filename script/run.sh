@@ -1135,7 +1135,11 @@ parse_args() {
         local _d
         while IFS= read -r _d; do
             [[ -n "$_d" ]] && TASKS+=("$_d")
-        done < <(find "$INPUT_DIR" -mindepth 1 -maxdepth 1 -type d | sort)
+        # -L: a batch dir may be assembled from symlinks to task dirs that
+        # live elsewhere (Raman batch_3 = links into batch_1/batch_2 for the
+        # rerun of ungraded tasks). Without it `-type d` skips every link and
+        # the launch dies with "no task dirs" before spending anything.
+        done < <(find -L "$INPUT_DIR" -mindepth 1 -maxdepth 1 -type d | sort)
         (( ${#TASKS[@]} > 0 )) || { log::err "no task dirs under --input-dir $INPUT_DIR"; exit 2; }
     fi
 
