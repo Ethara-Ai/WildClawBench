@@ -285,3 +285,46 @@ if out and filtered and len(filtered) < len(out):
 | Upstream probe | Bedrock `claude-opus-4.7` | OAuth bridge `claude-opus-4.7` | **Change 4** (OAuth branch) |
 | Sub-agents (opencode) | Same model as main | Same model as main | **Part 1** (inherit, no override) |
 | Preflight | Skipped | `preflight_judge_oauth()` | **Change 5** (provider-gate) |
+
+---
+
+## ADDENDUM — one provider per LANE
+
+The design principle above is amended:
+
+**"One provider per lane; one provider everywhere by default."**
+
+The agent lane and the judge lane may now run on different providers, selected
+by `WCB_JUDGE_AUTH_PROVIDER` (CLI: `--judge-auth-provider`, wrapper:
+`--judge-provider`). Unset — the default — the judge lane IS the agent lane and
+every gate resolves exactly what it resolved before, which is the acceptance
+condition for the whole change.
+
+Summary table, gaining a lane column:
+
+| Call site | Lane | Keyed on |
+|---|---|---|
+| Main agent | AGENT | `WCB_AUTH_PROVIDER` |
+| Sub-agents (opencode) | AGENT | inherits the main agent |
+| Test generation | AGENT | `WCB_AUTH_PROVIDER` (CP-5) |
+| Upstream probe | AGENT | `WCB_AUTH_PROVIDER` (CP-6) |
+| Sidecar model_list + AWS-cred zeroing | AGENT | `WCB_AUTH_PROVIDER` (CP-2, CP-3) |
+| Judge Sonnet transport (bridge vs ARN) | JUDGE | `WCB_JUDGE_AUTH_PROVIDER`, resolved env-only |
+| Judge council roster | JUDGE | `WCB_JUDGE_AUTH_PROVIDER` (CP-1, CP-7) |
+| Judge no-fallback guard | JUDGE | `WCB_JUDGE_AUTH_PROVIDER` (CP-∞) |
+| Judge evidence budget | JUDGE | `WCB_JUDGE_AUTH_PROVIDER` + a resolvable bridge URL |
+| Judge rate card and effective model name | JUDGE | via the bridge-URL gate |
+| Judge preflight | JUDGE | `WCB_JUDGE_AUTH_PROVIDER` |
+| cc-bridge lifecycle | EITHER | started when either lane is on OAuth |
+
+The cc-bridge is the only shared resource whose gate widened. It is started
+once per batch by whichever lane needs it, and torn down by the same
+owner-PID-guarded path as before.
+
+Cost follows the lanes: agent tokens are priced by the agent's provider and
+judge tokens by the judge's, through two independent gates in
+`reprice_oauth_sources`. Note that both rate cards carry the same published
+Sonnet numbers — `oauth_pricing.SONNET_RATES` mirrors
+`grading._FAMILY_RATES["sonnet"]` and the module says the two cannot disagree —
+so the split buys lane purity and immunity to a future divergence, not a
+different figure for a Sonnet judge.

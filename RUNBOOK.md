@@ -170,6 +170,51 @@ The harness infers which APIs the agent will need from (a) keyword matching agai
 
 ## 5. Running
 
+### 5.0 Preflight: check BOTH lanes before you launch
+
+A run has TWO auth lanes. Verify both before any batch — a healthy agent lane
+with a dead judge lane spends the whole trajectory and then reports UNGRADED.
+
+1. **Which lanes am I on?**
+   - `WCB_AUTH_PROVIDER` → the AGENT lane (default: `bedrock`)
+   - `WCB_JUDGE_AUTH_PROVIDER` → the JUDGE lane (default: same as the agent)
+
+   `run.sh` prints both at startup, and a mixed run logs `DUAL-PROVIDER MODE`.
+
+2. **AGENT lane = oauth?** Confirm the pool is fresh:
+   `source script/wcb setup && source script/wcb login`.
+   `start_bridge` re-reads the OS store on every launch but only rewrites STALE
+   slots, so check that the fingerprint actually changed. Never switch accounts
+   mid-batch: the bridge latches its pool at start.
+
+3. **AGENT lane = bedrock?** Confirm `KENSEI_AWS_BEARER_TOKEN` and
+   `KENSEI_BEDROCK_MODEL_ARN`.
+
+4. **JUDGE lane = oauth?** The same pool must be present EVEN IF the agent is on
+   Bedrock — the harness starts the cc-bridge for the judge alone.
+   `WCB_CC_BRIDGE_SECRET` must be set in `.env` for that combination: the bridge
+   is started by a subprocess, so a secret generated there never reaches the
+   host-side judge and every grading call is rejected. `preflight_judge_oauth()`
+   makes one real `max_tokens=1` call through the exact grading route at T+0.
+
+5. **JUDGE lane = bedrock?** Confirm `KENSEI_AWS_BEARER_TOKEN` and
+   `JUDGE_COUNCIL_SONNET_ARN`. `preflight_judge_bedrock()` makes one
+   `maxTokens=1` Converse call at T+0 whenever the judge lane differs from the
+   agent lane.
+
+6. **`JUDGE_MAX_EVIDENCE` must be unset** unless you mean it. It short-circuits
+   the per-family evidence table on both lanes, so a box that carries it grades
+   at that number and the big-context judge buys you nothing. `run.sh` warns.
+
+7. **Do NOT set `WCB_SKIP_JUDGE_PREFLIGHT=1` on a mixed run.** It disables
+   exactly the check that makes dual-provider safe.
+
+8. **Do NOT `git pull` mid-launch.** A `-P N` worker forked after the pull
+   re-execs the NEW script.
+
+9. **Unset `WCB_JUDGE_AUTH_PROVIDER` when you are done.** It is honoured from
+   the environment, so a second batch from the same shell inherits the split.
+
 ### 5.1 Easiest: use `script/run.sh`
 
 The wrapper handles preflight (docker daemon, image presence, tag corruption, orphan cleanup), runs the harness, and on docker errors retries once.
@@ -229,7 +274,50 @@ python3 eval/run_batch.py \
 | `--thinking xhigh` | Reasoning effort. |
 | `--parallel 1` | Keep this 1 — concurrent runs race on shared mock image + Bedrock throttles. |
 | `--judge-council` | Use 3-judge council (Sonnet + Kimi + GLM). Without it, falls back to single judge (Sonnet primary, gpt-5.4 fallback). |
+| `--auth-provider oauth\|bedrock` | Provider for the whole run. |
+| `--judge-auth-provider oauth\|bedrock` | Provider for the JUDGE lane only; default is the agent's. See §5.3.1. |
 | `--force-testgen` | Bypass the testgen cache and regenerate tests. |
+
+### 5.3.1 Dual-provider mode (grade on a different provider than you ran on)
+
+`--judge-provider oauth|bedrock` moves the JUDGE lane alone. Unset, the judge
+grades on whatever the agent ran on and behaviour is identical to not passing
+the flag.
+
+```bash
+# Agent on the Claude Max subscription, rubric graded on Bedrock Sonnet:
+bash script/run.sh --input-dir input_batch --parallel-tasks 6 \
+     --use-claude-oauth --judge-provider bedrock
+
+# Re-judge an oversize transcript that was refused before it was graded:
+bash script/run.sh --regrade output/openclaw/<task>/trajectories/<model>/run_N \
+     --judge-provider bedrock
+```
+
+Why the recommended shape is `agent=oauth, judge=bedrock`:
+
+| | judge on `oauth` | judge on `bedrock` |
+|---|---|---|
+| Sonnet evidence budget | 700,000 chars | **1,175,000 chars** |
+| Long-context ceiling | undocumented ~290K-token entitlement wall | none below the 1M window |
+| Council | Sonnet only | whatever `.env` defines (ship Sonnet only) |
+| Model family | Sonnet 4.6 | Sonnet 4.6 — **no recalibration** |
+
+A transcript between 700,000 and 1,175,000 characters raises
+`TranscriptTooLarge` on the OAuth lane, every member is dropped, and the run
+ships `score.failed.json` / UNGRADED. Two `yves_quinn` runs at 787,562 and
+710,802 characters died exactly that way; on the Bedrock lane they grade with
+33% and 39% margin. Raising `KENSEI_JUDGE_OAUTH_MAX_EVIDENCE` instead does not
+work — it converts a clean pre-flight refusal into a 429 the bridge mislabels
+as a transient throttle.
+
+Costs are tracked per lane: the agent is priced by the agent's provider and the
+judge by the judge's. On a mixed run `usage.json` gains `judge_auth_provider`
+and `score.json`'s `judge_council` block gains the same key; an unmixed run
+gains nothing, and the client bundle's `report.json` never carries it.
+
+There is still NO fallback between providers on either lane. A judge on OAuth
+never drops to Bedrock; a judge on Bedrock never dials the bridge.
 
 ### 5.4 Sequential vs parallel
 The wrapper runs sequentially. Concurrent runs are unsupported:
@@ -303,7 +391,21 @@ Reuses the existing `chat.jsonl` + `task_output/artifacts/` (or `workspace_full/
 
 Options:
 - `--rubric path/to/alt.json` — A/B against a different rubric file.
+- `--judge-auth-provider oauth|bedrock` — grade THIS regrade on a chosen
+  provider. The trajectory is a fixed artifact and only Channel B re-runs, so
+  the judge provider is a free per-regrade choice. `bedrock` grades at the
+  1,175,000-char sonnet budget instead of the 700,000-char OAuth ceiling, which
+  is what rescues a run that was refused before it was graded. The stored
+  `auth_provider` keeps describing the trajectory either way; a mixed regrade
+  additionally writes `judge_auth_provider`, and a same-lane regrade clears it.
 - `--quiet` — suppress the summary print.
+
+Through the wrapper the flag is `--judge-provider`:
+
+```bash
+bash script/run.sh --regrade output/openclaw/<task>/trajectories/<model>/run_N \
+     --judge-provider bedrock
+```
 
 ### 7.3 Hot-edit prompts
 

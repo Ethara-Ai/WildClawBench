@@ -166,3 +166,37 @@ The judge Sonnet member has its OWN routing independent of the trajectory provid
 | `KENSEI_AWS_BEARER_TOKEN` | run_batch.py, sidecar | Injected into sidecar even under OAuth |
 | `KENSEI_BEDROCK_MODEL_ARN` | run_batch.py | Gates test generation even under OAuth |
 | `WCB_CC_ACCOUNT_POOL` | bootstrap_sidecar.py | Needed for OAuth; presence triggers inference under Bedrock |
+
+---
+
+## ADDENDUM — the lane split (dual-provider mode)
+
+The judge lane can now run on a provider of its own, selected by
+`WCB_JUDGE_AUTH_PROVIDER` / `--judge-auth-provider` / `run.sh --judge-provider`
+and defaulting to the agent's. Every checkpoint in this document survives; what
+changes is WHICH provider each one consults.
+
+| CP | Guarantee | Status after the lane split |
+|---|---|---|
+| CP-1 | `load_dotenv()` loads both credential sets, so isolation is enforced at the APPLICATION layer by roster filtering, never by absence of credentials | **PRESERVED, re-keyed.** The filter consults the JUDGE lane. Still application-layer. |
+| CP-2 | The sidecar YAML OAuth branch must win over the Bedrock branch; an OAuth flag with an empty bridge URL falls through to Bedrock | **UNTOUCHED.** The sidecar serves the AGENT only, and `build_litellm_config_yaml` is still called with `use_claude_oauth=use_oauth`. A non-empty `bridge_url` with that flag false is inert. |
+| CP-3 | Under an OAuth agent the sidecar container receives NO AWS credentials | **PRESERVED, explicitly.** The cred-zeroing gate stays on the AGENT lane. A Bedrock JUDGE dials Bedrock from the HOST process and never re-arms the sidecar. |
+| CP-4 | The judge's OAuth bridge route is provider-gated | **RE-KEYED to the JUDGE lane.** This is the core of the change. A Bedrock run still never routes the Sonnet judge through the bridge merely because `KENSEI_JUDGE_OAUTH_BRIDGE_URL` is in `.env` — now deliberately rather than incidentally. Resolution there is env-only: the gate was a RAW read of `WCB_AUTH_PROVIDER` and must not acquire `resolve_provider()`'s inference, or every process that never exports the var (`script/regrade.py` first) flips meaning. |
+| CP-5 | Test generation auto-enable must be OAuth-aware | **UNTOUCHED.** Agent lane, sidecar-routed. |
+| CP-6 | Upstream probe needs an OAuth branch | **UNTOUCHED.** Agent lane. |
+| CP-7 | Council shrinkage must WARN and an empty roster must RAISE | **PRESERVED**, now naming the judge lane in both messages. |
+| CP-∞ | NO FALLBACK BETWEEN PROVIDERS, EVER | **PRESERVED and EXTENDED.** Lane-scoped: a judge on OAuth never drops to Bedrock, and a judge on Bedrock never dials the bridge. A judge on OAuth with no bridge URL now RAISES instead of silently addressing `bedrock/arn` — that was a live crossing this document's gates did not cover, because until the lanes could differ it could not occur. |
+
+**Blocking dependency #1 in this document ("check `WCB_AUTH_PROVIDER == oauth`
+before using the bridge URL") is resolved and refined**: the gate checks the
+JUDGE lane, which is a strictly stronger statement — it is correct for every
+value of the agent's provider, including the mixed cases.
+
+The design principle is narrowed, not abandoned: **one provider per LANE, chosen
+explicitly, defaulting to one provider everywhere.** The four call sites in
+`FIX_unified_provider_isolation.md`'s summary table split into an AGENT group
+(trajectory, test generation, upstream probe, sub-agents) keyed on
+`WCB_AUTH_PROVIDER`, and a JUDGE group (judge transport, council roster, judge
+preflight, evidence budget, judge pricing) keyed on `WCB_JUDGE_AUTH_PROVIDER`.
+With the new var unset the two groups hold the same value and every behaviour is
+identical to before it existed.
