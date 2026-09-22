@@ -54,13 +54,17 @@ from src.utils import pass_summary as _pass_summary
 from src.utils.config import Config
 from src.utils.auth_provider import (
     BEDROCK,
+    JUDGE_PROVIDER_ENV_VAR,
     OAUTH,
     PROVIDER_ENV_VAR,
     AuthProviderError,
     available_judge_families,
+    lanes_differ,
     provider_label,
+    resolve_judge_provider,
     resolve_provider,
     served_trajectory_models,
+    validate_judge_provider_auth,
     validate_model_for_provider,
     validate_provider_auth,
 )
@@ -4272,7 +4276,15 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     # this expression used to -- so callers that never pass the new flag are
     # unaffected.
     auth_provider_id = resolve_provider(args)
+    judge_provider_id = resolve_judge_provider(args)
+    # AGENT lane. Governs the sidecar model_list (CP-2), the AWS-cred zeroing
+    # (CP-3), testgen (CP-5) and the upstream probe (CP-6). UNCHANGED SEMANTICS:
+    # a Bedrock JUDGE must never re-arm the sidecar with AWS credentials, and an
+    # OAuth judge must never put a bridge route in a Bedrock agent's model_list.
     use_oauth = auth_provider_id == OAUTH
+    # The cc-bridge, by contrast, serves whichever lane asks for it. It is the
+    # ONLY gate this feature widens.
+    bridge_needed = use_oauth or judge_provider_id == OAUTH
 
     import uuid as _uuid
     batch_id = _uuid.uuid4().hex[:12]
@@ -4293,7 +4305,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
 
     cc_bridge_name = ""
     cc_bridge_url = ""
-    if use_oauth:
+    if bridge_needed:
         if shared_mode and shared_cc_bridge and shared_cc_bridge_url:
             cc_bridge_name = shared_cc_bridge
             cc_bridge_url = shared_cc_bridge_url
@@ -4400,7 +4412,14 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             # the feed (R1).
             os.environ["WCB_STREAM_LOG_PATH"] = str(stream_log_path)
 
-    if use_oauth and not (shared_mode and shared_cc_bridge):
+    if bridge_needed and not (shared_mode and shared_cc_bridge):
+        # Widened from `use_oauth`: this block is where the bridge is actually
+        # STARTED (start_bridge below), not merely named, so an agent on Bedrock
+        # with its judge on OAuth used to reach grade time with no bridge, no
+        # URL, and therefore a completion addressed to bedrock/arn -- the judge
+        # silently answering from the provider it was taken off. The pool is
+        # required here even on a Bedrock agent; validate_judge_provider_auth
+        # has already refused at T+0 if it is missing.
         pool_paths = [p.strip() for p in config.cc_account_pool.split(":") if p.strip()]
         pool_dirs = {os.path.dirname(os.path.abspath(p)) for p in pool_paths if os.path.isfile(p)}
         if not pool_dirs:
@@ -4508,20 +4527,71 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
                 cc_bridge_host_port,
             )
 
-        # Fail-fast preflight of the GRADING Claude path. wait_for_bridge_healthy
-        # above only checks /healthz from INSIDE the container against a cached
-        # access token; it does NOT catch (a) a dropped host loopback publish or
-        # (b) a dead OAuth refresh token — both of which otherwise surface only at
-        # GRADE time, AFTER the (expensive) trajectory has already run. When the
-        # Sonnet judge is routed through the OAuth bridge
-        # (KENSEI_JUDGE_OAUTH_BRIDGE_URL set), validate that exact
-        # host -> bridge -> anthropic path end-to-end here so broken Claude auth
-        # aborts the run up front and asks for a re-login. Opt out with
-        # WCB_SKIP_JUDGE_PREFLIGHT=1.
-        _skip_preflight = os.environ.get(
-            "WCB_SKIP_JUDGE_PREFLIGHT", ""
+        # Opus thinking-visibility preflight (non-fatal). The grading preflight
+        # above proves the OAuth path REACHES Claude; it does not prove Opus
+        # returns READABLE thinking. Opus 4.7+ defaults display:omitted (empty
+        # thinking + signature) and a server-side x-cc-atis A/B can blank 4.8
+        # even with display:summarized. Probe the exact host -> bridge path once
+        # with {type:adaptive,display:summarized} and warn (do NOT abort) if the
+        # summary text comes back empty, so a redaction regression is visible in
+        # the log up front rather than discovered by eyeballing trajectories.
+        # Opt out with WCB_SKIP_OPUS_THINKING_PREFLIGHT=1.
+        _skip_thinking_pf = os.environ.get(
+            "WCB_SKIP_OPUS_THINKING_PREFLIGHT", ""
         ).strip().lower() in ("1", "true", "yes", "on")
-        if not _skip_preflight and use_oauth and os.environ.get("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "").strip():
+        if not _skip_thinking_pf and use_oauth:
+            from src.utils.judge_litellm import preflight_opus_thinking
+            _tok, _tdetail = preflight_opus_thinking(
+                f"http://127.0.0.1:{cc_bridge_host_port}", bridge_secret
+            )
+            if _tok:
+                logger.info("Opus thinking preflight OK (%s)", _tdetail)
+            else:
+                logger.warning(
+                    "Opus thinking preflight: reasoning text came back EMPTY "
+                    "(%s). Tokens and grading are unaffected, but agent "
+                    "trajectories will show empty thinking blocks. Skip this "
+                    "check with WCB_SKIP_OPUS_THINKING_PREFLIGHT=1.",
+                    _tdetail,
+                )
+
+    # ---- JUDGE-LANE PREFLIGHTS -------------------------------------------
+    # FUNCTION SCOPE, deliberately. These used to live inside the
+    # self-owned-bridge branch above, whose condition is false whenever
+    # script/run.sh supplies a shared bridge -- i.e. on the canonical launch
+    # path they never ran at all, in the parent or in any -P N child, and the
+    # "fail at T+0 before you spend a trajectory" promise was not kept for the
+    # only shape anybody launches. Here they run once per run_batch process:
+    # once for a serial or TUI run, once per parallel-task child. That is a
+    # fraction of a cent per child and it also catches a child whose inherited
+    # environment diverged from the parent's.
+    #
+    # This is the earliest point where both are decidable: the bridge URL is
+    # final on BOTH paths -- exported by run.sh before the child starts on the
+    # shared path, and set by the block above on the self-owned one -- and the
+    # sidecar, the mock stack and every agent container are still ahead of us.
+    _skip_judge_preflight = os.environ.get(
+        "WCB_SKIP_JUDGE_PREFLIGHT", ""
+    ).strip().lower() in ("1", "true", "yes", "on")
+
+    if judge_provider_id == OAUTH:
+        _bridge_url = os.environ.get("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "").strip()
+        if not _bridge_url:
+            # Not a warning. With no bridge URL the judge's completion goes out
+            # as bedrock/arn and answers from the provider this run opted out
+            # of -- billed, unlogged, and absent from every artifact. CP-infinity
+            # forbids that crossing, so refuse before the trajectory is spent.
+            raise RuntimeError(
+                f"judge lane is {OAUTH!r} but no cc-bridge URL resolved "
+                f"(KENSEI_JUDGE_OAUTH_BRIDGE_URL is empty). The Sonnet judge "
+                f"would fall through to Bedrock under its ARN, which is exactly "
+                f"the provider crossing --judge-auth-provider exists to prevent. "
+                f"Agent lane is {auth_provider_id!r}; if the agent is on Bedrock "
+                f"the bridge is started for the judge alone, so check that "
+                f"WCB_CC_ACCOUNT_POOL and WCB_CC_BRIDGE_SECRET are set. Unset "
+                f"WCB_JUDGE_AUTH_PROVIDER to grade on the agent's provider."
+            )
+        if not _skip_judge_preflight:
             _host_port = os.environ.get("WCB_CC_BRIDGE_HOST_PORT", "").strip()
             if _host_port and not wait_for_bridge_host_port(_host_port):
                 raise RuntimeError(
@@ -4547,33 +4617,27 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
                 )
             logger.info("Claude OAuth grading preflight OK (%s)", _detail)
 
-        # Opus thinking-visibility preflight (non-fatal). The grading preflight
-        # above proves the OAuth path REACHES Claude; it does not prove Opus
-        # returns READABLE thinking. Opus 4.7+ defaults display:omitted (empty
-        # thinking + signature) and a server-side x-cc-atis A/B can blank 4.8
-        # even with display:summarized. Probe the exact host -> bridge path once
-        # with {type:adaptive,display:summarized} and warn (do NOT abort) if the
-        # summary text comes back empty, so a redaction regression is visible in
-        # the log up front rather than discovered by eyeballing trajectories.
-        # Opt out with WCB_SKIP_OPUS_THINKING_PREFLIGHT=1.
-        _skip_thinking_pf = os.environ.get(
-            "WCB_SKIP_OPUS_THINKING_PREFLIGHT", ""
-        ).strip().lower() in ("1", "true", "yes", "on")
-        if not _skip_thinking_pf:
-            from src.utils.judge_litellm import preflight_opus_thinking
-            _tok, _tdetail = preflight_opus_thinking(
-                f"http://127.0.0.1:{cc_bridge_host_port}", bridge_secret
+    elif judge_provider_id == BEDROCK and not _skip_judge_preflight and lanes_differ(
+        auth_provider_id, judge_provider_id
+    ):
+        # Symmetric loud-fail for a Bedrock judge on a non-Bedrock agent. Without
+        # it the first proof that the judge's AWS bearer is alive arrives AFTER
+        # the trajectory, as a 403 at grade time, and every criterion abstains.
+        # One maxTokens=1 Converse ping costs well under a cent and lands here.
+        # A same-lane Bedrock run is skipped: its agent credentials are the
+        # judge's, and the sidecar's own upstream probe already exercised them.
+        from src.utils.judge_litellm import preflight_judge_bedrock
+        _ok, _detail = preflight_judge_bedrock()
+        if not _ok:
+            raise RuntimeError(
+                "Bedrock judge preflight FAILED — the judge lane cannot reach "
+                f"Bedrock: {_detail}. The agent lane is {auth_provider_id!r}, so "
+                "this trajectory would run to completion and then fail at grade "
+                "time. Fix KENSEI_AWS_BEARER_TOKEN / JUDGE_COUNCIL_SONNET_ARN, "
+                "unset WCB_JUDGE_AUTH_PROVIDER to grade on the agent's provider, "
+                "or skip with WCB_SKIP_JUDGE_PREFLIGHT=1."
             )
-            if _tok:
-                logger.info("Opus thinking preflight OK (%s)", _tdetail)
-            else:
-                logger.warning(
-                    "Opus thinking preflight: reasoning text came back EMPTY "
-                    "(%s). Tokens and grading are unaffected, but agent "
-                    "trajectories will show empty thinking blocks. Skip this "
-                    "check with WCB_SKIP_OPUS_THINKING_PREFLIGHT=1.",
-                    _tdetail,
-                )
+        logger.info("Bedrock judge preflight OK (%s)", _detail)
 
     if use_codex_oauth:
         # Bring up the Codex subscription bridge before the sidecar so the shared
@@ -5205,12 +5269,31 @@ def _run_main_body(args) -> None:
     auth_provider_id = resolve_provider(args)
     validate_provider_auth(auth_provider_id, config)
     os.environ[PROVIDER_ENV_VAR] = auth_provider_id
+
+    # The JUDGE lane, same discipline. Exported unconditionally even when it
+    # equals the agent's, so every live env reader sees one deterministic value
+    # and a stale WCB_JUDGE_AUTH_PROVIDER from the caller's shell cannot split
+    # the lanes of a run that did not ask for it. A judge that cannot
+    # authenticate costs a whole trajectory and then reports UNGRADED, so its
+    # credentials are validated here beside the agent's, before any container.
+    judge_provider_id = resolve_judge_provider(args)
+    validate_judge_provider_auth(judge_provider_id, auth_provider_id, config)
+    os.environ[JUDGE_PROVIDER_ENV_VAR] = judge_provider_id
+
     logger.info(
         "Auth provider: %s (%s) -- judge council: %s",
         auth_provider_id,
         provider_label(auth_provider_id),
-        ", ".join(available_judge_families(auth_provider_id)),
+        ", ".join(available_judge_families(judge_provider_id)),
     )
+    if lanes_differ(auth_provider_id, judge_provider_id):
+        logger.warning(
+            "DUAL-PROVIDER MODE: agent lane=%s (%s), judge lane=%s (%s). Agent "
+            "cost is priced by the agent provider and judge cost by the judge "
+            "provider; usage.json carries both stamps.",
+            auth_provider_id, provider_label(auth_provider_id),
+            judge_provider_id, provider_label(judge_provider_id),
+        )
 
     _init_usage_reporting(args, config)
 

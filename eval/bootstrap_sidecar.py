@@ -162,13 +162,22 @@ def main() -> int:
     _overflow_guard = overflow_guard_enabled(config.meta_api_key, config.meta_model)
 
     use_oauth = config.use_claude_oauth and bool(config.cc_account_pool)
+    # The cc-bridge serves whichever lane is on OAuth. The sidecar YAML flags
+    # below stay on use_oauth: they describe the AGENT's model_list, and a judge
+    # on OAuth must not put a bridge route in a Bedrock agent's routing table
+    # any more than a judge on Bedrock may re-arm the sidecar with AWS
+    # credentials. Read from env because run.sh invokes this as a subprocess.
+    judge_use_oauth = (
+        os.environ.get("WCB_JUDGE_AUTH_PROVIDER", "").strip().lower() == "oauth"
+    )
+    bridge_needed = use_oauth or judge_use_oauth
     bridge_secret = config.cc_bridge_secret
-    if use_oauth and not bridge_secret:
+    if bridge_needed and not bridge_secret:
         import secrets
         bridge_secret = secrets.token_hex(32)
         _log("generated ephemeral WCB_CC_BRIDGE_SECRET for this batch")
     cc_bridge_host_port = ""
-    if use_oauth:
+    if bridge_needed:
         cc_bridge_url = f"http://{cc_bridge}:{CC_BRIDGE_INTERNAL_PORT}"
         os.environ["WCB_CC_BRIDGE_SECRET"] = bridge_secret
         # Publish the bridge on a loopback host port so the HOST-side judge
@@ -265,7 +274,7 @@ def main() -> int:
     if heartbeat_dir_str:
         os.environ.setdefault("WCB_HEARTBEAT_HOST_DIR", heartbeat_dir_str)
 
-    if use_oauth:
+    if bridge_needed:
         pool_paths = [p.strip() for p in config.cc_account_pool.split(":") if p.strip()]
         pool_dirs = {os.path.dirname(os.path.abspath(p)) for p in pool_paths if os.path.isfile(p)}
         if not pool_dirs:
@@ -459,7 +468,7 @@ def main() -> int:
     _emit("usage_log", str(usage_log_path))
     _emit("yaml_path", str(cfg_path))
     _emit("master_key", config.litellm_master_key)
-    _emit("cc_bridge", cc_bridge if use_oauth else "")
+    _emit("cc_bridge", cc_bridge if bridge_needed else "")
     _emit("cc_bridge_url", cc_bridge_url)
     _emit("cc_bridge_host_port", cc_bridge_host_port)
     _emit(
