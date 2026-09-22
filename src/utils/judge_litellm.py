@@ -239,6 +239,115 @@ def preflight_judge_oauth(timeout_s: float | None = None) -> tuple[bool, str]:
     )
 
 
+def preflight_judge_bedrock(timeout_s: float | None = None) -> tuple[bool, str]:
+    """Validate the Bedrock judge path END-TO-END with one maxTokens=1 call.
+
+    The mirror of preflight_judge_oauth for the other lane. Without it the
+    first proof that the judge's AWS bearer is alive arrives AFTER the
+    trajectory, as a 403 inside the grading call, every criterion abstains and
+    the run is ungraded with an expensive trajectory already paid for.
+
+    Returns (True, "not configured") when no sonnet council member resolves,
+    so callers may invoke it unconditionally. The model comes from
+    grading.council_members(), so a rotated or typo'd ARN is caught here, and
+    auth is the same Authorization: Bearer the real Converse call uses -- which
+    is what makes this meaningful on a host that has no litellm installed and
+    no AWS credentials beyond the bearer.
+    """
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    from . import grading
+
+    try:
+        members = [m for m in grading.council_members() if m.family == "sonnet"]
+    except Exception as exc:  # noqa: BLE001 - a broken roster is its own error
+        return False, f"judge council roster unusable: {exc}"
+    if not members:
+        return True, "not configured (no sonnet council member on the Bedrock lane)"
+
+    model = members[0].model
+    arn = model
+    while arn.startswith("bedrock/"):
+        arn = arn[len("bedrock/"):]
+    tok = os.environ.get("KENSEI_AWS_BEARER_TOKEN") or os.environ.get(
+        "AWS_BEARER_TOKEN_BEDROCK", ""
+    )
+    if not tok:
+        return False, (
+            "no Bedrock bearer token for the judge (set KENSEI_AWS_BEARER_TOKEN, "
+            "alias AWS_BEARER_TOKEN_BEDROCK)"
+        )
+    if timeout_s is None:
+        timeout_s = _judge_preflight_timeout()
+
+    region = grading._bedrock_region_for(arn)
+    url = (
+        f"https://bedrock-runtime.{region}.amazonaws.com/model/"
+        f"{urllib.parse.quote(arn, safe='')}/converse-stream"
+    )
+    infer: dict[str, Any] = {"maxTokens": 1}
+    infer.update(_judge_sampling_params(model, "sonnet"))
+    import json as _json
+
+    body = _json.dumps({
+        "system": [{"text": "ping"}],
+        "messages": [{"role": "user", "content": [{"text": "ping"}]}],
+        "inferenceConfig": infer,
+    }).encode()
+    req = urllib.request.Request(
+        url, data=body, method="POST",
+        headers={
+            "Authorization": f"Bearer {tok}",
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.amazon.eventstream",
+        },
+    )
+
+    last = ""
+    for _attempt in (1, 2):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+                resp.read(1)
+            return True, f"ok ({_short_arn(arn)} @ {region})"
+        except urllib.error.HTTPError as exc:
+            detail = ""
+            try:
+                detail = exc.read().decode("utf-8", "replace")[:400]
+            except Exception:  # noqa: BLE001
+                pass
+            if exc.code == 400 and "temperature" in detail.lower():
+                # Learned exactly as the real call learns it, so the profile is
+                # known BEFORE grade time rather than costing a round trip then.
+                _TEMP_REJECTED_MODELS.add(model)
+                infer.pop("temperature", None)
+                req.data = _json.dumps({
+                    "system": [{"text": "ping"}],
+                    "messages": [{"role": "user", "content": [{"text": "ping"}]}],
+                    "inferenceConfig": infer,
+                }).encode()
+                continue
+            # An auth failure is not retried: it would fail identically and only
+            # delay the abort.
+            return False, f"HTTP {exc.code}: {detail}"
+        except Exception as exc:  # noqa: BLE001 - urllib/socket hierarchy is wide
+            last = f"{type(exc).__name__}: {str(exc)[:400]}"
+            blob = last.lower()
+            if "timeout" not in blob and "timed out" not in blob:
+                return False, last
+    return False, (
+        f"{last} — timed out twice at {timeout_s:g}s each. Raise the budget with "
+        f"KENSEI_JUDGE_PREFLIGHT_TIMEOUT=<seconds>, or skip the check with "
+        f"WCB_SKIP_JUDGE_PREFLIGHT=1 (grading then fails late instead of early "
+        f"if the judge's Bedrock auth really is broken)."
+    )
+
+
+def _short_arn(arn: str) -> str:
+    return arn.rsplit("/", 1)[-1] if "/" in arn else arn
+
+
 def preflight_opus_thinking(
     bridge_url: str,
     bridge_secret: str,
