@@ -1291,11 +1291,15 @@ run_parallel_tasks() {
         ) &
         pids+=("$!")
         log::info "launched [${#pids[@]}/${#TASKS[@]}]: $name"
-        # Bound concurrency portably (no `wait -n`, which is bash 4.3+): when at
-        # capacity, block on the OLDEST job, then free its slot.
+        # Bound concurrency: when at capacity, block until ANY job exits
+        # (bash >= 4.3), then drop every finished pid so all freed slots refill.
         if (( ${#pids[@]} >= par )); then
-            wait "${pids[0]}" 2>/dev/null || true
-            pids=("${pids[@]:1}")
+            wait -n 2>/dev/null || true
+            local -a alive=()
+            for p in "${pids[@]}"; do
+                kill -0 "$p" 2>/dev/null && alive+=("$p")
+            done
+            pids=("${alive[@]}")
         fi
     done
     wait  # drain the remaining workers
