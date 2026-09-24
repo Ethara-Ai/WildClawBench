@@ -658,11 +658,14 @@ class OpenClawAgent(BaseAgent):
                            task_id, turn_index + 1,
                            (r.stderr or "").strip()[:200])
             return
-        logger.info(
-            "[%s] session-restore: dropped %d orphan row(s) from turn %d's "
+        after = cls._session_line_count(task_id)
+        # A mismatch means the head>tmp && mv swapped the inode under a
+        # concurrent append - the rollback did not land. Do not whisper it.
+        log = logger.info if after == lines_before else logger.warning
+        log("[%s] session-restore: dropped %d orphan row(s) from turn %d's "
             "aborted attempt before re-send (before=%d stalled=%d after=%s)",
             task_id, now - lines_before, turn_index + 1, lines_before, now,
-            cls._session_line_count(task_id))
+            after)
 
     def _break_stuck_llm_connections(self, task_id: str) -> None:
         """Best-effort RST of the container's sockets to the sidecar so the
