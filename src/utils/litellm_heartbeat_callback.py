@@ -20,7 +20,8 @@ healthy long call is indistinguishable from a wedged one.
   landed 3 min AFTER the kill, proving the request had never stopped moving.
 
 This module gives the guard a per-chunk liveness signal: a zero-byte file whose
-mtime is bumped at request start and again as chunks flow. The guard ORs that
+mtime is bumped at request start and again as CONTENT-bearing chunks flow
+(a keepalive ping proves the connection is open, never that the stream moved). The guard ORs that
 mtime against its existing row-count check, so an advancing heartbeat resets the
 stall clock while a genuinely wedged request (no chunks, no rows) still trips it.
 
@@ -55,6 +56,7 @@ each other by tests/test_stall_guard_heartbeat.py.
 from __future__ import annotations
 
 import os
+import re
 import sys
 import time
 from typing import Any, AsyncGenerator
@@ -87,6 +89,18 @@ _MIN_INTERVAL_DEFAULT_S = 1.0
 
 _last_touch: dict[str, float] = {}
 _disabled = False
+
+# A keepalive is not progress. The OAuth bridge synthesizes `event: ping` every
+# 15s for the LIFE of a buffered request, gated on the request still being open
+# and NOT on upstream progress (claude_oauth/bridge.py:306-311, :1165-1172), so
+# touching on one made this a liveness signal for the CONNECTION rather than for
+# the STREAM: a frozen upstream kept the mtime moving forever, the guard's
+# `b > beat` test refreshed last_progress on every poll, "stalled" was never
+# reached, and the turn died at the run deadline as "timeout" — past the
+# give-up branch, and past the gateway restart that only the stall path runs
+# (cite: ledger §23, phase-4 batch_3 — audrey 6/20, binta 5/20, nandini 12/17,
+# each burning its whole remaining budget at dur≈1790s in=0 out=0).
+_PING_DATA = re.compile(rb'^\{\s*"type"\s*:\s*"ping"\s*\}$')
 
 
 def heartbeat_dir() -> str:
@@ -146,6 +160,36 @@ def touch(run_key: str) -> None:
             )
         except Exception:  # noqa: BLE001 - even the warning is best-effort
             pass
+
+
+def _chunk_has_content(chunk: Any) -> bool:
+    """False only when a chunk is ENTIRELY SSE keepalive noise.
+
+    Tested per LINE, because frames arrive batched — one raw chunk routinely
+    carries a ping and a real event together — so any non-ping line wins. A
+    non-bytes chunk is content by definition: only the /v1/messages passthrough
+    yields raw bytes, and this guard must never get STRICTER on a shape it
+    cannot read.
+
+    ponytail: an upstream that is genuinely idle-but-alive for the whole stall
+    window, emitting nothing but pings, reads here as frozen — from outside the
+    bridge the two are the same bytes, and "stalled" (restart, re-send the turn)
+    is the right verdict for both.
+    """
+    if not isinstance(chunk, (bytes, bytearray)):
+        return True
+    for raw in bytes(chunk).splitlines():
+        line = raw.strip()
+        if not line or line.startswith(b":"):
+            continue
+        field, _, value = line.partition(b":")
+        value = value.strip()
+        if field == b"event" and value == b"ping":
+            continue
+        if field == b"data" and _PING_DATA.match(value):
+            continue
+        return True
+    return False
 
 
 def _run_key_of(user_api_key_dict: Any, request_data: Any) -> str:
@@ -226,7 +270,8 @@ class HeartbeatTap(CustomLogger):
         response: Any,
         request_data: dict,
     ) -> AsyncGenerator[Any, None]:
-        """Per-chunk touch. Pure pass-through (R5)."""
+        """Per-CONTENT-chunk touch. Pure pass-through (R5): every chunk is
+        yielded, keepalive or not — only the touch is skipped."""
         try:
             run_key = _run_key_of(user_api_key_dict, request_data)
         except Exception:  # noqa: BLE001
@@ -239,7 +284,8 @@ class HeartbeatTap(CustomLogger):
         async for chunk in response:
             if run_key:
                 try:
-                    touch(run_key)
+                    if _chunk_has_content(chunk):
+                        touch(run_key)
                 except Exception:  # noqa: BLE001 - stop trying, keep streaming
                     run_key = ""
             # R5: forward the ORIGINAL object, unconditionally.

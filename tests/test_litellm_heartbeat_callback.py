@@ -122,6 +122,45 @@ def test_throttle_collapses_chunk_storm_to_one_write(hb, monkeypatch):
         "throttled window must not re-touch")
 
 
+_PING = b'event: ping\ndata: {"type": "ping"}\n\n'
+_DELTA = (b'event: content_block_delta\ndata: {"type":"content_block_delta",'
+          b'"delta":{"type":"text_delta","text":"hi"}}\n\n')
+_STOP = b'event: message_stop\ndata: {"type":"message_stop"}\n\n'
+
+
+def test_keepalive_pings_do_not_refresh_the_heartbeat(hb, monkeypatch):
+    calls: list[str] = []
+    monkeypatch.setattr(hb, "touch", lambda key: calls.append(key))
+    chunks = [_DELTA, _PING, _PING, _PING, _STOP]
+    out = _drain(hb, chunks)
+    assert len(out) == len(chunks)
+    for got, want in zip(out, chunks):
+        assert got is want, "R5: every chunk is forwarded, keepalive or not"
+    # One request-start touch inside the hook, then one per CONTENT chunk. The
+    # three pings must add nothing: counting them is what kept a frozen stream
+    # looking alive until the run deadline (ledger §23). Today this is 6.
+    assert len(calls) == 3
+
+
+@pytest.mark.parametrize("chunk, has_content", [
+    (_PING, False),
+    (_PING + _PING, False),
+    # Frames arrive batched — a ping riding along with a real event is content.
+    (_PING + _DELTA, True),
+    (b": keepalive\n\n", False),
+    (b"", False),
+    (_DELTA, True),
+    # A delta that merely TALKS about pings is content; matching the ping shape
+    # loosely would silence the heartbeat for the rest of the stream.
+    (b'event: content_block_delta\ndata: {"type":"content_block_delta",'
+     b'"delta":{"type":"text_delta","text":"{\\"type\\": \\"ping\\"}"}}\n\n', True),
+    # Never stricter on a route whose chunks are not raw bytes.
+    ("a string chunk", True),
+])
+def test_chunk_content_classifier(hb, chunk, has_content):
+    assert hb._chunk_has_content(chunk) is has_content
+
+
 # ----------------------------------------------------------------- R5 / R2
 
 
