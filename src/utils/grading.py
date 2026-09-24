@@ -1013,6 +1013,58 @@ _LINKED_MEDIA_EXTS = {".html", ".htm", ".md", ".markdown"}
 _HTML_IMG_SRC_RE = re.compile(
     r"""<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
 _MD_IMG_RE = re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s>]+)")
+# The OTHER embedding style: the page inlines its images as
+# `data:image/jpeg;base64,...` so it "works off a tablet with nothing attached".
+# One 1080p JPEG is 300-700 KB of characters no judge can read. Across 74 graded
+# runs 44 pegged the 700K OAuth evidence budget and 31 clipped an HTML board
+# that was 81-99% base64, which produced 142 criteria failed WITHOUT a
+# truncation flag — silent fails on files the judge only saw the head and tail
+# of. The largest real markup behind such a board is 61 KB, so stripping the
+# payload makes every one of them fit whole.
+# Whitespace is allowed INSIDE the payload (wrapped base64) but only when a
+# base64 character follows, so a match can never end on the newline after the
+# payload and the surrounding markup stays byte-identical.
+_DATA_URI_RE = re.compile(
+    r"data:(image/[\w.+-]+);base64,"
+    r"((?:[A-Za-z0-9+/=]|\s(?=[A-Za-z0-9+/=]))+)")
+# Payload floor. A spacer GIF or a bullet SVG costs nothing to leave inline,
+# and replacing it would strip the tiny icons out of a page for no budget.
+_DATA_URI_MIN_PAYLOAD = 200
+
+
+def _inline_data_uris(text: str) -> list[tuple[int, int, str, str]]:
+    """`(start, end, mime, payload)` per inline base64 image big enough to be
+    worth stripping, in document order.
+
+    The 1-based position in this list IS the N in both the `[inline image N]`
+    placeholder and the `board.html#inline-image-N` attachment label, which is
+    how the judge ties a placeholder to the pixels it was handed. Both sides
+    walk THIS list rather than two regexes that could drift apart."""
+    return [(m.start(), m.end(), m.group(1), m.group(2))
+            for m in _DATA_URI_RE.finditer(text)
+            if len(m.group(2)) >= _DATA_URI_MIN_PAYLOAD]
+
+
+def _strip_inline_data_uris(text: str) -> str:
+    """`data:image/jpeg;base64,<payload>` -> `[inline image N: image/jpeg, 463
+    KB]`, for the evidence block only.
+
+    Only the payload goes. The enclosing tag and its `alt`/`title` attributes
+    stay exactly where they were — that caption is usually what the criterion
+    is about — so the page the judge reads keeps its structure and loses only
+    the characters it could never have read."""
+    spans = _inline_data_uris(text)
+    if not spans:
+        return text
+    out: list[str] = []
+    prev = 0
+    for n, (start, end, mime, payload) in enumerate(spans, 1):
+        out.append(text[prev:start])
+        out.append(f"[inline image {n}: {mime}, "
+                   f"{max(1, len(payload) * 3 // 4 // 1024)} KB]")
+        prev = end
+    out.append(text[prev:])
+    return "".join(out)
 
 
 def _is_within(path: Path, root: Path) -> bool:
@@ -1062,13 +1114,18 @@ def _linked_image_attachments(path: Path, root: Path, room: int) -> list[dict]:
     resolves to a real file inside the agent's own output tree, named
     `index.html#assets/chart.png`.
 
-    Only such references qualify. An `http(s)://` or protocol-relative URL, an
-    inline `data:` payload and an absolute filesystem path are all refused
-    outright, and the resolved target must still land under `root` — `..`
-    chains and symlinks are collapsed by resolve() first, so that single test
-    covers traversal and symlink escape together. The judge payload is built
-    from agent-authored text; a reference in it is a request, not a permission.
-    NEVER raises."""
+    Only such references qualify. An `http(s)://` or protocol-relative URL and
+    an absolute filesystem path are refused outright, and the resolved target
+    must still land under `root` — `..` chains and symlinks are collapsed by
+    resolve() first, so that single test covers traversal and symlink escape
+    together. The judge payload is built from agent-authored text; a reference
+    in it is a request, not a permission.
+
+    A `data:` payload is not a reference at all — nothing is fetched and
+    nothing outside the file is reachable — so the inline images
+    `_strip_inline_data_uris` took out of the evidence text are decoded back to
+    pixels HERE, on the one channel that already carries a page's images to the
+    judge. NEVER raises."""
     if room <= 0:
         return []
     import base64
@@ -1112,6 +1169,25 @@ def _linked_image_attachments(path: Path, root: Path, room: int) -> list[dict]:
         out.append({
             "name": f"{path.name}#{label}",
             "media_type": media,
+            "b64": base64.b64encode(data).decode("ascii"),
+        })
+    # ponytail: document order, so what `room` drops is the images lowest on
+    # the page — their `[inline image N]` placeholders stay in the text either
+    # way, and N still names the one the judge can see.
+    for n, (_start, _end, mime, payload) in enumerate(_inline_data_uris(text), 1):
+        if len(out) >= room:
+            break
+        if mime not in _IMAGE_MEDIA_TYPES.values():
+            continue
+        try:
+            data = base64.b64decode(payload)
+        except Exception:
+            continue
+        if not data or len(data) > _IMAGE_ATTACH_MAX_BYTES:
+            continue
+        out.append({
+            "name": f"{path.name}#inline-image-{n}",
+            "media_type": mime,
             "b64": base64.b64encode(data).decode("ascii"),
         })
     return out
@@ -1333,6 +1409,8 @@ def _deliverable_evidence_marker(path: Path) -> str | None:
     try:
         if _is_text_deliverable(path):
             body = path.read_text(encoding="utf-8", errors="replace")
+            if path.suffix.lower() in _LINKED_MEDIA_EXTS:
+                body = _strip_inline_data_uris(body)
             return f"\n----- DELIVERABLE: {path.name} -----\n{body}"
         if _is_image_deliverable(path):
             dims = _image_dimensions(path)

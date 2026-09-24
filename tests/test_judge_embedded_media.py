@@ -23,9 +23,10 @@ rubric-named, the 8-image / 3.5MB caps are the same caps, routing is still
 
 The linked-media half is also a trust boundary. The reference is agent-authored
 text in a file the agent wrote, so it is a request and not a permission:
-`http(s)://`, protocol-relative `//host/x.png`, inline `data:` payloads,
-absolute filesystem paths, `..` traversal and symlinks pointing out of the tree
-are all refused.
+`http(s)://`, protocol-relative `//host/x.png`, absolute filesystem paths,
+`..` traversal and symlinks pointing out of the tree are all refused. An
+inline `data:` payload is not a reference to anywhere and has its own path —
+see test_judge_inline_data_uris.py.
 """
 from __future__ import annotations
 
