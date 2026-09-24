@@ -264,3 +264,69 @@ def test_first_stall_restarts_the_gateway_before_resending(monkeypatch,
     assert result.gateway_proc is procs[2], (
         "the AgentExecution must carry the RELAUNCHED gateway; run_batch tears "
         "down whatever proc it finds there and would otherwise leak this one")
+
+
+# --- T4: the give-up branch must say WHICH class killed the turn -----------
+
+
+def test_give_up_logs_which_liveness_signal_was_silent(monkeypatch, tmp_path,
+                                                       caplog):
+    """A turn that dies at the deadline instead of stalling leaves no trace of
+    WHY: ledger §23's three lost runs (audrey, binta, nandini) each needed log
+    forensics on another host to tell a frozen stream from a slow one. One line
+    at give-up carries the verdict — and separating the run's OWN heartbeat
+    lane from the newest lane is what makes a sibling's traffic holding this
+    run's stall clock open visible instead of invisible."""
+    from src.agents.base import AgentTaskSpec
+    from src.agents.openclaw import OpenClawAgent
+
+    out = tmp_path / "out"
+    out.mkdir()
+    # Only the shared bridge lane is warm; this run's own lane never existed.
+    hb = tmp_path / "heartbeats"
+    hb.mkdir()
+    (hb / OpenClawAgent._HEARTBEAT_LANE_BRIDGE).write_text("")
+    monkeypatch.delenv("WCB_HEARTBEAT_HOST_DIR", raising=False)
+    monkeypatch.setenv("WCB_EMPTY_TURN_LIMIT", "0")
+    monkeypatch.setenv("WCB_TURN_STALL_SECONDS", "600")
+
+    for name in ("start_container", "inject_lobster_workspace",
+                 "inject_data_into_workspace", "inject_persona_into_workspace",
+                 "inject_openclaw_models", "inject_api_connectors",
+                 "run_warmup", "setup_skills", "setup_workspace",
+                 "snapshot_workspace_state", "write_turn_marker"):
+        monkeypatch.setattr(ocr, name, lambda *a, **k: None)
+    monkeypatch.setattr(ocr.time, "sleep", lambda *a, **k: None)
+    monkeypatch.setattr(ocr, "run_background",
+                        lambda *a, **k: _StubProc(pid=4242))
+    monkeypatch.setattr(ocr.subprocess, "run",
+                        lambda cmd, **kw: subprocess.CompletedProcess(
+                            cmd, 0, "", ""))
+
+    agent = OpenClawAgent(gateway_port=8080, image_model="")
+    for m in ("_set_bootstrap_limits", "_index_memory", "_set_model",
+              "_inject_auth", "_set_image_model"):
+        monkeypatch.setattr(agent, m, lambda *a, **k: None)
+    monkeypatch.setattr(agent, "_wait_for_llm_route_ready", lambda *a, **k: True)
+    monkeypatch.setattr(ocr.OpenClawAgent, "_wait_gateway_listening",
+                        staticmethod(lambda *a, **k: True))
+    agent.litellm_usage_log = str(tmp_path / "usage.jsonl")
+    monkeypatch.setattr(agent, "_run_key_bearer_live", lambda *a, **k: True)
+    monkeypatch.setattr(agent, "_count_run_key_rows", lambda *a, **k: 0)
+    monkeypatch.setattr(agent, "_turn_wait_outcome", lambda *a, **k: "timeout")
+
+    with caplog.at_level("WARNING"):
+        agent.run_task(AgentTaskSpec(
+            task_id="task-t4", task={}, workspace_path=str(tmp_path),
+            prompt="p", timeout_seconds=30, output_dir=out, model="m",
+            thinking=None, models_config=None, lobster=None))
+
+    line = [r.getMessage() for r in caplog.records
+            if "liveness at give-up" in r.getMessage()]
+    assert len(line) == 1, caplog.text
+    assert "own heartbeat never written" in line[0]
+    assert "newest lane 0s ago" in line[0], (
+        "a warm NEWEST lane beside a cold OWN lane is a sibling's traffic on "
+        "the shared bridge lane holding this run's stall clock open")
+    assert "0 successful sidecar row(s)" in line[0]
+    assert "stall threshold 600s" in line[0]

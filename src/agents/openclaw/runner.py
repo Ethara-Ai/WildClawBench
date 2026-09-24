@@ -486,6 +486,10 @@ class OpenClawAgent(BaseAgent):
             ch if (ch.isalnum() or ch in "._-") else "_" for ch in run_key
         )[:200]
 
+    @staticmethod
+    def _age_str(mtime: float, now: float) -> str:
+        return f"{now - mtime:.0f}s ago" if mtime else "never written"
+
     def _heartbeat_dir(self) -> str:
         """Host directory the heartbeat files land in, or "" when unknown.
 
@@ -499,8 +503,15 @@ class OpenClawAgent(BaseAgent):
             return ""
         return os.path.join(os.path.dirname(self.litellm_usage_log), "heartbeats")
 
-    def _heartbeat_mtime(self, run_key: str) -> float:
+    def _heartbeat_mtime(self, run_key: str, shared: bool = True) -> float:
         """Newest heartbeat mtime for this attempt, or 0.0 when there is none.
+
+        `shared=False` reads only the run's OWN lane, excluding the bridge's
+        cross-run lane. The guard itself always ORs both (a shared-lane write
+        is still proof that SOMETHING is moving upstream); the give-up
+        diagnostic asks for the run's own lane alone, because "my lane is cold
+        but the shared one is warm" is exactly a sibling's traffic holding this
+        run's stall clock open, and that is otherwise invisible.
 
         0.0 is the load-bearing value: a run whose sidecar predates the
         heartbeat module, whose call never streamed, or whose heartbeat dir was
@@ -511,7 +522,7 @@ class OpenClawAgent(BaseAgent):
         if not directory or not run_key:
             return 0.0
         names = [self._heartbeat_name(run_key)]
-        if os.environ.get("WCB_STALL_HEARTBEAT_SHARED_LANE", "1").strip() != "0":
+        if shared and os.environ.get("WCB_STALL_HEARTBEAT_SHARED_LANE", "1").strip() != "0":
             names.append(self._HEARTBEAT_LANE_BRIDGE)
         newest = 0.0
         for name in names:
@@ -1405,9 +1416,31 @@ class OpenClawAgent(BaseAgent):
                     # record it so the loss is visible as partial, not zero.
                     # Successful rows only — a turn that 400-stormed and then
                     # timed out did NO genuine work.
-                    if _rows_guarded and self._count_run_key_rows(
-                            _run_key, successes_only=True) > succ_before_turn:
-                        turns_partial.append(turn_index)
+                    if _rows_guarded:
+                        _succ_now = self._count_run_key_rows(
+                            _run_key, successes_only=True)
+                        # Which class killed this turn, in one line, so the next
+                        # batch needs no forensics. "timed out" with a cold OWN
+                        # lane and no new rows is a stream that froze without
+                        # the guard ever seeing it — the class that never
+                        # reaches the stall branch, so the gateway is never
+                        # restarted and the turn is never re-sent (ledger §23).
+                        # A cold own lane beside a WARM newest lane is the
+                        # other shape: a sibling's traffic on the shared bridge
+                        # lane held this run's stall clock open.
+                        _now = time.time()
+                        logger.warning(
+                            "[%s] turn %d liveness at give-up: own heartbeat "
+                            "%s, newest lane %s, %d successful sidecar row(s) "
+                            "since the turn started, stall threshold %.0fs",
+                            spec.task_id, turn_index + 1,
+                            self._age_str(
+                                self._heartbeat_mtime(_run_key, shared=False),
+                                _now),
+                            self._age_str(self._heartbeat_mtime(_run_key), _now),
+                            _succ_now - succ_before_turn, self._stall_seconds())
+                        if _succ_now > succ_before_turn:
+                            turns_partial.append(turn_index)
                     self._terminate_agent_invocations(spec.task_id)
                     agent_proc.kill()
                     agent_proc.wait()
