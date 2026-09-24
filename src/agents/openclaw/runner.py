@@ -555,6 +555,32 @@ class OpenClawAgent(BaseAgent):
             capture_output=True, text=True, timeout=30,
         )
 
+    @staticmethod
+    def _terminate_gateway(task_id: str) -> None:
+        """Kill the container's `openclaw gateway`, then drop the chat lock it
+        held. The gateway owns the in-flight stream AND chat.jsonl.lock for the
+        whole turn, and openclaw has no stream read-idle timeout: a stream that
+        freezes without closing wedges it permanently, so every re-send lands in
+        a process that will never answer (§21: 7/7 fatal, 630s of zero bytes).
+        Lock removal is ALSO here, after the KILL, so the relaunched gateway
+        never meets a lock whose holder pid is dead - the aleksei 1P run_4
+        FailoverError loop. The agent-kill copy (D-fixed) runs ~3s earlier
+        while the gateway still holds it: redundant, not harmful (a missing
+        lock is openclaw's happy path, O_EXCL create) and the only cleanup on
+        the give-up path at :1328, so it stays. `[o]`: as in the agent kill;
+        `openclaw agent` is a sibling docker exec, so the patterns don't
+        overlap."""
+        subprocess.run(
+            ["docker", "exec", task_id, "/bin/bash", "-lc",
+             "pkill -TERM -f '[o]penclaw gateway' 2>/dev/null || true; "
+             "sleep 2; "
+             "pkill -KILL -f '[o]penclaw gateway' 2>/dev/null || true; "
+             "sleep 1; "
+             "rm -f /root/.openclaw/agents/*/sessions/chat.jsonl.lock "
+             "/root/.openclaw/agents/*/sessions/chat.lock 2>/dev/null || true"],
+            capture_output=True, text=True, timeout=30,
+        )
+
     # The session store the retry loop must not double-write into. Hard-coded
     # to the same agent directory the stale-lock cleanup above already targets:
     # the agent CLI runs as the container's root under the default "main" agent.
@@ -1327,6 +1353,40 @@ class OpenClawAgent(BaseAgent):
                         self._terminate_agent_invocations(spec.task_id)
                         agent_proc.kill()
                         agent_proc.wait()
+                        # The gateway, not the agent CLI, is what is wedged: it
+                        # owns the frozen stream and the session lock, and the
+                        # old retry deliberately spared it — attempt 2 re-sent
+                        # into a process that could never answer (ledger §21).
+                        # ponytail: in-flight tool exec in the gateway is lost
+                        # on restart — the same exposure the existing
+                        # SIGKILL+rollback retry already accepts; the on-disk
+                        # transcript carries the turn.
+                        _glog = (gateway_log.read_text(errors="ignore")
+                                 if gateway_log.exists() else "")
+                        baseline = (_glog.count("listening on ws")
+                                    - _glog.count("already listening on ws"))
+                        logger.warning(
+                            "[%s] stall-guard: restarting the container gateway "
+                            "— it owns the wedged stream and the session lock "
+                            "(listen markers so far: %d)", spec.task_id, baseline)
+                        self._terminate_gateway(spec.task_id)
+                        gateway_proc.kill()
+                        gateway_proc.wait()
+                        close_proc_log(gateway_proc)
+                        gateway_proc = run_background(
+                            spec.task_id, bash_cmd=gateway_cmd,
+                            log_path=gateway_log, append=True)
+                        logger.info("[%s] stall-guard: gateway relaunched, "
+                                    "waiting for listen marker %d",
+                                    spec.task_id, baseline + 1)
+                        if self._wait_gateway_listening(
+                                spec.task_id, gateway_log, gateway_proc,
+                                baseline=baseline):
+                            time.sleep(1)
+                            logger.info("[%s] stall-guard: gateway back up "
+                                        "(PID=%s); re-sending turn %d",
+                                        spec.task_id, gateway_proc.pid,
+                                        turn_index + 1)
                         # After the kill + lock removal: nothing is writing,
                         # so the orphaned user row can be rolled back safely.
                         self._restore_session_to(
