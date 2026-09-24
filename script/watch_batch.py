@@ -29,27 +29,30 @@ RUN_INCOMPLETE_RE = re.compile(r"RUN INCOMPLETE: (\d+) of (\d+)")
 ABORTING_RE = re.compile(r"ABORTING RUN: (.*)")
 GIVE_UP_RE = re.compile(r"Agent turn \d+ (timed out|stalled twice)")
 
-TAIL_BYTES = 64 * 1024
-HEAD_BYTES = 4 * 1024
-
-
 def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _read_log_text(log_path: Path) -> str:
-    # Read head (first-turn line lives near the top) + tail (everything else
-    # of interest — turn progress, stalls, incomplete/abort markers — lives
-    # near the end). A multi-MB log makes a whole-file read wasteful; this
-    # keeps each poll cheap without a byte-offset cache.
-    size = log_path.stat().st_size
-    if size <= HEAD_BYTES + TAIL_BYTES:
-        return log_path.read_text(errors="ignore")
-    with log_path.open("rb") as fh:
-        head = fh.read(HEAD_BYTES)
-        fh.seek(max(0, size - TAIL_BYTES))
-        tail = fh.read()
-    return head.decode("utf-8", "ignore") + "\n" + tail.decode("utf-8", "ignore")
+    # Whole-file read, not a head/tail window: an aborted run keeps logging
+    # (grading-adjacent output, retries) AFTER its "ABORTING RUN:"/"timed
+    # out"/"stalled twice" line, which can push that line out of a
+    # fixed-size tail window on a multi-MB log — a real miss seen against
+    # gama's artifacts. Simplicity over a byte-offset cache; logs here are
+    # MBs, not GBs.
+    return log_path.read_text(errors="ignore")
+
+
+def _last_incomplete_reason(text: str):
+    # Union of the two "why did this run give up" markers, LAST occurrence
+    # by position — a run can retry (stall) before ultimately timing out or
+    # aborting, so only the final one is the true reason.
+    candidates = [(m.start(), m.group(1)) for m in ABORTING_RE.finditer(text)]
+    candidates += [(m.start(), m.group(1)) for m in GIVE_UP_RE.finditer(text)]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda c: c[0])
+    return candidates[-1][1]
 
 
 def _find_run_dirs(root: Path):
@@ -120,11 +123,32 @@ def scan(root: Path, state: dict) -> list:
         # watcher started after the batch did), and such a run should only
         # ever emit its terminal event — not a "launched" that immediately
         # contradicts it.
+        #
+        # score.failed.json wins outright, ahead of score.json and the log:
+        # a dead judge is ungraded no matter what turns_* fields the failure
+        # payload happens to carry, and no matter what a stale/leftover
+        # score.json next to it might say (grading.write_score enforces
+        # mutual exclusion going forward, but a watcher reading someone
+        # else's tree should not assume every historical writer did).
         score_path = run_dir / "score.json"
         failed_path = run_dir / "score.failed.json"
-        incomplete_m = RUN_INCOMPLETE_RE.search(text)
-        aborting_m = ABORTING_RE.search(text)
-        give_up_m = GIVE_UP_RE.search(text)
+
+        if failed_path.is_file():
+            try:
+                failed_score = json.loads(failed_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                failed_score = {}
+            reason = _grading_failure_reason(failed_score) or failed_score.get("error")
+            if reason:
+                reason = str(reason)[:120]
+            rec["terminal"] = True
+            rec["terminal_kind"] = "ungraded"
+            events.append({"ts": _now_iso(), "event": "ungraded",
+                            "task": task_id, "run": run_dir.name,
+                            "reason": reason,
+                            "turns_completed": failed_score.get("turns_completed"),
+                            "turns_planned": failed_score.get("turns_planned")})
+            continue
 
         if score_path.is_file():
             try:
@@ -132,14 +156,12 @@ def scan(root: Path, state: dict) -> list:
             except (OSError, ValueError):
                 score = None
             if isinstance(score, dict):
-                if score.get("run_incomplete") or "RUN INCOMPLETE" in text:
-                    reason = None
-                    if aborting_m:
-                        reason = aborting_m.group(1)
-                    elif give_up_m:
-                        reason = give_up_m.group(1)
-                    elif incomplete_m:
-                        reason = f"{incomplete_m.group(1)} of {incomplete_m.group(2)} turns"
+                if score.get("run_incomplete"):
+                    reason = _last_incomplete_reason(text)
+                    if reason is None:
+                        m = RUN_INCOMPLETE_RE.search(text)
+                        if m:
+                            reason = f"{m.group(1)} of {m.group(2)} turns"
                     rec["terminal"] = True
                     rec["terminal_kind"] = "incomplete"
                     events.append({
@@ -162,34 +184,17 @@ def scan(root: Path, state: dict) -> list:
                     })
             continue
 
-        if failed_path.is_file():
-            try:
-                failed_score = json.loads(failed_path.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                failed_score = {}
-            reason = _grading_failure_reason(failed_score) or failed_score.get("error")
-            if reason:
-                reason = str(reason)[:120]
-            rec["terminal"] = True
-            rec["terminal_kind"] = "ungraded"
-            events.append({"ts": _now_iso(), "event": "ungraded",
-                            "task": task_id, "run": run_dir.name,
-                            "reason": reason})
-            continue
-
-        if incomplete_m or aborting_m or give_up_m:
-            reason = None
-            if aborting_m:
-                reason = aborting_m.group(1)
-            elif give_up_m:
-                reason = give_up_m.group(1)
+        incomplete_m = RUN_INCOMPLETE_RE.search(text)
+        if incomplete_m:
+            reason = _last_incomplete_reason(text) or (
+                f"{incomplete_m.group(1)} of {incomplete_m.group(2)} turns")
             rec["terminal"] = True
             rec["terminal_kind"] = "incomplete"
             events.append({
                 "ts": _now_iso(), "event": "incomplete",
                 "task": task_id, "run": run_dir.name,
-                "turns_completed": int(incomplete_m.group(1)) if incomplete_m else None,
-                "turns_planned": int(incomplete_m.group(2)) if incomplete_m else rec["turns_planned"],
+                "turns_completed": int(incomplete_m.group(1)),
+                "turns_planned": int(incomplete_m.group(2)),
                 "reason": reason,
             })
             continue
