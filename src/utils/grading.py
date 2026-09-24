@@ -1052,7 +1052,14 @@ def _strip_inline_data_uris(text: str) -> str:
     Only the payload goes. The enclosing tag and its `alt`/`title` attributes
     stay exactly where they were — that caption is usually what the criterion
     is about — so the page the judge reads keeps its structure and loses only
-    the characters it could never have read."""
+    the characters it could never have read.
+
+    Deliberately asymmetric with the attachment half: stripping is
+    unconditional for every .html/.md block, while getting the pixels back
+    needs the file to be rubric-named and `WCB_JUDGE_ATTACH_IMAGES` unset.
+    Nothing is lost by that — the payload was unreadable text to the judge
+    either way, and under both settings it now costs a placeholder instead of
+    the whole deliverable budget."""
     spans = _inline_data_uris(text)
     if not spans:
         return text
@@ -1174,9 +1181,14 @@ def _linked_image_attachments(path: Path, root: Path, room: int) -> list[dict]:
     # ponytail: document order, so what `room` drops is the images lowest on
     # the page — their `[inline image N]` placeholders stay in the text either
     # way, and N still names the one the judge can see.
+    seen_payloads: set[bytes] = set()
     for n, (_start, _end, mime, payload) in enumerate(_inline_data_uris(text), 1):
         if len(out) >= room:
             break
+        # `image/jpg` is not a real media type but agents write it constantly,
+        # and the judge APIs reject it.
+        if mime == "image/jpg":
+            mime = "image/jpeg"
         if mime not in _IMAGE_MEDIA_TYPES.values():
             continue
         try:
@@ -1185,6 +1197,15 @@ def _linked_image_attachments(path: Path, root: Path, room: int) -> list[dict]:
             continue
         if not data or len(data) > _IMAGE_ATTACH_MAX_BYTES:
             continue
+        # A board that repeats one header logo on every card would otherwise
+        # spend the whole 8-image cap on copies of it and the photos the rubric
+        # grades would get no pixels at all. Deduped on the DECODED bytes, so
+        # differently-wrapped copies of one payload collapse too, and `n` still
+        # comes from the document-order walk: the label a judge is given keeps
+        # naming the placeholder it belongs to.
+        if data in seen_payloads:
+            continue
+        seen_payloads.add(data)
         out.append({
             "name": f"{path.name}#inline-image-{n}",
             "media_type": mime,

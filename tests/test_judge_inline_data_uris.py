@@ -29,6 +29,13 @@ _BIG_B64 = base64.b64encode(_BIG_JPEG).decode("ascii")
 _TINY_B64 = base64.b64encode(bytes(90)).decode("ascii")
 
 
+def _big_b64(i: int) -> str:
+    """A distinct 300 KB photo. Four copies of ONE payload would collapse to a
+    single attachment by the dedup, which is a different property."""
+    return base64.b64encode(
+        _BIG_JPEG[:4] + bytes([i + 1]) + _BIG_JPEG[5:]).decode("ascii")
+
+
 def _results(tmp_path: Path) -> Path:
     results = tmp_path / "task_output" / "artifacts" / "results"
     results.mkdir(parents=True)
@@ -126,12 +133,52 @@ def test_unattachable_and_corrupt_payloads_are_skipped_not_raised(tmp_path):
     assert base64.b64decode(got[0]["b64"]) == _BIG_JPEG
 
 
+def test_a_repeated_logo_does_not_eat_the_whole_cap(tmp_path):
+    results = _results(tmp_path)
+    logo = base64.b64encode(b"\x89PNG" + bytes(600)).decode("ascii")
+    photo = base64.b64encode(b"\xff\xd8\xff" + bytes(900)).decode("ascii")
+    (results / "board.html").write_text(
+        "".join(f'<img src="data:image/png;base64,{logo}" alt="logo">'
+                for _ in range(9))
+        + f'<img src="data:image/png;base64,{photo}" alt="the photo">',
+        encoding="utf-8")
+
+    got = grading._collect_image_attachments(
+        results, frozenset({"board.html"}))
+
+    # One logo, one photo - and N is still the document-order position, so the
+    # photo's label names the 10th placeholder in the text.
+    assert [a["name"] for a in got] == [
+        "board.html#inline-image-1", "board.html#inline-image-10"]
+    assert base64.b64decode(got[1]["b64"]) == b"\xff\xd8\xff" + bytes(900)
+
+
+def test_the_non_standard_image_jpg_type_still_ships_pixels(tmp_path):
+    results = _results(tmp_path)
+    (results / "board.html").write_text(
+        f'<img src="data:image/jpg;base64,{_BIG_B64}" alt="proof">',
+        encoding="utf-8")
+
+    marker = grading._deliverable_evidence_marker(results / "board.html")
+    got = grading._collect_image_attachments(
+        results, frozenset({"board.html"}))
+
+    # The text keeps the author's own spelling; the attachment is corrected to
+    # the media type the judge APIs actually accept.
+    assert "[inline image 1: image/jpg, 300 KB]" in marker
+    assert len(got) == 1
+    assert got[0]["media_type"] == "image/jpeg"
+    assert base64.b64decode(got[0]["b64"]) == _BIG_JPEG
+
+
 def test_the_image_cap_still_bounds_inline_attachments(tmp_path):
     results = _results(tmp_path)
-    small = base64.b64encode(bytes(600)).decode("ascii")
     (results / "board.html").write_text(
-        "".join(f'<img src="data:image/png;base64,{small}">'
-                for _ in range(grading._judge_max_images() + 4)),
+        "".join(
+            '<img src="data:image/png;base64,'
+            + base64.b64encode(bytes([i + 1]) + bytes(600)).decode("ascii")
+            + '">'
+            for i in range(grading._judge_max_images() + 4)),
         encoding="utf-8")
 
     got = grading._collect_image_attachments(
@@ -154,11 +201,11 @@ def test_a_1_2mb_inlined_board_is_no_longer_the_partial_block(tmp_path):
     markup = ("<p>row MIDDLE-SENTINEL-4417 hold</p>\n" * 800)[:30_000]
     board = (
         "<html><body>\n"
-        + f'<img src="data:image/jpeg;base64,{_BIG_B64}" alt="proof a">\n'
+        + f'<img src="data:image/jpeg;base64,{_big_b64(0)}" alt="proof a">\n'
         + markup
-        + f'<img src="data:image/jpeg;base64,{_BIG_B64}" alt="proof b">\n'
-        + f'<img src="data:image/jpeg;base64,{_BIG_B64}" alt="proof c">\n'
-        + f'<img src="data:image/jpeg;base64,{_BIG_B64}" alt="proof d">\n'
+        + f'<img src="data:image/jpeg;base64,{_big_b64(1)}" alt="proof b">\n'
+        + f'<img src="data:image/jpeg;base64,{_big_b64(2)}" alt="proof c">\n'
+        + f'<img src="data:image/jpeg;base64,{_big_b64(3)}" alt="proof d">\n'
         + "</body></html>\n"
     )
     (results / "board.html").write_text(board, encoding="utf-8")
@@ -175,7 +222,7 @@ def test_a_1_2mb_inlined_board_is_no_longer_the_partial_block(tmp_path):
     # The middle of the page - what the head+tail cut used to eat - is there.
     assert "MIDDLE-SENTINEL-4417" in ev
     assert "[inline image 4: image/jpeg, 300 KB]" in ev
-    assert _BIG_B64[:400] not in ev
+    assert _big_b64(3)[:400] not in ev
     assert grading._split_evidence(ev)[1] == transcript
 
     got = grading._collect_image_attachments(
