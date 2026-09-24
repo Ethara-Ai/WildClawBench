@@ -138,10 +138,11 @@ class TestWhisperRecipeParity:
     def test_layers_onto_the_base_without_mutating_its_runtime_env(self):
         directives = _directives(_AGENT_DOCKERFILE.read_text(encoding="utf-8"))
         assert directives[0] == "FROM %s" % _BASE_IMAGE
-        # Exactly one instruction total: the image must be v1.3 + whisper and
-        # nothing else, so a rollback is a pure tag flip. A persisted ENV here
-        # would also un-fix the proxy override the harness relies on at RUN time.
-        assert len(directives) == 2, directives
+        # RUNs only, and only these two: the image must be v1.3 + whisper +
+        # iproute2 and nothing else, so a rollback is a pure tag flip. A
+        # persisted ENV here would also un-fix the proxy override the harness
+        # relies on at RUN time.
+        assert len(directives) == 3, directives
         assert not [d for d in directives if d.startswith(("ENV ", "CMD ", "ENTRYPOINT ", "WORKDIR "))]
 
 

@@ -76,6 +76,14 @@ RUN unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY \
     && python3 -c "import whisper; whisper.load_model('small', download_root='/opt/wb_whisper_models')" \
     && mkdir -p /root/.cache && ln -sfn /opt/wb_whisper_models /root/.cache/whisper
 
+# iproute2 for `ss -K`: _break_stuck_llm_connections (runner.py:636-661) resets
+# the container's wedged sockets to the sidecar, and v1.3 has no `ss` at all -
+# every stall since has logged WCB_SS_UNAVAILABLE and done nothing. Placed
+# AFTER the whisper RUN so the ~20-minute torch layer stays cached.
+RUN unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY \
+    && apt-get update && apt-get install -y --no-install-recommends iproute2 \
+    && rm -rf /var/lib/apt/lists/*
+
 # No CMD/ENTRYPOINT/ENV/WORKDIR override — everything else about the runtime
 # contract (entrypoint, baked proxy env, workdir) is inherited unchanged from
 # v1.3 so this image is a drop-in replacement.
