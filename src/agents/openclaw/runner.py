@@ -802,6 +802,58 @@ class OpenClawAgent(BaseAgent):
             elif time.time() - last_progress > stall_s:
                 return "stalled"
 
+    @staticmethod
+    def _wait_gateway_listening(task_id: str, gateway_log: Path,
+                                gateway_proc, baseline: int = 0) -> bool:
+        """Poll gateway.log until the gateway reports it is listening, rather
+        than sleeping a fixed 2s. The gateway can take up to ~30s to become
+        ready (memory index, bootstrap-limit tuning, config-triggered
+        restarts). A fixed 2s wait raced the agent's websocket connect: on
+        a slow start the agent connected before the gateway was up, the
+        socket dropped with a "1006 abnormal closure", and the agent fell
+        back to EMBEDDED mode — where it makes no real tool/API calls, so
+        the audit is empty and every rubric/test scores 0. Waiting for the
+        readiness marker removes the race regardless of gateway start time.
+
+        `baseline` = SUCCESS-marker count already in the log; a RESTART must
+        wait for a NEW one, and gateway.log is appended across restarts so the
+        old marker is still there. Initial start passes 0, i.e. count > 0 —
+        exactly the old `"listening on ws" in text` test.
+
+        The subtraction is load-bearing: the only OTHER occurrence of the
+        literal in the v1.4 dist is GatewayLockError's `another gateway
+        instance is already listening on ws://…`, so a plain count reports
+        "back up" on the exact bind failure this poll exists to catch."""
+        ready_timeout = float(os.environ.get("OPENCLAW_GATEWAY_READY_TIMEOUT", "60"))
+        logger.info("[%s] Waiting for gateway to listen (up to %ds)...",
+                    task_id, int(ready_timeout))
+        deadline = time.time() + ready_timeout
+        # Iteration bound alongside the wall-clock deadline: terminates
+        # even under a frozen/stubbed clock (unit tests no-op time.sleep).
+        for _ in range(max(1, int(ready_timeout / 0.5))):
+            if time.time() >= deadline:
+                break
+            if gateway_proc.poll() is not None:
+                logger.error("[%s] Gateway process exited before listening "
+                             "(rc=%s) — see gateway.log", task_id,
+                             gateway_proc.returncode)
+                break
+            try:
+                if gateway_log.exists():
+                    text = gateway_log.read_text(errors="ignore")
+                    if (text.count("listening on ws")
+                            - text.count("already listening on ws")) > baseline:
+                        logger.info("[%s] Gateway is listening; launching agent",
+                                    task_id)
+                        return True
+            except OSError:
+                pass
+            time.sleep(0.5)
+        logger.warning("[%s] Gateway readiness marker not seen within "
+                       "%ds; proceeding anyway (agent may fall back to "
+                       "embedded mode)", task_id, int(ready_timeout))
+        return False
+
     def run_task(self, spec: AgentTaskSpec) -> AgentExecution:
         gateway_proc = None
         agent_proc = None
@@ -1070,48 +1122,11 @@ class OpenClawAgent(BaseAgent):
                 bash_cmd=gateway_cmd,
                 log_path=spec.output_dir / "gateway.log",
             )
-            # Poll gateway.log until the gateway reports it is listening, rather
-            # than sleeping a fixed 2s. The gateway can take up to ~30s to become
-            # ready (memory index, bootstrap-limit tuning, config-triggered
-            # restarts). A fixed 2s wait raced the agent's websocket connect: on
-            # a slow start the agent connected before the gateway was up, the
-            # socket dropped with a "1006 abnormal closure", and the agent fell
-            # back to EMBEDDED mode — where it makes no real tool/API calls, so
-            # the audit is empty and every rubric/test scores 0. Waiting for the
-            # readiness marker removes the race regardless of gateway start time.
             gateway_log = spec.output_dir / "gateway.log"
-            ready_timeout = float(os.environ.get("OPENCLAW_GATEWAY_READY_TIMEOUT", "60"))
-            logger.info("[%s] Waiting for gateway to listen (up to %ds)...",
-                        spec.task_id, int(ready_timeout))
-            deadline = time.time() + ready_timeout
-            gateway_ready = False
-            # Iteration bound alongside the wall-clock deadline: terminates
-            # even under a frozen/stubbed clock (unit tests no-op time.sleep).
-            for _ in range(max(1, int(ready_timeout / 0.5))):
-                if time.time() >= deadline:
-                    break
-                if gateway_proc.poll() is not None:
-                    logger.error("[%s] Gateway process exited before listening "
-                                 "(rc=%s) — see gateway.log", spec.task_id,
-                                 gateway_proc.returncode)
-                    break
-                try:
-                    if gateway_log.exists() and "listening on ws" in \
-                            gateway_log.read_text(errors="ignore"):
-                        gateway_ready = True
-                        break
-                except OSError:
-                    pass
-                time.sleep(0.5)
-            if gateway_ready:
+            if self._wait_gateway_listening(spec.task_id, gateway_log,
+                                            gateway_proc):
                 # Small settle margin so the ws server is fully accepting conns.
                 time.sleep(1)
-                logger.info("[%s] Gateway is listening; launching agent",
-                            spec.task_id)
-            else:
-                logger.warning("[%s] Gateway readiness marker not seen within "
-                               "%ds; proceeding anyway (agent may fall back to "
-                               "embedded mode)", spec.task_id, int(ready_timeout))
             # LLM route probe (OAuth/sidecar path): confirm the gateway can
             # actually complete a model round-trip before the first turn.
             self._wait_for_llm_route_ready(spec.task_id)

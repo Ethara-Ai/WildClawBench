@@ -6,7 +6,9 @@ frozen upstream stream and `chat.jsonl.lock`. 7/7 such stalls were fatal.
 
 T1 pins the kill script's `[o]`-class pattern (a bare `openclaw agent` pattern
 also matches the wrapper shell's own cmdline, so the shell SIGTERMs itself and
-the SIGKILL + lock removal never run).
+the SIGKILL + lock removal never run). T2 pins the readiness poll's marker
+arithmetic, which a restart depends on because gateway.log is appended across
+gateway lifetimes.
 """
 from __future__ import annotations
 
@@ -107,3 +109,52 @@ def test_kill_script_survives_its_own_pattern(tmp_path, terminator):
         if decoy.poll() is None:
             decoy.kill()
         decoy.wait()
+
+
+# --- T2: a restart must wait for a NEW marker, and a bind failure is not one --
+
+_LISTEN = "INFO gateway listening on ws://0.0.0.0:8080\n"
+_BIND_FAIL = ("ERROR GatewayLockError: another gateway instance is already "
+              "listening on ws://0.0.0.0:8080\n")
+
+
+class _AliveProc:
+    pid = 4242
+    returncode = None
+
+    def poll(self):
+        return None
+
+
+def _wait(log: Path, baseline: int) -> bool:
+    return ocr.OpenClawAgent._wait_gateway_listening(
+        "task-t2", log, _AliveProc(), baseline=baseline)
+
+
+def test_restart_waits_for_a_new_listen_marker(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENCLAW_GATEWAY_READY_TIMEOUT", "1")
+    log = tmp_path / "gateway.log"
+    log.write_text(_LISTEN)
+
+    assert _wait(log, 0) is True, (
+        "baseline 0 is the initial start and must behave exactly like the old "
+        "`'listening on ws' in text` test")
+    assert _wait(log, 1) is False, (
+        "gateway.log is opened with append=True across restarts, so the "
+        "PREVIOUS lifetime's marker is still in the file; counting it as "
+        "readiness returns before the new gateway has bound anything")
+
+    with log.open("a") as fh:
+        fh.write(_LISTEN)
+    assert _wait(log, 1) is True
+
+
+def test_bind_failure_is_not_read_as_ready(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENCLAW_GATEWAY_READY_TIMEOUT", "1")
+    log = tmp_path / "gateway.log"
+    log.write_text(_LISTEN + _BIND_FAIL)
+
+    assert _wait(log, 1) is False, (
+        "GatewayLockError's 'another gateway instance is already listening on "
+        "ws://…' contains the readiness literal, so a plain count reports the "
+        "gateway back up on the exact bind failure this poll exists to catch")
