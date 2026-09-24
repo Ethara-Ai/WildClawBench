@@ -991,8 +991,8 @@ class TestStallGuard:
         ocr.OpenClawAgent._terminate_agent_invocations("task-x")
         joined = " ".join(captured["cmd"])
         assert "docker exec task-x" in joined
-        assert "pkill -TERM -f 'openclaw agent'" in joined
-        assert "pkill -KILL -f 'openclaw agent'" in joined
+        assert "pkill -TERM -f '[o]penclaw agent'" in joined
+        assert "pkill -KILL -f '[o]penclaw agent'" in joined
         assert "openclaw gateway" not in joined
         assert "sessions/chat.jsonl.lock" in joined, (
             "stale chat-session locks from killed agents must be removed or "

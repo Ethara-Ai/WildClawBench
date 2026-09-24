@@ -538,12 +538,17 @@ class OpenClawAgent(BaseAgent):
         FailoverError for hours; the exact path comes from that incident
         log). Scoped to chat* deliberately: a bare sessions/*.lock also
         deletes locks of gateway-hosted sub-agent child sessions that the
-        pkill deliberately does NOT kill - a real two-writer exposure."""
+        pkill deliberately does NOT kill - a real two-writer exposure.
+
+        The `[o]` class is load-bearing: a bare 'openclaw agent' pattern also
+        matches THIS wrapper shell's own cmdline, so the shell SIGTERMs itself
+        (rc=143) and everything after the first pkill - the SIGKILL and the
+        lock removal - never runs (reproduced in image v1.3, ledger §21)."""
         subprocess.run(
             ["docker", "exec", task_id, "/bin/bash", "-lc",
-             "pkill -TERM -f 'openclaw agent' 2>/dev/null || true; "
+             "pkill -TERM -f '[o]penclaw agent' 2>/dev/null || true; "
              "sleep 2; "
-             "pkill -KILL -f 'openclaw agent' 2>/dev/null || true; "
+             "pkill -KILL -f '[o]penclaw agent' 2>/dev/null || true; "
              "sleep 1; "
              "rm -f /root/.openclaw/agents/*/sessions/chat.jsonl.lock "
              "/root/.openclaw/agents/*/sessions/chat.lock 2>/dev/null || true"],
