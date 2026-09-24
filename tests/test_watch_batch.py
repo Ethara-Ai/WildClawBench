@@ -82,6 +82,26 @@ def test_stale_score_json_next_to_score_failed_json_still_ungraded(tmp_path):
     assert [ev["event"] for ev in events] == ["ungraded"]
 
 
+def test_render_shows_header_counts_running_row_and_recent(batch_root):
+    _make_run(
+        batch_root, "openclaw", "task_running", "model_x", "run_1",
+        log_lines=["Agent turn 2/5 starting"],
+    )
+    state = {}
+    events = watch_batch.scan(batch_root, state)
+    block = watch_batch.render(state, events)
+
+    assert "batch progress" in block
+    assert "launched 4" in block
+    assert "completed 1" in block
+    assert "incomplete 0" in block
+    assert "ungraded 1" in block
+    assert "running 2" in block
+    assert "task_running" in block
+    assert "2/5" in block
+    assert "completed task_b 80.0%" in block
+
+
 def test_incomplete_reason_found_past_a_large_tail_of_later_log_output(tmp_path):
     # Regression: the give-up line sits well before a lot of later,
     # unrelated log output (grading-adjacent lines) — 200KB+ of it — which

@@ -104,7 +104,7 @@ def scan(root: Path, state: dict) -> list:
         rec = state.setdefault(key, {
             "task": task_id, "run": run_dir.name, "turn": 0,
             "turns_planned": None, "stall_count": 0, "gateway_restarts": 0,
-            "launched": False, "terminal": False,
+            "launched": False, "terminal": False, "launched_at": time.time(),
         })
         if rec["terminal"]:
             continue
@@ -112,6 +112,7 @@ def scan(root: Path, state: dict) -> list:
         log_path = run_dir / "harness_debug.log"
         if not log_path.is_file():
             continue
+        rec["log_path"] = str(log_path)
 
         try:
             text = _read_log_text(log_path)
@@ -174,6 +175,9 @@ def scan(root: Path, state: dict) -> list:
                 else:
                     rec["terminal"] = True
                     rec["terminal_kind"] = "completed"
+                    rec["score"] = score.get("overall_score")
+                    rec["abstained"] = score.get("criteria_abstained")
+                    rec["criteria_total"] = score.get("criteria_total")
                     events.append({
                         "ts": _now_iso(), "event": "completed",
                         "task": task_id, "run": run_dir.name,
@@ -229,29 +233,102 @@ def scan(root: Path, state: dict) -> list:
     return events
 
 
-def _summarize(state: dict) -> str:
-    counts = {"launched": 0, "running": 0, "completed": 0,
-              "incomplete": 0, "ungraded": 0}
+def _fmt_duration(seconds) -> str:
+    if seconds is None:
+        return "?"
+    seconds = max(0, int(seconds))
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m"
+
+
+def _fmt_recent(ev: dict) -> str:
+    kind, task = ev["event"], ev["task"]
+    if kind == "completed":
+        score = ev.get("score")
+        pct = f"{score * 100:.1f}%" if score is not None else "?"
+        return f"completed {task} {pct}"
+    if kind == "incomplete":
+        reason = ev.get("reason") or "?"
+        return (f"incomplete {task} "
+                f"{ev.get('turns_completed')}/{ev.get('turns_planned')} {reason}")
+    if kind == "ungraded":
+        return f"ungraded {task} {ev.get('reason') or '?'}"
+    return f"{kind} {task}"
+
+
+def _rule(label: str, width: int = 80, fill: str = "\u2500") -> str:
+    prefix = f"{fill}{fill} {label} "
+    return prefix + fill * max(4, width - len(prefix))
+
+
+def render(state: dict, events: list) -> str:
+    """Render one presentation block for the current state + this tick's events."""
+    now = time.time()
+    counts = {"launched": 0, "completed": 0, "incomplete": 0, "ungraded": 0, "running": 0}
+    scores, abstains_total, criteria_total = [], 0, 0
+    stall_total = gateway_restart_total = 0
     running = []
     for rec in state.values():
+        stall_total += rec.get("stall_count", 0)
+        gateway_restart_total += rec.get("gateway_restarts", 0)
         if rec["terminal"]:
             counts["launched"] += 1
             kind = rec.get("terminal_kind", "completed")
             counts[kind] = counts.get(kind, 0) + 1
+            if kind == "completed" and rec.get("score") is not None:
+                scores.append(rec["score"])
+            abstains_total += rec.get("abstained") or 0
+            criteria_total += rec.get("criteria_total") or 0
         elif rec["launched"]:
             counts["launched"] += 1
             counts["running"] += 1
-            running.append(f"{rec['task']}@{rec['turn']}/{rec['turns_planned'] or '?'}")
-    running_str = ", ".join(running[:8])
-    if len(running) > 8:
-        running_str += f", +{len(running) - 8} more"
-    ts = datetime.now().strftime("%H:%M")
-    line = (f"{ts}  launched={counts['launched']} running={counts['running']} "
-            f"completed={counts['completed']} incomplete={counts['incomplete']} "
-            f"ungraded={counts['ungraded']}")
-    if running_str:
-        line += f"  | running: {running_str}"
-    return line
+            elapsed = now - rec.get("launched_at", now)
+            last_activity = None
+            log_path = rec.get("log_path")
+            if log_path:
+                try:
+                    last_activity = now - Path(log_path).stat().st_mtime
+                except OSError:
+                    pass
+            running.append((elapsed, rec, last_activity))
+    running.sort(key=lambda r: r[0], reverse=True)
+
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    lines = [_rule(f"batch progress  {ts}", fill="\u2501")]
+    lines.append(f"  launched {counts['launched']:<4}completed {counts['completed']:<4}"
+                 f"incomplete {counts['incomplete']:<4}ungraded {counts['ungraded']:<4}"
+                 f"running {counts['running']}")
+    if scores:
+        score_str = (f"mean {sum(scores) / len(scores) * 100:.1f}%  "
+                     f"min {min(scores) * 100:.1f}%  max {max(scores) * 100:.1f}%")
+    else:
+        score_str = "mean --  min --  max --"
+    lines.append(f"  scores: {score_str}   |  abstains {abstains_total}/{criteria_total}"
+                 f"   |  stalls {stall_total}   gateway restarts {gateway_restart_total}")
+
+    lines.append(_rule("running"))
+    if running:
+        lines.append(f"  {'task':<34}  {'turn':<9} {'elapsed':<9} last activity")
+        for elapsed, rec, last_activity in running:
+            turn_str = f"{rec['turn']}/{rec['turns_planned'] or '?'}"
+            lines.append(f"  {rec['task'][:34]:<34}  {turn_str:<9} "
+                         f"{_fmt_duration(elapsed):<9} "
+                         f"{_fmt_duration(last_activity) + ' ago' if last_activity is not None else '?'}")
+    else:
+        lines.append("  (none)")
+
+    recent = [ev for ev in events if ev["event"] in ("completed", "incomplete", "ungraded")][-3:]
+    if recent:
+        lines.append(_rule("recent"))
+        for ev in recent:
+            lines.append("  " + _fmt_recent(ev))
+
+    return "\n".join(lines)
 
 
 def main() -> None:
@@ -274,7 +351,13 @@ def main() -> None:
             with log_path.open("a", encoding="utf-8") as fh:
                 for ev in events:
                     fh.write(json.dumps(ev, ensure_ascii=False) + "\n")
-        print(_summarize(state))
+        block = render(state, events)
+        if sys.stdout.isatty():
+            sys.stdout.write("\033[2J\033[H")
+            print(block)
+        else:
+            print(block)
+            print()
         sys.stdout.flush()
 
     if args.once:
